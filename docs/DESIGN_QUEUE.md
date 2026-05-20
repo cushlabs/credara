@@ -27,9 +27,9 @@ portability requirement.
 privileged ports or root-owned paths).
 
 **How to apply.**
-- **Images:** build on distroless *nonroot* variants; set a non-root `USER` in every
-  Dockerfile; no `setuid` binaries; read-only root filesystem where possible with explicit
-  writable volumes for state.
+- **Images:** build on the Fedora Hummingbird hardened distroless base images (see DQ-4),
+  *nonroot* variants; set a non-root `USER` in every Dockerfile; no `setuid` binaries;
+  read-only root filesystem where possible with explicit writable volumes for state.
 - **Binaries:** bind only to unprivileged ports (>=1024); never assume write access outside
   declared data/cache volumes; no reliance on root-owned config paths.
 - **Helm / k8s:** pod and container `securityContext` set
@@ -118,6 +118,55 @@ unmodified Helm chart under the restricted Pod Security Standard.
 
 ---
 
+## DQ-4 — Container base images: Fedora Hummingbird (FIPS, distroless) — REQUIRED
+
+**Requirement.** All Creda container images — both **build** stages and **runtime** stages,
+for every binary — are based on **Fedora Hummingbird** hardened distroless images, using the
+**FIPS-validated variants by default**.
+
+**What Hummingbird is.** A catalog of minimal, hardened, distroless OCI images (no package
+manager, no shell, just the app and its strict runtime deps) kept at near-zero CVE via
+reproducible builds from pinned package lists and continuous Syft/Grype scanning, with FIPS
+variants and multi-arch support (x86_64 and **aarch64**). It ships images for our exact
+stacks: a **Rust** image (Core, Export Gate, Verifier) and an **OpenJDK** image (the HAPI
+FHIR Bridge).
+
+**Decided scope.** Container images only. Creda standardizes its build and runtime base
+images on Hummingbird; the **host OS remains the operator's choice** (Hummingbird also ships
+a bootable read-only-root OS, noted here as an option operators may adopt for extra posture,
+but Creda does not require it).
+
+**Why.**
+- **Lower attack surface + near-zero CVE.** Distroless removes the shell and package
+  manager; Hummingbird's pipeline rebuilds and reships on upstream patches, keeping CVE
+  counts near zero — a meaningful upgrade over a static generic distroless base.
+- **FIPS by default fits the domain.** PHI handling and Creda's FIPS 204 (ML-DSA-65) /
+  FIPS 205 (SLH-DSA) post-quantum signature choices align with FIPS-validated crypto in the
+  base image; many healthcare and federal deployments require it.
+- **Reinforces DQ-1.** Distroless nonroot images are exactly what the non-root requirement
+  needs; pairs cleanly with read-only root filesystem and dropped capabilities.
+
+**How to apply.**
+- **Dockerfiles (M8):** multi-stage — Hummingbird Rust image as the Rust builder → Hummingbird
+  minimal distroless (FIPS) runtime for Core/Export Gate/Verifier; Hummingbird OpenJDK image
+  as the Bridge builder/runtime (FIPS). Pin image digests; non-root `USER`.
+- **Defaults & opt-out:** FIPS variant is the default tag; a documented non-FIPS opt-out
+  exists for deployments that explicitly do not need it.
+- **Multi-arch:** publish x86_64 and aarch64 (Hummingbird supports both).
+- **CI (M8):** the existing "no root" gate (DQ-1) plus a base-image check that fails if an
+  image is not a pinned Hummingbird base; surface the Grype/CVE status in CI.
+
+**Acceptance criteria.** Every Creda image FROMs a pinned Fedora Hummingbird base (FIPS by
+default); images run non-root under the restricted Pod Security Standard (DQ-1); a CVE scan
+of the shipped images shows near-zero high/critical findings; images build and run on both
+x86_64 and aarch64.
+
+**Supersedes.** The generic "distroless" base-image choice (spec §10.6 / the original
+decision record). This is a *specialization* of "distroless," not a contradiction — Creda's
+distroless base is now specifically Fedora Hummingbird.
+
+---
+
 ## Decisions log (for these items)
 
 | Item | Decision | Date |
@@ -125,3 +174,4 @@ unmodified Helm chart under the restricted Pod Security Standard.
 | DQ-1 | Non-root is a hard requirement in all environments | 2026-05-20 |
 | DQ-2 | Ansible automates **deploy onto existing cluster** (not host provisioning) | 2026-05-20 |
 | DQ-3 | Test bed provides **both** Compose (fast) and kind/k3d (production-like) paths | 2026-05-20 |
+| DQ-4 | Base images = **Fedora Hummingbird**, **FIPS by default**, **container images only** (host OS = operator's choice) | 2026-05-20 |

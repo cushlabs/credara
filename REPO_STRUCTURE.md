@@ -83,7 +83,8 @@ creda/
 │
 ├── deploy/                    # M8 — deployment packaging. Same image + same Helm chart
 │   │                          #   must run on laptop, on-prem, and cloud (config only).
-│   ├── docker/                #   Multi-stage Dockerfiles (distroless NONROOT) per binary.
+│   ├── docker/                #   Multi-stage Dockerfiles on Fedora Hummingbird distroless
+│   │                          #   NONROOT base (FIPS by default, DQ-4) per binary.
 │   ├── compose/               #   Docker Compose for laptop dev.
 │   ├── helm/creda/            #   Helm chart: StatefulSet, Services, ConfigMap, RBAC,
 │   │                          #   NetworkPolicy, PDB, CronJobs; non-root securityContext (DQ-1).
