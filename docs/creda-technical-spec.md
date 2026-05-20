@@ -1278,7 +1278,7 @@ This is one of the more sensitive operations and requires elevated authorization
 
 #### 8.2.9 Operation: $creda-authorize, $creda-revoke, $creda-verify, $creda-export
 
-These four operations expose the portable authorization layer (Section 4) through FHIR. They operate on the FathomAuthorization-equivalent profile (CredaAuthorization, based on FHIR Consent) and are the FHIR-side surface for the authorization event types.
+These four operations expose the portable authorization layer (Section 4) through FHIR. They operate on the CredaAuthorization profile (based on FHIR Consent) and are the FHIR-side surface for the authorization event types.
 
 ```
 POST Patient/[id]/$creda-authorize
