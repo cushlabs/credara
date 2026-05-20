@@ -41,8 +41,7 @@ creda/
 │   ├── creda-technical-spec.md   # AUTHORITATIVE specification, Sections 1–13 + appendices.
 │   ├── creda-technical-spec.pdf  # Rendered spec for non-technical reviewers.
 │   ├── COWORK_CONTEXT.md         # Context & decision history (the "why").
-│   ├── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
-│   └── creda-fathom-diff.md      # Diff analysis vs. the sibling "Fathom" spec.
+│   └── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
 │
 ├── crates/                    # The Rust workspace members (Core, Export Gate, Verifier).
 │   ├── creda-events/          # M1 — event node schema, 10 event types, canonical CBOR,
