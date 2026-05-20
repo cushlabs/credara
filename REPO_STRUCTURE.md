@@ -15,6 +15,12 @@ the `pqcrypto` family, ciborium, blake3, SPIRE, cert-manager, and others. If a
 component starts reimplementing a gossip protocol, a DHT, a FHIR server, or a crypto
 primitive, that is a mistake — assemble it instead.
 
+**Cross-cutting requirements** that constrain how milestones are built are tracked in
+`docs/DESIGN_QUEUE.md`. Notably, **every container runs non-root** in all environments
+(DQ-1) — a hard requirement, not a per-deployment default. Deployment automation for an
+existing cluster lives in `deploy/ansible/` (DQ-2); the local multi-peer test bed lives in
+`testbed/` (DQ-3).
+
 ## Top-level layout
 
 ```
@@ -41,7 +47,8 @@ creda/
 │   ├── creda-technical-spec.md   # AUTHORITATIVE specification, Sections 1–13 + appendices.
 │   ├── creda-technical-spec.pdf  # Rendered spec for non-technical reviewers.
 │   ├── COWORK_CONTEXT.md         # Context & decision history (the "why").
-│   └── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
+│   ├── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
+│   └── DESIGN_QUEUE.md           # Queued design reqs (DQ-1 non-root, DQ-2 ansible, DQ-3 testbed).
 │
 ├── crates/                    # The Rust workspace members (Core, Export Gate, Verifier).
 │   ├── creda-events/          # M1 — event node schema, 10 event types, canonical CBOR,
@@ -76,13 +83,19 @@ creda/
 │
 ├── deploy/                    # M8 — deployment packaging. Same image + same Helm chart
 │   │                          #   must run on laptop, on-prem, and cloud (config only).
-│   ├── docker/                #   Multi-stage Dockerfiles (distroless) per binary.
+│   ├── docker/                #   Multi-stage Dockerfiles (distroless NONROOT) per binary.
 │   ├── compose/               #   Docker Compose for laptop dev.
-│   └── helm/creda/            #   Helm chart: StatefulSet, Services, ConfigMap, RBAC,
-│                              #   NetworkPolicy, PodDisruptionBudget, CronJobs.
-│                              #   Spec §10.5, §10.6, §7.4, §11.
+│   ├── helm/creda/            #   Helm chart: StatefulSet, Services, ConfigMap, RBAC,
+│   │                          #   NetworkPolicy, PDB, CronJobs; non-root securityContext (DQ-1).
+│   └── ansible/               #   Deploy onto an existing cluster: cert-manager + SPIRE +
+│                              #   Helm release, idempotent (DQ-2). Spec §10.5, §10.6, §7.4, §11.
 │
-└── tools/                     # Dev utilities and scripts (e.g., local multi-peer harness).
+├── testbed/                   # Local multi-peer test bed (DQ-3); same scenarios, two paths.
+│   ├── compose/               #   Fast multi-peer bring-up (Docker Compose).
+│   ├── kind/                  #   Production-fidelity: real Helm chart on kind/k3d, non-root.
+│   └── scenarios/             #   Shared, runner-agnostic scenario library (also used by M9).
+│
+└── tools/                     # Dev utilities and scripts.
 ```
 
 ## How the structure fills in over time
