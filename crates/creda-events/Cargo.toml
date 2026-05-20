@@ -1,0 +1,37 @@
+[package]
+name = "creda-events"
+description = "Creda event model: signed DAG event nodes, canonical CBOR, Blake3, UUIDv7, and algorithm-agile signatures (spec §3, §4, §5)."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# PQC (ML-DSA-65, SLH-DSA-256s, and the Ed25519+ML-DSA hybrid) is on by default but
+# feature-gated, so a first build can fall back to `--no-default-features` (Ed25519 only)
+# if the pqcrypto C-backed crates need version/toolchain attention. The SignatureAlgorithm
+# enum always carries all four variants regardless, so the on-wire schema is stable.
+default = ["pqc"]
+pqc = ["dep:pqcrypto-mldsa", "dep:pqcrypto-sphincsplus", "dep:pqcrypto-traits"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ciborium = "0.2"
+blake3 = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+thiserror = "1"
+
+# --- PQC (feature = "pqc") ----------------------------------------------------------------
+# NOTE TO FIRST BUILDER: these pqcrypto crates wrap C reference implementations; crate
+# names, module paths, and exact versions are the items most likely to need a small
+# adjustment on first compile. They are isolated in src/crypto/pqc.rs to keep any fix local.
+pqcrypto-mldsa = { version = "0.1", optional = true }
+pqcrypto-sphincsplus = { version = "0.7", optional = true }
+pqcrypto-traits = { version = "0.3", optional = true }
+
+[dev-dependencies]
+hex = "0.4"

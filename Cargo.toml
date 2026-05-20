@@ -1,9 +1,10 @@
 # Creda Rust workspace.
-# Members are added per milestone (M1 creda-events first). Empty at M0 so the
-# workspace builds green before any component code lands. See REPO_STRUCTURE.md.
+# Members are added per milestone. See REPO_STRUCTURE.md.
 [workspace]
 resolver = "2"
-members = []
+members = [
+    "crates/creda-events", # M1 — event model (spec §3, §4, §5)
+]
 
 [workspace.package]
 edition = "2021"
