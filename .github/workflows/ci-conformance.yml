@@ -1,0 +1,17 @@
+name: ci-conformance
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run conformance suite
+        run: |
+          if [ -x conformance/run.sh ]; then
+            conformance/run.sh
+          else
+            echo "Conformance suite not implemented yet (grows per milestone, full at M9) - skipping."
+          fi

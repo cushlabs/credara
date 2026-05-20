@@ -1,0 +1,54 @@
+# ---- Rust ----
+/target
+**/target
+*.rs.bk
+# Cargo.lock IS committed for the workspace (binaries + reproducible builds).
+# If a member crate is a pure library published to crates.io, it may ignore its own lock.
+
+# ---- Java / Kotlin / Gradle (bridge/) ----
+bridge/build/
+bridge/.gradle/
+**/build/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+.gradletasknamecache
+
+# ---- Node (tooling, docs rendering) ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Secrets / credentials (NEVER commit) ----
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+.env
+.env.*
+!.env.example
+secrets/
+*-credentials.*
+*.kubeconfig
+
+# ---- Synthetic / generated data (regenerate from the M9 generator) ----
+/data/
+*.ndjson
+!conformance/**/fixtures/**
+
+# ---- Build / packaging output ----
+/dist/
+*.tar.gz
+charts/*.tgz
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml

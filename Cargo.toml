@@ -1,0 +1,21 @@
+# Creda Rust workspace.
+# Members are added per milestone (M1 creda-events first). Empty at M0 so the
+# workspace builds green before any component code lands. See REPO_STRUCTURE.md.
+[workspace]
+resolver = "2"
+members = []
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.78"
+license = "Apache-2.0"
+repository = "https://github.com/REPLACE_ME/creda"
+authors = ["The Creda Authors"]
+
+# Shared dependency versions are declared here as crates are added (M1+),
+# e.g. ciborium, blake3, uuid, ed25519-dalek, pqcrypto-*, tokio, tonic.
+[workspace.dependencies]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

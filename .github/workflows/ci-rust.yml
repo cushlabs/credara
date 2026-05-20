@@ -1,0 +1,38 @@
+name: ci-rust
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Detect workspace members
+        id: members
+        run: |
+          if grep -qE '^\s*members\s*=\s*\[\s*\]' Cargo.toml; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            echo "Workspace has no members yet (M0 placeholder) - skipping build/test."
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Format check
+        if: steps.members.outputs.empty == 'false'
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        if: steps.members.outputs.empty == 'false'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        if: steps.members.outputs.empty == 'false'
+        run: cargo test --workspace
+      - name: Release build
+        if: steps.members.outputs.empty == 'false'
+        run: cargo build --workspace --release
+      - name: Manifest sanity (always)
+        run: cargo metadata --no-deps --format-version 1 > /dev/null && echo "Cargo manifest valid."

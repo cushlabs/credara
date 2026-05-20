@@ -1,0 +1,30 @@
+name: ci-java
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect bridge build
+        id: bridge
+        run: |
+          if [ -f bridge/build.gradle ] || [ -f bridge/build.gradle.kts ] || [ -f bridge/pom.xml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No bridge build file yet (added in M7) - skipping."
+          fi
+      - name: Set up JDK
+        if: steps.bridge.outputs.present == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and test bridge
+        if: steps.bridge.outputs.present == 'true'
+        working-directory: bridge
+        run: |
+          if [ -f gradlew ]; then ./gradlew build --no-daemon; else echo "Add build invocation when bridge lands."; fi

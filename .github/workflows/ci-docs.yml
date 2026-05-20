@@ -1,0 +1,43 @@
+name: ci-docs
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs presence
+        run: |
+          test -f docs/creda-technical-spec.md || { echo "Missing spec markdown"; exit 1; }
+          echo "Spec present."
+      - name: Validate internal markdown links
+        run: |
+          python3 - <<'PY'
+          import re, os, sys, glob, urllib.parse
+          root = os.getcwd()
+          md_files = glob.glob('**/*.md', recursive=True)
+          bad = []
+          link_re = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
+          for f in md_files:
+              with open(f, encoding='utf-8', errors='ignore') as fh:
+                  text = fh.read()
+              for m in link_re.finditer(text):
+                  target = m.group(1).strip()
+                  if target.startswith(('http://','https://','mailto:','#','computer://')):
+                      continue
+                  path = target.split('#',1)[0]
+                  if not path:
+                      continue
+                  path = urllib.parse.unquote(path)
+                  resolved = os.path.normpath(os.path.join(os.path.dirname(f), path))
+                  if not os.path.exists(resolved):
+                      bad.append((f, target))
+          if bad:
+              print("Broken internal links:")
+              for f,t in bad:
+                  print(f"  {f} -> {t}")
+              sys.exit(1)
+          print(f"Checked {len(md_files)} markdown files: all internal links resolve.")
+          PY
