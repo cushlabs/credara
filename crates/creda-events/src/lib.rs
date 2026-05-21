@@ -44,7 +44,7 @@ pub use demographics::{
     StructuredAddress, TokenizedDate, TokenizedString, VerificationMethod,
 };
 pub use error::{Error, Result};
-pub use event::{IdentityEventNode, IdentityEventType, RedistributionPolicy};
+pub use event::{IdentityEventNode, IdentityEventType, RedistributionPolicy, TestDataTag};
 pub use hash::{ContentHash, HashAlgorithm};
 pub use ids::{CertificateFingerprint, EventId};
 pub use payload::{

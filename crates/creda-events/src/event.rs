@@ -107,6 +107,26 @@ pub struct IdentityEventNode {
     /// Originating-institution redistribution policy (§4.6 step 6).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub redistribution_policy: Option<RedistributionPolicy>,
+
+    /// Test-data tag (§11.4): present only on **synthetic** events. Synthetic events propagate
+    /// and replicate like real events, but are filtered from clinical FHIR responses and from
+    /// real patients' confidence scoring, while remaining visible to operator-scoped queries.
+    /// `None` on real events (and omitted from the canonical bytes, so real-event signatures are
+    /// unaffected by the existence of this field).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub test_data: Option<TestDataTag>,
+}
+
+/// Marks an event as synthetic test data (§11.4.1).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TestDataTag {
+    /// Why the data exists: `integration-testing`, `load-testing`, `compliance-validation`, etc.
+    pub purpose: String,
+    /// Identifier of the test plan that generated the data.
+    pub originating_test: String,
+    /// When the test data should be tombstoned (RFC3339), if set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub expiration_time: Option<String>,
 }
 
 /// The signed view of a node: every field except the signature, in a fixed shape. Built for
@@ -126,6 +146,8 @@ struct SignableView {
     logical_clock: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     redistribution_policy: Option<RedistributionPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    test_data: Option<TestDataTag>,
 }
 
 impl IdentityEventNode {
@@ -141,6 +163,50 @@ impl IdentityEventNode {
         logical_clock: u64,
         wall_clock_timestamp: impl Into<String>,
         redistribution_policy: Option<RedistributionPolicy>,
+    ) -> Result<Self> {
+        Self::build_signed(
+            payload,
+            parent_ids,
+            signing_key,
+            logical_clock,
+            wall_clock_timestamp.into(),
+            redistribution_policy,
+            None,
+        )
+    }
+
+    /// Like [`Self::create`], but tags the event as synthetic test data (§11.4). The tag is
+    /// signed along with the rest of the node, so a synthetic event cannot be silently relabeled
+    /// as real (or vice versa) without breaking the signature.
+    pub fn create_test_data(
+        payload: EventPayload,
+        parent_ids: Vec<EventId>,
+        signing_key: &SigningKey,
+        logical_clock: u64,
+        wall_clock_timestamp: impl Into<String>,
+        redistribution_policy: Option<RedistributionPolicy>,
+        tag: TestDataTag,
+    ) -> Result<Self> {
+        Self::build_signed(
+            payload,
+            parent_ids,
+            signing_key,
+            logical_clock,
+            wall_clock_timestamp.into(),
+            redistribution_policy,
+            Some(tag),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_signed(
+        payload: EventPayload,
+        parent_ids: Vec<EventId>,
+        signing_key: &SigningKey,
+        logical_clock: u64,
+        wall_clock_timestamp: String,
+        redistribution_policy: Option<RedistributionPolicy>,
+        test_data: Option<TestDataTag>,
     ) -> Result<Self> {
         let verifying_key = signing_key.verifying_key();
         let institution_id = CertificateFingerprint::new(verifying_key.fingerprint());
@@ -162,15 +228,22 @@ impl IdentityEventNode {
                 public_key_fingerprint: Vec::new(),
                 signature_bytes: Vec::new(),
             },
-            wall_clock_timestamp: wall_clock_timestamp.into(),
+            wall_clock_timestamp,
             logical_clock,
             redistribution_policy,
+            test_data,
         };
 
         node.validate_structure()?;
         let message = node.signable_bytes()?;
         node.signature = signing_key.sign(&message)?;
         Ok(node)
+    }
+
+    /// Whether this event is synthetic test data (§11.4) — propagates but is filtered from
+    /// clinical responses.
+    pub fn is_test_data(&self) -> bool {
+        self.test_data.is_some()
     }
 
     /// The canonical bytes that are (or must be) signed — every field except the signature.
@@ -186,6 +259,7 @@ impl IdentityEventNode {
             wall_clock_timestamp: self.wall_clock_timestamp.clone(),
             logical_clock: self.logical_clock,
             redistribution_policy: self.redistribution_policy.clone(),
+            test_data: self.test_data.clone(),
         };
         canonical::to_vec(&view)
     }

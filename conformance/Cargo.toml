@@ -1,0 +1,20 @@
+[package]
+name = "creda-conformance"
+description = "Creda conformance suite + synthetic data generator (spec §11.4). Exercises the components end-to-end against synthetic, test-data-tagged events: provenance preservation, authorization + revocation, data-category handling, and test-data filtering."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+creda-events = { path = "../crates/creda-events" }
+# MemoryStore + the Store trait; no RocksDB, so the suite stays fast.
+creda-store = { path = "../crates/creda-store", default-features = false }
+creda-graph = { path = "../crates/creda-graph" }
+
+[dev-dependencies]
+creda-events = { path = "../crates/creda-events" }
+creda-store = { path = "../crates/creda-store", default-features = false }
+creda-graph = { path = "../crates/creda-graph" }

@@ -10,6 +10,7 @@ members = [
     "crates/creda-core",   # M5 — peer daemon: engine + gRPC + CLI (spec §10.1)
     "crates/creda-export-gate", # M6 — source-side dual-control (spec §4.5.1, §10.2)
     "crates/creda-verifier",    # M6 — relying-side dual-control (spec §4.5.2, §10.3)
+    "conformance",              # M9 — conformance suite + synthetic data generator (spec §11.4)
 ]
 
 [workspace.package]
