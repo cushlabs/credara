@@ -345,8 +345,61 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             core.event_count().unwrap_or(0),
             config.grpc_socket
         );
+
+        // Start P2P replication when libp2p is built in: bring up the swarm, subscribe to the
+        // configured buckets, and pump received gossip batches into the engine's ingest gate.
+        #[cfg(feature = "libp2p")]
+        {
+            let (transport, mut inbound) =
+                creda_net::Libp2pTransport::generate_and_spawn(&config.libp2p_listen, Vec::new())
+                    .await?;
+            // TODO(libp2p-verify): this resolver must be backed by the UDAP / participant registry
+            // (open question, App C). Until then it resolves no keys, so received events are
+            // refused — the replication data-plane is wired end to end but *inert* until key
+            // resolution lands. Do not represent inbound replication as functional before then.
+            let resolver: Arc<dyn crate::engine::VerifyingKeyResolver> = Arc::new(RegistryResolverTodo);
+            let replicator = Arc::new(crate::replication::Replicator::new(
+                core.clone(),
+                transport,
+                resolver,
+                100_000,
+            ));
+            replicator.subscribe_buckets(&config.subscribed_buckets).await?;
+            let repl = replicator.clone();
+            tokio::spawn(async move {
+                while let Some(bytes) = inbound.recv().await {
+                    if let Err(e) = repl.ingest_batch(&bytes) {
+                        eprintln!("creda serve: gossip ingest error: {e}");
+                    }
+                }
+            });
+            eprintln!(
+                "creda serve: libp2p replication active (listen={}, buckets={})",
+                config.libp2p_listen,
+                config.subscribed_buckets.len()
+            );
+            // NOTE: outbound publish-on-create (notifying this replicator of locally created
+            // events) and the anti-entropy peer-exchange loop are the remaining hooks — both
+            // land with the multi-peer test bed (DQ-3), which can drive real peers.
+        }
+
         serve_with_core(core, &config.grpc_socket, shutdown_signal()).await
     })
+}
+
+/// Placeholder verifying-key resolver used until the UDAP/participant-registry integration lands
+/// (open question, App C). It resolves no keys, so every received event is refused at ingest.
+#[cfg(feature = "libp2p")]
+struct RegistryResolverTodo;
+
+#[cfg(feature = "libp2p")]
+impl crate::engine::VerifyingKeyResolver for RegistryResolverTodo {
+    fn resolve(
+        &self,
+        _fingerprint: &creda_events::CertificateFingerprint,
+    ) -> Option<creda_events::VerifyingKey> {
+        None
+    }
 }
 
 #[cfg(test)]

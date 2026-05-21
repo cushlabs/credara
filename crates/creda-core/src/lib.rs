@@ -31,12 +31,14 @@
 pub mod config;
 pub mod engine;
 pub mod error;
+pub mod replication;
 pub mod signer;
 
 #[cfg(feature = "grpc")]
 pub mod grpc;
 
 pub use config::{CredaConfig, PostureSetting};
-pub use engine::CredaCore;
+pub use engine::{CredaCore, Ingest, VerifyingKeyResolver};
 pub use error::{Error, Result};
+pub use replication::{IngestSummary, Replicator};
 pub use signer::{InMemorySigner, Signer};

@@ -51,3 +51,6 @@ tonic-build = "0.12"
 creda-events = { path = "../creda-events" }
 creda-store = { path = "../creda-store" }
 creda-graph = { path = "../creda-graph" }
+# Test-only async runtime for the replication tests (the library itself stays runtime-free in the
+# default build — async fns compile without an executor; only the tests need one).
+tokio = { version = "1", features = ["rt", "macros"] }

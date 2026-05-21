@@ -6,7 +6,7 @@
 
 use creda_events::{
     CertificateFingerprint, EventId, EventPayload, IdentityEventNode, RedistributionPolicy,
-    SignatureAlgorithm, SigningKey,
+    SignatureAlgorithm, SigningKey, VerifyingKey,
 };
 
 /// Abstracts the institution's signing key (§10.1.4).
@@ -43,6 +43,13 @@ impl InMemorySigner {
         Ok(Self {
             key: SigningKey::generate(SignatureAlgorithm::Ed25519)?,
         })
+    }
+
+    /// This signer's public verifying key — what a peer needs to authenticate events this signer
+    /// produced (the value a [`crate::engine::VerifyingKeyResolver`] would return for our
+    /// fingerprint).
+    pub fn verifying_key(&self) -> VerifyingKey {
+        self.key.verifying_key()
     }
 }
 

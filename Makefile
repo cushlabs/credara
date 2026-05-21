@@ -15,6 +15,9 @@
 #   make build       # release build of the workspace
 #   make grpc        # build + lint + test creda-core with the opt-in gRPC feature (needs protoc;
 #                    #   the dev image carries it). Not part of `anchor creda`'s default build.
+#   make libp2p      # compile-check creda-core with gRPC + libp2p (the shipped feature set). This
+#                    #   is the reconciliation entry point for the quarantined libp2p adapter; kept
+#                    #   out of CI by design (libp2p churn must not gate the workspace).
 #   make bridge      # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle+JDK container (M7)
 #   make shell       # interactive shell in the dev container
 #   make clean       # remove build artifacts and the dependency cache
@@ -61,7 +64,7 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc shell ci clean bridge bridge-image bridge-stock
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc libp2p shell ci clean bridge bridge-image bridge-stock
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
@@ -100,6 +103,13 @@ build: dev-image
 grpc: dev-image
 	$(RUN) cargo clippy -p creda-core --features grpc --all-targets $(CARGO_JOBS) -- -D warnings
 	$(RUN) cargo test -p creda-core --features grpc $(CARGO_JOBS)
+
+# Compile-check the shipped feature set (gRPC + libp2p). libp2p is the one quarantined dependency
+# whose API churns between versions, so this is its reconciliation entry point and is intentionally
+# NOT in CI — a libp2p API shift must never turn the workspace red. Reconcile TODO(libp2p-verify)
+# spots here on first build / version bump.
+libp2p: dev-image
+	$(RUN) cargo clippy -p creda-core --features grpc,libp2p --all-targets $(CARGO_JOBS) -- -D warnings
 
 # Everything CI checks, in one go.
 ci: fmt-check clippy test

@@ -28,7 +28,7 @@
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
-use libp2p::swarm::NetworkBehaviour;
+use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{gossipsub, identify, kad, request_response, Multiaddr, PeerId, Swarm};
 use tokio::sync::{mpsc, oneshot};
 
@@ -92,6 +92,11 @@ impl Libp2pTransport {
     /// addresses of bootstrap peers (§6.1.3). Noise + SPIFFE keying (§6.2.3) is wired by the
     /// caller via the provided keypair.
     ///
+    /// Returns the handle plus an **inbound channel** of received gossip-batch bytes: the daemon
+    /// drains it and feeds each batch to the engine's ingest path (`Replicator::ingest_batch`),
+    /// which is where mandatory signature verification happens (§3.6). This is the transport→engine
+    /// half of replication.
+    ///
     /// TODO(libp2p-verify): the `SwarmBuilder` chain, the gossipsub/kad/request_response
     /// constructors, and the executor wiring are the version-sensitive lines — reconcile against
     /// the pinned libp2p version on first build.
@@ -99,7 +104,7 @@ impl Libp2pTransport {
         keypair: libp2p::identity::Keypair,
         listen_on: Multiaddr,
         bootstrap: Vec<(PeerId, Multiaddr)>,
-    ) -> Result<Self> {
+    ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let local_peer_id = PeerId::from(keypair.public());
 
         let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
@@ -123,12 +128,34 @@ impl Libp2pTransport {
         }
 
         let (cmd_tx, cmd_rx) = mpsc::channel(256);
-        tokio::spawn(run_swarm(swarm, cmd_rx));
+        let (inbound_tx, inbound_rx) = mpsc::channel(1024);
+        tokio::spawn(run_swarm(swarm, cmd_rx, inbound_tx));
 
-        Ok(Self {
-            cmd_tx,
-            local_peer_id: local_peer_id.to_bytes(),
-        })
+        Ok((
+            Self {
+                cmd_tx,
+                local_peer_id: local_peer_id.to_bytes(),
+            },
+            inbound_rx,
+        ))
+    }
+
+    /// Convenience constructor that hides libp2p types from callers (Creda Core): generate a
+    /// fresh Ed25519 identity, parse the listen multiaddr, and spawn. Returns the handle and the
+    /// inbound gossip-batch channel.
+    ///
+    /// TODO(libp2p-verify): derive the identity from the institution signing key / SPIFFE SVID
+    /// rather than generating a throwaway one (§6.2.3), and parse `bootstrap` entries of the form
+    /// `/ip4/.../tcp/.../p2p/<peer-id>` into `(PeerId, Multiaddr)` pairs (left empty for now).
+    pub async fn generate_and_spawn(
+        listen: &str,
+        _bootstrap: Vec<String>,
+    ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        let listen_on: Multiaddr = listen
+            .parse()
+            .map_err(|e| Error::Transport(format!("bad listen multiaddr {listen:?}: {e}")))?;
+        Self::spawn(keypair, listen_on, Vec::new()).await
     }
 
     async fn send<T>(&self, make: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
@@ -214,11 +241,21 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
 
 /// The background event loop: service commands from handles and react to Swarm events.
 ///
-/// TODO(libp2p-verify): the `SwarmEvent`/`CredaBehaviourEvent` match arms (gossipsub messages,
-/// kad query results, request_response messages) are where most version-specific reconciliation
-/// happens. Inbound gossip batches and event requests are surfaced to Core via channels that
-/// Core (M5) supplies; this scaffold focuses on the outbound command path.
-async fn run_swarm(mut swarm: Swarm<CredaBehaviour>, mut cmd_rx: mpsc::Receiver<Command>) {
+/// The gossipsub-message arm is wired: a received batch's bytes are forwarded on `inbound_tx`,
+/// which the daemon drains into `Replicator::ingest_batch` (signature verification happens there,
+/// §3.6). If the channel is full or closed the batch is dropped — gossip is best-effort and
+/// anti-entropy (§6.1.8) backfills any gap.
+///
+/// TODO(libp2p-verify): the `SwarmEvent`/`CredaBehaviourEvent` match arms are version-sensitive
+/// (the generated `CredaBehaviourEvent` variant names track the behaviour field names). The
+/// request_response and Kademlia arms still need correlation maps (keyed by `OutboundRequestId` /
+/// `QueryId`) to complete `request_events` / `dht_find_providers`, and an `EventSource` hook to
+/// answer inbound `EventRequest`s from the local store — both tracked for the test bed (DQ-3).
+async fn run_swarm(
+    mut swarm: Swarm<CredaBehaviour>,
+    mut cmd_rx: mpsc::Receiver<Command>,
+    inbound_tx: mpsc::Sender<Vec<u8>>,
+) {
     loop {
         tokio::select! {
             command = cmd_rx.recv() => {
@@ -226,10 +263,24 @@ async fn run_swarm(mut swarm: Swarm<CredaBehaviour>, mut cmd_rx: mpsc::Receiver<
                 handle_command(&mut swarm, command);
             }
             event = swarm.select_next_some() => {
-                // TODO(libp2p-verify): handle SwarmEvent::Behaviour(...) — deliver received
-                // gossip batches to Core's ingest path, answer EventRequests from the local
-                // store, and complete pending DHT/request_response queries.
-                let _ = event;
+                match event {
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::Gossipsub(
+                        gossipsub::Event::Message { message, .. },
+                    )) => {
+                        // Deliver the received gossip batch to the engine's ingest path.
+                        let _ = inbound_tx.try_send(message.data);
+                    }
+                    // TODO(libp2p-verify): answer inbound EventRequests from the local store and
+                    // complete pending request_response responses (correlate by OutboundRequestId).
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(ev)) => {
+                        let _ = ev;
+                    }
+                    // TODO(libp2p-verify): complete get_providers queries (correlate by QueryId).
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(ev)) => {
+                        let _ = ev;
+                    }
+                    _ => {}
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventNode};
+use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventNode, VerifyingKey};
 use creda_graph::{
     evaluate, project, AuthorizationDecision, AuthorizationQuery, ConfidenceConfig,
     EffectiveIdentity, Subgraph,
@@ -22,6 +22,30 @@ use creda_store::Store;
 use crate::config::CredaConfig;
 use crate::error::Result;
 use crate::signer::Signer;
+
+/// Resolves an event author's verifying key from its certificate fingerprint — the seam to the
+/// participant registry / UDAP certificate infrastructure (Appendix C, open question). Ingest
+/// needs the public key to verify a received event's signature; the key is *not* carried in the
+/// event (only its fingerprint is), so it must be looked up.
+///
+/// The production implementation backs onto the UDAP/Participant Registry; that integration is an
+/// open question. Tests and the loopback test bed supply an in-memory key map.
+pub trait VerifyingKeyResolver: Send + Sync {
+    /// The verifying key for an institution fingerprint, or `None` if the signer is unknown
+    /// (an unknown signer means the event cannot be authenticated and must be rejected).
+    fn resolve(&self, fingerprint: &CertificateFingerprint) -> Option<VerifyingKey>;
+}
+
+/// The outcome of ingesting a replicated event (§3.6).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Ingest {
+    /// Verified and stored.
+    Accepted,
+    /// Already present locally (idempotent no-op).
+    AlreadyHave,
+    /// Refused — the reason is suitable for logging/metrics, not for trusting.
+    Rejected(String),
+}
 
 /// The composed peer engine.
 pub struct CredaCore {
@@ -70,6 +94,55 @@ impl CredaCore {
     /// `GetEvent` (§10.1.3).
     pub fn get_event(&self, id: &EventId) -> Result<Option<IdentityEventNode>> {
         Ok(self.store.get_event(id)?)
+    }
+
+    /// Fetch several events by id, skipping any not held locally. Used to answer a peer's
+    /// targeted event request (§6.1.5, §6.1.8) and to serve replication deltas.
+    pub fn get_events(&self, ids: &[EventId]) -> Result<Vec<IdentityEventNode>> {
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(node) = self.store.get_event(id)? {
+                out.push(node);
+            }
+        }
+        Ok(out)
+    }
+
+    /// All event ids held locally, sorted (UUIDv7 / creation-time order). Feeds the anti-entropy
+    /// Merkle root and reconciliation (§6.1.8).
+    pub fn all_event_ids(&self) -> Result<Vec<EventId>> {
+        Ok(self.store.all_event_ids()?)
+    }
+
+    /// Ingest an event received from a peer (§3.6). **Signature verification is mandatory during
+    /// replication**, and it is the gate that protects the whole graph: a peer accepts a foreign
+    /// event only if its signature verifies against the author's resolved key, it is structurally
+    /// valid, and its content hash (if present) matches. Already-held events are a no-op.
+    ///
+    /// Returns the [`Ingest`] outcome rather than erroring on a bad event, because a single bad
+    /// event in a batch must not abort ingest of the rest; a transport/store failure still errors.
+    pub fn ingest_event(
+        &self,
+        node: IdentityEventNode,
+        keys: &dyn VerifyingKeyResolver,
+    ) -> Result<Ingest> {
+        if self.store.has_event(&node.id)? {
+            return Ok(Ingest::AlreadyHave);
+        }
+        let Some(vk) = keys.resolve(&node.institution_id) else {
+            return Ok(Ingest::Rejected("unknown signer (no key for fingerprint)".into()));
+        };
+        if node.verify_signature(&vk).is_err() {
+            return Ok(Ingest::Rejected("signature verification failed".into()));
+        }
+        if let Err(e) = node.validate_structure() {
+            return Ok(Ingest::Rejected(format!("structural validation failed: {e}")));
+        }
+        if node.verify_content_hash() == Some(false) {
+            return Ok(Ingest::Rejected("content hash does not match payload".into()));
+        }
+        self.store.put_event(&node)?;
+        Ok(Ingest::Accepted)
     }
 
     /// `GetSubgraph` (§10.1.3): materialize the subgraph reachable from the entry points.
