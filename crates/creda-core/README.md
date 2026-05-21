@@ -11,7 +11,7 @@ EvaluateAuthorization, Subscribe, GetMetrics, plus scaffolded disambiguation RPC
 
 **Assemble:** tonic (gRPC), tokio. **Write:** the composition, gRPC service definitions, CLI, config.
 
-## Status: implemented (M5 engine/config/CLI verified-ready; gRPC + libp2p opt-in)
+## Status: M5 engine/config/CLI verified green ✓ (gRPC + libp2p opt-in)
 
 Completes the M1→M5 spine. Same isolation discipline as the rest of the workspace.
 
