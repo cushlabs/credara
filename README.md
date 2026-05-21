@@ -24,8 +24,7 @@ authority or vendor lock-in.
 
 > **Pre-launch — scaffolding.** The [technical specification](docs/creda-technical-spec.md)
 > (Sections 1–13 + appendices, ~81 pages) is complete and authoritative. Component code
-> is being built out milestone by milestone per the
-> [build guide](docs/COWORK_BUILD_GUIDE.md). This repository currently contains the M0
+> is being built out milestone by milestone. This repository currently contains the M0
 > foundation: licensing, documentation, directory skeleton, and CI scaffolding.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
