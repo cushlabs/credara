@@ -13,7 +13,7 @@ bucketing scheme, anti-entropy reconciliation, snapshot format, the trait bounda
 
 > DHT query-privacy is `TODO(open-question-13.3)` / §8.5 — scaffold the DHT, mark the privacy gap.
 
-## Status: implemented (M4 pure logic verified-ready; libp2p adapter is an opt-in scaffold)
+## Status: M4 pure logic verified green ✓ (libp2p adapter is an opt-in scaffold)
 
 ### The approach: assemble, but quarantine the assembled part
 
