@@ -22,12 +22,25 @@ authority or vendor lock-in.
 
 ## Status
 
-> **Pre-launch — scaffolding.** The [technical specification](docs/creda-technical-spec.md)
-> (Sections 1–13 + appendices, ~81 pages) is complete and authoritative. Component code
-> is being built out milestone by milestone. This repository currently contains the M0
-> foundation: licensing, documentation, directory skeleton, and CI scaffolding.
+> **Pre-launch — all milestones implemented; hardening in progress.** The
+> [technical specification](docs/creda-technical-spec.md) (Sections 1–13 + appendices, ~81
+> pages) is complete and authoritative. All ten build milestones (M0–M9) are implemented:
+> the full Rust spine (event model → storage → graph reasoning → networking → Core daemon),
+> the dual-control Export Gate and Verifier, the HAPI FHIR Bridge, deployment packaging, and
+> the conformance suite with its synthetic-data generator. The default workspace build and
+> tests pass; the per-milestone table below records what is verified versus what is
+> feature-gated and still being reconciled.
+>
+> This is **pre-launch software**: not yet deployed to a real network and not yet
+> independently security-reviewed. Do not use it with real PHI.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
+
+Beyond the milestones, the in-daemon **gRPC serve socket** (Bridge ↔ Core over a Unix
+domain socket) and the **libp2p transport ↔ engine replication** path (signed-event ingest
+with mandatory signature verification, gossip publish, anti-entropy) are wired. The
+replication orchestration is transport-agnostic and unit-tested in the default build; the
+libp2p adapter itself remains an opt-in, separately-reconciled module (see *Verification*).
 
 ## Architectural thesis
 
@@ -76,31 +89,46 @@ specification documents in `docs/`.
 The build proceeds in strict dependency order (full detail in
 [`docs/COWORK_BUILD_GUIDE.md`](docs/COWORK_BUILD_GUIDE.md)):
 
-| Milestone | Component | Spec sections |
-|---|---|---|
-| M0 | Repo init + CI | §12.2.2 |
-| M1 | Event model (`creda-events`) | §3, §4, §5 |
-| M2 | Storage (`creda-store`) | §5.2, §7.3, App. C |
-| M3 | Graph / computation (`creda-graph`) | §5.2.4, §4.6, §5.3 |
-| M4 | Networking (`creda-net`) | §6, §7 |
-| M5 | Creda Core (`creda-core`) | §10.1 |
-| M6 | Export Gate + Verifier | §4.5, §10.2, §10.3 |
-| M7 | FHIR Bridge (`bridge/`) | §8, §10.4 |
-| M8 | Deployment (`deploy/`) | §10.5, §10.6, §11 |
-| M9 | Conformance + synthetic data (`conformance/`) | §11.4 |
+| Milestone | Component | Spec sections | Status |
+|---|---|---|---|
+| M0 | Repo init + CI | §12.2.2 | Done |
+| M1 | Event model (`creda-events`) | §3, §4, §5 | Implemented · tests green |
+| M2 | Storage (`creda-store`) | §5.2, §7.3, App. C | Implemented · tests green (incl. RocksDB) |
+| M3 | Graph / computation (`creda-graph`) | §5.2.4, §4.6, §5.3 | Implemented · tests green |
+| M4 | Networking (`creda-net`) | §6, §7 | Pure logic green; libp2p adapter opt-in (reconciling) |
+| M5 | Creda Core (`creda-core`) | §10.1 | Implemented · tests green |
+| M6 | Export Gate + Verifier | §4.5, §10.2, §10.3 | Implemented · tests green |
+| M7 | FHIR Bridge (`bridge/`) | §8, §10.4 | Builds green; FHIR↔CBOR mappers are stubs |
+| M8 | Deployment (`deploy/`) | §10.5, §10.6, §11 | Manifests authored; runtime verify on the test bed |
+| M9 | Conformance + synthetic data (`conformance/`) | §11.4 | Implemented · tests green |
 
-## Building (once components land)
+Verified by component: the default workspace (M1–M6, M9, plus the replication core) builds
+and tests green via `anchor creda` (or `make test`); the opt-in **gRPC** server via `make
+grpc`; the **FHIR Bridge** via `make bridge`. The shipped **libp2p** feature set
+(`make libp2p`) is the one quarantined surface still being reconciled against the pinned
+libp2p version, and is deliberately kept out of CI so its API churn never blocks the
+workspace. End-to-end multi-peer deployment (Helm on kind/k3d, gossip convergence,
+anti-entropy, revocation latency) is exercised in the test bed under `testbed/`.
 
-The Rust workspace builds with a standard toolchain:
+## Building
+
+The only host prerequisite is **Docker**: every task runs inside the dev container, so no
+one installs a Rust toolchain, protoc, or a JDK by hand (see
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
 
 ```sh
-cargo build --workspace
-cargo test  --workspace
+anchor creda      # build + test the whole default workspace, one rolled-up summary (= make anchor)
+make grpc         # build + lint + test the opt-in gRPC server (feature `grpc`; needs protoc)
+make libp2p       # compile-check the shipped feature set (gRPC + libp2p) — libp2p reconciliation
+make bridge       # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
 ```
 
-The FHIR Bridge (from M7) builds via Gradle under `bridge/`. Local multi-peer
-development uses Docker Compose under `deploy/compose/` (from M8). At M0 the workspace
-is intentionally empty, so these commands succeed trivially.
+The default build is intentionally free of the heavy, version-volatile dependencies
+(libp2p, tonic/protoc, the JVM bridge): those live behind features and separate targets so
+`anchor creda` stays fast and always green. With a local toolchain the workspace also builds
+the ordinary way (`cargo build --workspace` / `cargo test --workspace`). Local multi-peer
+development uses Docker Compose under `deploy/compose/`, and the multi-peer test bed lives
+under `testbed/`.
 
 ## Security and data handling
 
