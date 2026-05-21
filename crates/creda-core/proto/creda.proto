@@ -6,6 +6,11 @@ syntax = "proto3";
 // gRPC layer is a thin transport over the engine.
 package creda;
 
+// Java options for the HAPI FHIR Bridge's grpc-java codegen (M7). Ignored by the Rust/prost
+// build, which uses the same .proto.
+option java_package = "health.creda.grpc";
+option java_multiple_files = true;
+
 message CreateEventRequest {
   // Canonical-CBOR-encoded EventPayload (creda-events).
   bytes event_payload_cbor = 1;

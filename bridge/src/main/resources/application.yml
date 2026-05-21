@@ -1,0 +1,11 @@
+# Creda FHIR Bridge configuration.
+server:
+  # The FHIR REST API port exposed to clients.
+  port: 8080
+
+creda:
+  # Path to Creda Core's gRPC Unix domain socket inside the shared pod volume (§8.3.1, §10.4.3).
+  core-socket: /var/run/creda/core.sock
+  fhir:
+    # Base URL the server advertises in its CapabilityStatement.
+    base-url: http://localhost:8080/fhir
