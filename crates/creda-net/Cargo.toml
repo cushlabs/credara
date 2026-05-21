@@ -1,0 +1,54 @@
+[package]
+name = "creda-net"
+description = "Creda networking and replication: the NetworkTransport trait boundary, 1024-bucket topic scheme, Merkle-root anti-entropy, snapshot format, and an isolated libp2p adapter (spec §6, §7)."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# ---------------------------------------------------------------------------------------------
+# Design: "assemble, don't build", with the assembled part quarantined.
+#
+# The genuinely-new logic (topic bucketing, anti-entropy reconciliation, snapshot format, gossip
+# batching/dedup, and the `NetworkTransport` trait) is libp2p-free and unit-testable WITHOUT a
+# network — it makes up the default build. libp2p (the large, fast-moving "assemble" dependency,
+# spec §6.2.1/§6.3.1) lives behind the OFF-BY-DEFAULT `libp2p` feature in one module
+# (`libp2p_adapter`). Consequences:
+#   * `cargo build` / `make test` (default features) never compile libp2p, so the workspace
+#     stays green and fast regardless of rust-libp2p API churn between versions.
+#   * The heavy compile and any first-build API reconciliation are contained to one feature and
+#     one module, enabled deliberately (`--features libp2p`) by Core (M5) and the test bed (DQ-3).
+# ---------------------------------------------------------------------------------------------
+[features]
+default = []
+libp2p = ["dep:libp2p", "dep:tokio", "dep:futures"]
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+# Snapshot read/write goes through the Store trait; no RocksDB needed here.
+creda-store = { path = "../creda-store", default-features = false }
+thiserror = "1"
+
+# --- libp2p adapter (feature = "libp2p") --------------------------------------------------------
+# NOTE TO FIRST BUILDER: rust-libp2p's API moves between minor versions; this is the most
+# likely place to need adjustment. It is isolated in src/libp2p_adapter.rs and is not part of the
+# default build, so an API mismatch here cannot break the rest of the workspace.
+libp2p = { version = "0.54", optional = true, features = [
+    "gossipsub",
+    "kad",
+    "noise",
+    "tcp",
+    "yamux",
+    "identify",
+    "request-response",
+    "macros",
+    "tokio",
+] }
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "sync", "macros", "time"] }
+futures = { version = "0.3", optional = true }
+
+[dev-dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store", default-features = false }

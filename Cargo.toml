@@ -6,6 +6,7 @@ members = [
     "crates/creda-events", # M1 — event model (spec §3, §4, §5)
     "crates/creda-store",  # M2 — storage layer (spec §5.2, §7.3)
     "crates/creda-graph",  # M3 — graph reasoning (spec §5.2.4, §4.6, §5.3)
+    "crates/creda-net",    # M4 — networking & replication (spec §6, §7)
 ]
 
 [workspace.package]
