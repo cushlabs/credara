@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creda · Identity Resolution (steward console mockup)</title>
+<style>
+  :root {
+    --bg:#eef2f6; --surface:#fff; --surface-2:#f7f9fc;
+    --ink:#0f1b2d; --ink-2:#475569; --ink-3:#7c8aa0; --line:#dde4ee;
+    --primary:#6d28d9;            /* operator accent (distinct from the clinician teal) */
+    --assert:#2563eb; --attest:#15803d; --link:#7c3aed; --contest:#c2410c; --amend:#b45309; --tomb:#334155;
+    --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+    --shadow:0 1px 2px rgba(15,27,45,.06), 0 6px 20px rgba(15,27,45,.06);
+    --radius:12px; font-synthesis:none;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;cursor:pointer;}
+  .muted{color:var(--ink-3);}
+
+  .appbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:30;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;}
+  .brand .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#a78bfa,#6d28d9);display:grid;place-items:center;font-size:14px;font-weight:800;}
+  .appbar .ctx{color:#aebfd4;font-size:12.5px;}
+  .appbar .spacer{flex:1;}
+  .appbar .who{font-size:12.5px;color:#cdd8e8;display:flex;align-items:center;gap:8px;}
+  .appbar .who .dot{width:8px;height:8px;border-radius:50%;background:#a78bfa;}
+
+  .viewbanner{background:#f1ebfb;color:#6d28d9;border-bottom:1px solid #ddd0f4;font-size:12.5px;padding:7px 20px;display:flex;align-items:center;gap:8px;}
+  .viewbanner b{font-weight:650;}
+
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 56px - 34px);}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;height:auto;}}
+
+  /* ---- Queue ---- */
+  .queue{border-right:1px solid var(--line);background:var(--surface);overflow:auto;}
+  .queue .qhd{padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);}
+  .queue .qhd h2{margin:0;font-size:14px;}
+  .queue .qhd .sub{color:var(--ink-3);font-size:12px;margin-top:2px;}
+  .qitem{padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;gap:6px;}
+  .qitem:hover{background:var(--surface-2);}
+  .qitem.sel{background:#f5f1fd;box-shadow:inset 3px 0 0 var(--primary);}
+  .qitem.resolved{opacity:.55;}
+  .qitem .top{display:flex;align-items:center;gap:8px;}
+  .qitem .nm{font-weight:640;font-size:13.5px;}
+  .qitem .sm{color:var(--ink-3);font-size:12px;}
+  .qitem .meterrow{display:flex;align-items:center;gap:8px;}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:650;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+  .b-dup{background:#ede9fe;color:#6d28d9;}
+  .b-conflict{background:#fdf1e3;color:#b45309;}
+  .b-contest{background:#fdeee5;color:#c2410c;}
+  .b-synthetic{background:#e7f1fb;color:#2563eb;}
+  .b-stale{background:#eef2f6;color:#475569;}
+  .b-good{background:#e7f6ec;color:#15803d;}
+  .b-test{background:#fff3cd;color:#7c5800;border:1px dashed #d9b341;}
+
+  .meter{width:78px;height:7px;border-radius:999px;background:#e7edf4;overflow:hidden;}
+  .meter>span{display:block;height:100%;border-radius:999px;}
+  .pct{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-2);width:32px;text-align:right;}
+
+  /* ---- Case detail ---- */
+  .detail{overflow:auto;padding:20px 22px 60px;}
+  .empty{display:grid;place-items:center;height:100%;color:var(--ink-3);font-size:14px;}
+  .chead{display:flex;align-items:flex-start;gap:14px;margin-bottom:6px;}
+  .chead h1{font-size:20px;margin:0;}
+  .chead .summary{color:var(--ink-2);font-size:13.5px;margin:8px 0 0;}
+  .insts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .chip{font-size:11.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;color:var(--ink-2);}
+
+  .section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-top:16px;}
+  .section .hd{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .section .hd h2{margin:0;font-size:13.5px;}
+  .section .bd{padding:14px 16px;}
+
+  /* field comparison */
+  table.cmp{width:100%;border-collapse:collapse;font-size:13px;}
+  table.cmp th{text-align:left;color:var(--ink-3);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);}
+  table.cmp td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.cmp tr:last-child td{border-bottom:0;}
+  .agree{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;}
+  .a-match{background:#e7f6ec;color:#15803d;}
+  .a-partial{background:#fdf1e3;color:#b45309;}
+  .a-conflict{background:#fde7e7;color:#b91c1c;}
+  .val-conflict{color:#b91c1c;font-weight:600;}
+
+  /* DAG */
+  .legend{display:flex;flex-wrap:wrap;gap:12px;padding:10px 16px 0;font-size:12px;color:var(--ink-2);}
+  .legend .it{display:flex;align-items:center;gap:6px;}
+  .legend .sw{width:11px;height:11px;border-radius:3px;}
+  .dag{width:100%;height:auto;display:block;}
+  .node{cursor:pointer;}
+  .node rect{transition:filter .1s ease;}
+  .node:hover rect{filter:brightness(1.06);}
+  .node text{font-size:11px;fill:#fff;font-weight:600;pointer-events:none;}
+  .node .sub{font-size:9.5px;fill:rgba(255,255,255,.85);font-weight:500;}
+  .edge{stroke:#b9c6d8;stroke-width:2;fill:none;}
+  .edge.contest{stroke:var(--contest);stroke-dasharray:5 4;}
+
+  /* evidence */
+  .ev{display:grid;gap:7px;}
+  .ev .row{display:flex;align-items:center;gap:10px;font-size:12.5px;}
+  .ev .row .k{width:90px;color:var(--ink-3);}
+  .ev .wt{font-weight:700;font-variant-numeric:tabular-nums;width:46px;text-align:right;}
+  .ev .wt.pos{color:var(--good);}
+  .ev .wt.neg{color:var(--bad);}
+  .ev .desc{color:var(--ink-2);}
+
+  /* actions */
+  .acts{display:flex;flex-wrap:wrap;gap:8px;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;}
+  .btn:hover{border-color:#b9c6d8;}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .btn.attest{background:#e7f6ec;border-color:#bfe3c9;color:#15803d;}
+  .btn.contest{background:#fdeee5;border-color:#f3cdb3;color:#c2410c;}
+  .btn.amend{background:#fbf2e2;border-color:#ecd6ab;color:#b45309;}
+  .btn.tomb{background:#e8edf3;border-color:#c3cedd;color:#334155;}
+  .btn.ghost{background:transparent;}
+
+  /* slide-over */
+  .scrim{position:fixed;inset:0;background:rgba(15,27,45,.38);opacity:0;pointer-events:none;transition:opacity .15s;z-index:40;}
+  .scrim.on{opacity:1;pointer-events:auto;}
+  .sheet{position:fixed;top:0;right:0;height:100%;width:400px;max-width:92vw;background:#fff;z-index:50;box-shadow:-10px 0 40px rgba(15,27,45,.18);transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column;}
+  .sheet.on{transform:translateX(0);}
+  .sheet .sh-hd{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .sheet .sh-bd{padding:18px;overflow:auto;}
+  .sheet .x{margin-left:auto;border:0;background:transparent;font-size:20px;color:var(--ink-3);}
+  .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:800;color:#fff;padding:3px 9px;border-radius:999px;}
+  .kv{display:grid;grid-template-columns:104px 1fr;gap:6px 12px;font-size:13px;margin-top:6px;}
+  .kv .k{color:var(--ink-3);}
+  .kv .v{font-weight:550;word-break:break-word;}
+
+  /* modal */
+  .modal{position:fixed;inset:0;display:grid;place-items:center;z-index:60;opacity:0;pointer-events:none;transition:opacity .15s;}
+  .modal.on{opacity:1;pointer-events:auto;}
+  .modal .card{width:500px;max-width:94vw;background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(15,27,45,.32);overflow:hidden;}
+  .modal .m-hd{padding:16px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);}
+  .modal .m-bd{padding:18px;}
+  .modal .m-ft{padding:14px 18px;background:var(--surface-2);display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);}
+  .codecard{background:#0f1b2d;color:#cfe3ee;border-radius:10px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;margin-top:12px;white-space:pre;overflow:auto;}
+  .codecard .kk{color:#b9a4f0;} .codecard .vv{color:#f5d49b;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .2s;z-index:70;display:flex;align-items:center;gap:9px;}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Identity Resolution</span></div>
+    <div class="spacer"></div>
+    <div class="who"><span class="dot"></span> S. Okafor · Mercy General · Identity Steward</div>
+  </div>
+  <div class="viewbanner">
+    <span>◑</span><b>Operator view.</b><span>Synthetic / test-tagged records are visible here and clearly flagged (they are hidden from clinical views, §11.4). You operate on tokenized values, never raw PHI.</span>
+  </div>
+
+  <div class="layout">
+    <div class="queue" id="queue"></div>
+    <div class="detail" id="detail"><div class="empty">Select a case from the resolution queue.</div></div>
+  </div>
+
+  <div class="scrim" id="scrim" onclick="closeSheet()"></div>
+  <aside class="sheet" id="sheet"><div class="sh-hd" id="sheetHd"></div><div class="sh-bd" id="sheetBd"></div></aside>
+
+  <div class="modal" id="modal">
+    <div class="card">
+      <div class="m-hd" id="modalHd"></div>
+      <div class="m-bd" id="modalBd"></div>
+      <div class="m-ft"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="modalConfirm">Confirm</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   Creda identity-steward / operator console — interactive mockup (fake data).
+   The steward triages cross-institution identity-resolution cases and acts via
+   signed graph events (Link / Contest / Amend / Tombstone). Operator view: it
+   sees synthetic test-data records too, flagged.
+---------------------------------------------------------------------------- */
+
+const TYPE_COLORS = {Assert:'var(--assert)',Link:'var(--link)',Contest:'var(--contest)',Attest:'var(--attest)',Amend:'var(--amend)',Tombstone:'var(--tomb)'};
+const TYPE_DESC = {
+  Assert:'An institution asserted demographics for this patient (§3.4.1).',
+  Link:'Two subgraphs were asserted to be the same person, with a confidence score (§3.4.2).',
+  Contest:'A party to the subgraph disputed a link (§3.4.3).',
+  Attest:'An institution recorded reliance on this chain (§3.4.4).',
+  Amend:'The originating institution corrected demographics (§3.4.5).',
+  Tombstone:'Content was scrubbed while graph topology is preserved (§3.4.6).'
+};
+const KIND = {
+  duplicate:{tag:'Possible duplicate',cls:'b-dup'},
+  conflict:{tag:'Demographic conflict',cls:'b-conflict'},
+  contest:{tag:'Open contest',cls:'b-contest'},
+  synthetic:{tag:'Synthetic record',cls:'b-synthetic'},
+  stale:{tag:'Stale verification',cls:'b-stale'},
+};
+function confColor(p){return p>=85?'var(--good)':p>=60?'var(--warn)':'var(--bad)';}
+
+/* -------- Fake resolution queue -------- */
+const CASES = [
+  {
+    id:'c1', kind:'duplicate', conf:63, testData:false,
+    title:'Robert Chen  /  “Bob” Chen',
+    summary:'A 63% probabilistic match links a Mercy General record with an Eastgate Urgent Care record — same DOB and similar name, but different city. Below the auto-merge threshold; needs a human decision.',
+    insts:['Mercy General','Eastgate Urgent Care'],
+    cmp:[
+      {key:'Name', a:'Robert Chen', b:'“Bob” Chen', agree:'partial'},
+      {key:'Date of birth', a:'1990-05-27', b:'1990-05-27', agree:'match'},
+      {key:'Sex', a:'Male', b:'Male', agree:'match'},
+      {key:'Address', a:'Madison', b:'Clinton', agree:'conflict'},
+    ],
+    evidence:[
+      {k:'DOB', wt:'+4.1', sign:'pos', desc:'exact match on a high-entropy field'},
+      {k:'Name', wt:'+1.2', sign:'pos', desc:'given-name nickname, family match'},
+      {k:'Sex', wt:'+0.3', sign:'pos', desc:'low-entropy agreement'},
+      {k:'Address', wt:'−2.0', sign:'neg', desc:'different city — evidence against'},
+    ],
+    events:[
+      {id:'a1',type:'Assert',inst:'Mercy General',when:'2019-09-14',vm:'Government photo ID',x:70,y:55,parents:[],summary:'Robert Chen, Madison address.'},
+      {id:'a2',type:'Assert',inst:'Eastgate Urgent Care',when:'2024-03-30',vm:'Self-report',x:70,y:205,parents:[],summary:'"Bob" Chen, Clinton address.'},
+      {id:'l1',type:'Link',inst:'Eastgate Urgent Care',when:'2024-03-30',conf:'63%',method:'Algorithmic',x:320,y:130,parents:['a1','a2'],summary:'Probabilistic match; low confidence (below auto-merge).'},
+    ],
+    actions:[
+      {label:'Confirm — same person', cls:'attest', ev:'Attest', note:'Records a treatment-purpose attestation affirming the link. Downstream confidence rises; the two histories project as one identity.'},
+      {label:'Reject — different people', cls:'contest', ev:'Contest', note:'Contests the link. The projection severs it, and the two records stop merging.'},
+      {label:'Defer', cls:'ghost', ev:null, note:'No event written; the case stays open for more evidence.'},
+    ],
+  },
+  {
+    id:'c2', kind:'conflict', conf:48, testData:false,
+    title:'James R. Whitfield — conflicting DOB',
+    summary:'Two institutions assert different dates of birth ten days apart. Mercy General verified by photo ID; Lakeside is self-reported. The effective DOB is disputed until resolved.',
+    insts:['Mercy General','Lakeside Hospital'],
+    cmp:[
+      {key:'Name', a:'James R. Whitfield', b:'James Whitfield', agree:'match'},
+      {key:'Date of birth', a:'1971-08-04 (photo ID)', b:'1971-08-14 (self-report)', agree:'conflict'},
+      {key:'Sex', a:'Male', b:'Male', agree:'match'},
+    ],
+    evidence:[
+      {k:'Name', wt:'+3.0', sign:'pos', desc:'strong family + given match'},
+      {k:'DOB', wt:'−1.6', sign:'neg', desc:'10-day disagreement; one source is self-reported'},
+      {k:'Verify', wt:'note', sign:'', desc:'photo ID outranks self-report for DOB'},
+    ],
+    events:[
+      {id:'a1',type:'Assert',inst:'Mercy General',when:'2020-01-09',vm:'Government photo ID',x:70,y:55,parents:[],summary:'DOB 1971-08-04 (photo ID).'},
+      {id:'a2',type:'Assert',inst:'Lakeside Hospital',when:'2023-07-22',vm:'Self-report',x:70,y:205,parents:[],summary:'DOB 1971-08-14 (self-reported).'},
+      {id:'l1',type:'Link',inst:'Lakeside Hospital',when:'2023-07-23',conf:'82%',method:'Algorithmic',x:320,y:130,parents:['a1','a2'],summary:'Linked on name + address despite the DOB mismatch.'},
+    ],
+    actions:[
+      {label:'Request amendment from Lakeside', cls:'amend', ev:'Amend', note:'Requests that the originating institution (Lakeside) correct its DOB to the photo-ID-verified value. An Amend only takes effect once that institution signs it (§3.4.5).'},
+      {label:'Mark as distinct patients', cls:'contest', ev:'Contest', note:'If these are not the same person, contests the link so the records stop merging.'},
+      {label:'Defer', cls:'ghost', ev:null, note:'Hold for outreach to the patient or institution; no event written.'},
+    ],
+  },
+  {
+    id:'c3', kind:'contest', conf:0, testData:false,
+    title:'Open contest — Northside disputes a link',
+    summary:'Northside Clinic contested a 2023 link between two subgraphs, citing distinct patients. The projection has already severed the link; review whether the contest stands or new evidence supports re-linking.',
+    insts:['Mercy General','Northside Clinic'],
+    cmp:[
+      {key:'Name', a:'Maria E. Gonzalez', b:'Maria Gonzales', agree:'partial'},
+      {key:'Date of birth', a:'1984-03-12', b:'1986-11-02', agree:'conflict'},
+      {key:'Sex', a:'Female', b:'Female', agree:'match'},
+    ],
+    evidence:[
+      {k:'DOB', wt:'−4.0', sign:'neg', desc:'two-year disagreement — strong evidence against'},
+      {k:'Name', wt:'+0.8', sign:'pos', desc:'spelling variant of family name'},
+      {k:'Contest', wt:'note', sign:'', desc:'filed by a party to the subgraph (valid, §3.4.3)'},
+    ],
+    events:[
+      {id:'a1',type:'Assert',inst:'Mercy General',when:'2021-06-02',x:60,y:50,parents:[],summary:'Maria E. Gonzalez, DOB 1984-03-12.'},
+      {id:'a2',type:'Assert',inst:'Northside Clinic',when:'2022-11-18',x:60,y:200,parents:[],summary:'Maria Gonzales, DOB 1986-11-02.'},
+      {id:'l1',type:'Link',inst:'Mercy General',when:'2022-11-20',conf:'71%',method:'Algorithmic',x:280,y:125,parents:['a1','a2'],summary:'Algorithmic match (now contested).'},
+      {id:'x1',type:'Contest',inst:'Northside Clinic',when:'2023-02-01',x:470,y:125,parents:['l1'],summary:'Distinct patients — DOBs differ by two years.'},
+    ],
+    actions:[
+      {label:'Uphold the contest', cls:'ghost', ev:null, note:'Acknowledge; the link stays severed. No new event needed — the existing Contest governs the projection.'},
+      {label:'Re-link with new evidence', cls:'attest', ev:'Link', note:'Only if you have evidence the contest is mistaken. Creates a new Link; expect it to be scrutinized.'},
+    ],
+  },
+  {
+    id:'c4', kind:'synthetic', conf:90, testData:true,
+    title:'Synthetic patient surfaced in triage',
+    summary:'A load-test record (test-data tagged) appears in the operator view. This is expected — synthetic events propagate and replicate like real ones, but are filtered from every clinical view (§11.4.1). Confirm it is test data and dismiss.',
+    insts:['conformance/load-test'],
+    cmp:[
+      {key:'Name', a:'tok:smith / tok:james', b:'tok:smith / tok:james', agree:'match'},
+      {key:'Date of birth', a:'tok:1980-01-01', b:'tok:1980-01-01', agree:'match'},
+      {key:'Origin', a:'integration-testing', b:'integration-testing', agree:'match'},
+    ],
+    evidence:[
+      {k:'test_data', wt:'note', sign:'', desc:'tag present: purpose=integration-testing, signed with the node'},
+      {k:'Visibility', wt:'note', sign:'', desc:'visible to operators, invisible to clinical FHIR queries'},
+    ],
+    events:[
+      {id:'a1',type:'Assert',inst:'conformance generator',when:'just now',vm:'synthetic',x:150,y:130,parents:[],summary:'Synthetic Assert, test-data tagged (purpose: integration-testing).'},
+    ],
+    actions:[
+      {label:'Acknowledge (no change)', cls:'ghost', ev:null, note:'Confirms this is synthetic and removes it from the queue. No graph change.'},
+      {label:'Tombstone expired test data', cls:'tomb', ev:'Tombstone', note:'For test data past its expiration, scrub the content (topology preserved). Legal basis: test-data lifecycle.'},
+    ],
+  },
+];
+
+const RESOLVED = {};       // caseId -> chosen label
+const state = {caseId:null};
+const $ = id=>document.getElementById(id);
+
+/* ---------------- Queue ---------------- */
+function renderQueue(){
+  const open = CASES.filter(c=>!RESOLVED[c.id]).length;
+  $('queue').innerHTML = `
+    <div class="qhd"><h2>Resolution queue</h2><div class="sub">${open} open · ${CASES.length - open} resolved · operator view</div></div>
+    ${CASES.map(qitemHTML).join('')}`;
+}
+function qitemHTML(c){
+  const k = KIND[c.kind];
+  const done = RESOLVED[c.id];
+  const meter = c.kind==='contest' ? '' :
+    `<div class="meterrow"><span class="pct" style="color:${confColor(c.conf)}">${c.conf}%</span>
+      <div class="meter"><span style="width:${c.conf}%;background:${confColor(c.conf)}"></span></div>
+      <span class="muted" style="font-size:11px">match confidence</span></div>`;
+  return `<div class="qitem ${state.caseId===c.id?'sel':''} ${done?'resolved':''}" onclick="openCase('${c.id}')">
+      <div class="top"><span class="badge ${k.cls}">${k.tag}</span>
+        ${c.testData?'<span class="badge b-test">TEST DATA</span>':''}
+        ${done?'<span class="badge b-good">resolved</span>':''}</div>
+      <div class="nm">${c.title}</div>
+      <div class="sm">${c.insts.join('  ·  ')}</div>
+      ${meter}
+    </div>`;
+}
+
+/* ---------------- Case detail ---------------- */
+function openCase(id){
+  state.caseId=id;
+  const c=CASES.find(x=>x.id===id);
+  const k=KIND[c.kind];
+  const done=RESOLVED[c.id];
+  $('detail').innerHTML = `
+    <div class="chead">
+      <div style="flex:1">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="badge ${k.cls}">${k.tag}</span>
+          ${c.testData?'<span class="badge b-test">TEST DATA — clinical-invisible</span>':''}
+          ${c.kind!=='contest'?`<span class="badge" style="background:#f3f0fb;color:#6d28d9">match ${c.conf}%</span>`:''}
+        </div>
+        <h1 style="margin-top:8px">${c.title}</h1>
+        <div class="summary">${c.summary}</div>
+        <div class="insts">${c.insts.map(i=>`<span class="chip">${i}</span>`).join('')}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="hd"><h2>Field comparison</h2><span class="muted" style="font-size:12px;margin-left:auto">effective identity across institutions · §5.2.4</span></div>
+      <div class="bd" style="padding:6px 16px">
+        <table class="cmp">
+          <thead><tr><th>Field</th><th>${c.insts[0]||'A'}</th><th>${c.insts[1]||'B'}</th><th>Agreement</th></tr></thead>
+          <tbody>${c.cmp.map(rowHTML).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="hd"><h2>Provenance graph</h2><span class="muted" style="font-size:12px;margin-left:auto">tap a node for detail</span></div>
+      ${dagLegend()}
+      <div class="bd" style="padding:8px">${dagSVG(c)}</div>
+    </div>
+
+    <div class="section">
+      <div class="hd"><h2>Match evidence</h2><span class="muted" style="font-size:12px;margin-left:auto">Fellegi–Sunter-style weighting · §5.3</span></div>
+      <div class="bd"><div class="ev">${c.evidence.map(evHTML).join('')}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="hd"><h2>Resolve</h2>${done?`<span class="badge b-good" style="margin-left:auto">resolved · ${done}</span>`:''}</div>
+      <div class="bd">
+        ${done ? '<div class="muted" style="font-size:13px">This case is resolved. Re-open from the queue is disabled in the mockup.</div>'
+               : `<div class="acts">${c.actions.map((a,i)=>`<button class="btn ${a.cls}" onclick="askAction('${c.id}',${i})">${a.label}</button>`).join('')}</div>`}
+      </div>
+    </div>`;
+  renderQueue();
+}
+
+function rowHTML(r){
+  const cls={match:'a-match',partial:'a-partial',conflict:'a-conflict'}[r.agree];
+  const lab={match:'match',partial:'partial',conflict:'conflict'}[r.agree];
+  const vstyle=r.agree==='conflict'?'val-conflict':'';
+  return `<tr><td class="muted">${r.key}</td><td class="${vstyle}">${r.a}</td><td class="${vstyle}">${r.b}</td><td><span class="agree ${cls}">${lab}</span></td></tr>`;
+}
+function evHTML(e){
+  const wtcls=e.sign==='pos'?'pos':e.sign==='neg'?'neg':'';
+  const wt=e.wt==='note'?'·':e.wt;
+  return `<div class="row"><span class="k">${e.k}</span><span class="wt ${wtcls}">${wt}</span><span class="desc">${e.desc}</span></div>`;
+}
+
+/* ---------------- DAG ---------------- */
+function dagLegend(){
+  const items=[['Assert','var(--assert)'],['Link','var(--link)'],['Contest','var(--contest)'],['Attest','var(--attest)'],['Amend','var(--amend)'],['Tombstone','var(--tomb)']];
+  return `<div class="legend">${items.map(([n,c])=>`<span class="it"><span class="sw" style="background:${c}"></span>${n}</span>`).join('')}</div>`;
+}
+function dagSVG(c){
+  const W=620,H=290,nodeW=150,nodeH=52;
+  const byId=Object.fromEntries(c.events.map(e=>[e.id,e]));
+  let edges='';
+  c.events.forEach(e=>e.parents.forEach(pid=>{
+    const a=byId[pid]; if(!a)return;
+    const x1=a.x+nodeW,y1=a.y+nodeH/2,x2=e.x,y2=e.y+nodeH/2,mx=(x1+x2)/2;
+    edges+=`<path class="edge ${e.type==='Contest'?'contest':''}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+  }));
+  const nodes=c.events.map(e=>{
+    const col=TYPE_COLORS[e.type]||'var(--ink-2)';
+    const sub=e.conf?('match '+e.conf):(e.method?e.method:(e.vm?e.vm:e.when));
+    return `<g class="node" onclick="showEvent('${c.id}','${e.id}')">
+        <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${col}"/>
+        <text x="${e.x+12}" y="${e.y+21}">${e.type}</text>
+        <text class="sub" x="${e.x+12}" y="${e.y+38}">${trunc(e.inst,18)}</text>
+        <text class="sub" x="${e.x+nodeW-12}" y="${e.y+38}" text-anchor="end">${trunc(sub,16)}</text>
+      </g>`;
+  }).join('');
+  return `<svg class="dag" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMin meet">${edges}${nodes}</svg>`;
+}
+function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+'…':s;}
+
+/* ---------------- Event slide-over ---------------- */
+function showEvent(cid,eid){
+  const c=CASES.find(x=>x.id===cid); const e=c.events.find(x=>x.id===eid);
+  const col=TYPE_COLORS[e.type]||'var(--ink-2)';
+  $('sheetHd').innerHTML=`<span class="pill" style="background:${col}">${e.type}</span><button class="x" onclick="closeSheet()">×</button>`;
+  $('sheetBd').innerHTML=`
+    <div class="muted" style="font-size:13px;margin-bottom:10px">${TYPE_DESC[e.type]||''}</div>
+    <div class="kv">
+      <div class="k">Originating</div><div class="v">${e.inst}</div>
+      <div class="k">Recorded</div><div class="v">${e.when}</div>
+      ${e.vm?`<div class="k">Verification</div><div class="v">${e.vm}</div>`:''}
+      ${e.conf?`<div class="k">Match score</div><div class="v">${e.conf}</div>`:''}
+      ${e.method?`<div class="k">Link method</div><div class="v">${e.method}</div>`:''}
+      <div class="k">Parents</div><div class="v">${e.parents.length?e.parents.join(', '):'root (none)'}</div>
+    </div>
+    <div style="margin-top:14px;font-size:13px">${e.summary||''}</div>
+    <div class="codecard"><span class="kk">event_type</span>: <span class="vv">"${e.type}"</span>
+<span class="kk">institution</span>: <span class="vv">"${e.inst}"</span>
+<span class="kk">signature</span>:&nbsp; <span class="vv">ed25519:verified ✓</span></div>`;
+  $('scrim').classList.add('on'); $('sheet').classList.add('on');
+}
+function closeSheet(){$('scrim').classList.remove('on');$('sheet').classList.remove('on');}
+
+/* ---------------- Action modal ---------------- */
+let PENDING=null;
+function askAction(cid,idx){
+  const c=CASES.find(x=>x.id===cid); const a=c.actions[idx];
+  PENDING={cid,a};
+  const writes=!!a.ev; const col=TYPE_COLORS[a.ev]||'var(--ink-2)';
+  $('modalHd').innerHTML=writes?`<span class="pill" style="background:${col}">${a.ev}</span><b style="font-size:15px">Confirm this action</b>`:`<b style="font-size:15px">No graph change</b>`;
+  $('modalBd').innerHTML=`
+    <div style="font-size:14px;margin-bottom:6px"><b>${a.label}</b></div>
+    <div class="muted" style="font-size:13px">${a.note}</div>
+    ${writes?`<div class="codecard">A new signed event will be appended to the patient subgraph:
+<span class="kk">event_type</span>:&nbsp; <span class="vv">"${a.ev}"</span>
+<span class="kk">signed_by</span>:&nbsp;&nbsp; <span class="vv">"Mercy General · S. Okafor (steward)"</span>
+<span class="kk">references</span>: <span class="vv">[ the events under review ]</span></div>
+    <div class="muted" style="font-size:12px;margin-top:10px">Identity events are advisory — this informs the projection; it does not delete another institution's record.${a.ev==='Amend'?' An Amend must be accepted by the originating institution to take effect (§3.4.5).':''}${a.ev==='Tombstone'?' Tombstoning scrubs content while preserving graph topology (§3.4.6).':''}</div>`:`<div class="muted" style="font-size:12px;margin-top:10px">No event is written; the case is simply cleared from the queue.</div>`}`;
+  const btn=$('modalConfirm');
+  btn.textContent=writes?`Sign & record ${a.ev}`:'Confirm';
+  btn.onclick=commit;
+  $('modal').classList.add('on');
+}
+function commit(){
+  const {cid,a}=PENDING;
+  RESOLVED[cid]=a.label;
+  closeModal();
+  openCase(cid);
+  toast(a.ev?`${a.ev} recorded — propagating to peers`:'Case cleared');
+}
+function closeModal(){$('modal').classList.remove('on');PENDING=null;}
+
+let toastT=null;
+function toast(msg){const t=$('toast');t.innerHTML=`<span>✓</span> ${msg}`;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600);}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSheet();closeModal();}});
+renderQueue();
+openCase('c1');
+</script>
+</body>
+</html>
