@@ -105,6 +105,44 @@ graph at all. Everything that moves between peers is one of: a signed CBOR event
 tokenized content), a set of UUIDs and Merkle roots for reconciliation, or DHT routing records —
 all inside encrypted, mutually-authenticated Noise channels.
 
+The three exchanges, in sequence:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant EHR as Institution / EHR
+    participant A as Peer A
+    participant B as Peer B
+    participant C as Peer C
+    participant DHT as Kademlia DHT
+
+    Note over EHR,DHT: 1 · Event gossip — the main flow (spreads in ~log N rounds, ~1–2 s)
+    EHR->>A: create event — Assert / Link / Grant / Revoke / Tombstone
+    Note right of A: peer batches events,<br/>flushing at 64 events or 100 ms
+    A->>B: GossipBatch over Noise — sender ID, seq no., CBOR event nodes
+    A->>C: GossipBatch (same)
+    Note over B: verify signature → store → dedup by UUID
+    B->>C: re-gossip the batch
+    C-->>B: UUID already seen — ignored
+
+    Note over A,C: 2 · Anti-entropy — the backstop (periodic reconcile)
+    B->>C: Merkle root over the sorted event-UUID set
+    alt roots match
+        C-->>B: in sync — nothing more sent
+    else roots differ
+        C->>B: its UUID set (to compute the delta)
+        B->>C: only the missing event nodes
+    end
+
+    Note over A,DHT: 3 · DHT routing and targeted pull — discovery
+    C->>DHT: look up tokenized subgraph key
+    DHT-->>C: peer IDs that hold the subgraph
+    C->>A: request events — point to point
+    A-->>C: CBOR event nodes · or a detached AuthorizationGrant
+
+    Note over EHR,DHT: On the wire: tokenized CBOR events · UUIDs and Merkle roots · DHT routing records — all inside encrypted, mutually-authenticated Noise. Never: cleartext PHI.
+```
+
 ## Technology at a glance
 
 | Layer | Choice |
