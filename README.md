@@ -60,6 +60,51 @@ libp2p adapter itself remains an opt-in, separately-reconciled module (see *Veri
   HAPI FHIR, RocksDB/libgit2, the `pqcrypto` family, SPIRE, cert-manager, TEFCA
   tokenization). Only the healthcare-domain layer is new code. See spec **Appendix C**.
 
+## What peers exchange
+
+Three distinct kinds of exchange flow between Creda peers. They are worth separating because
+they carry different things — and because none of them ever carries cleartext PHI.
+
+**1. Event gossip (the main flow).** When an institution creates an event — a new identity
+assertion, a link, an authorization grant, a revocation, a tombstone — its peer pushes that
+event to a handful of neighboring peers, who push it onward, spreading it across the network in
+roughly log(N) rounds (about 1–2 seconds network-wide). What is on the wire is a *batch* of
+event nodes serialized in canonical CBOR, inside an encrypted Noise channel. Each batch carries:
+
+- the sender's peer ID,
+- a batch sequence number (for deduplication), and
+- the serialized events themselves.
+
+Batches flush every 100 ms or when they reach 64 events, whichever comes first — amortizing
+encryption and framing overhead and cutting message count 10–50× versus sending events one at a
+time. Each event node inside a batch contains its UUIDv7 (the address), the event type, parent
+UUIDs (the edges of the graph), the payload, the originating institution's signature,
+timestamps, and a logical clock. Critically, the payload carries **tokenized demographics, never
+cleartext PHI** — cleartext patient data never traverses the gossip network by design. Receiving
+peers verify the signature, store the event, and re-gossip it; they ignore any event UUID they
+have already seen.
+
+**2. Anti-entropy (the backstop).** Gossip is best-effort, so peers periodically reconcile. Two
+peers holding the same patient's subgraph exchange a Merkle root computed over their *sorted set
+of event UUIDs* — deliberately not over event contents, so tombstoning (which mutates content)
+never makes two peers with the same event set diverge. If the roots match, they are in sync and
+nothing more is sent. If they differ, they exchange the UUID sets each holds, identify the
+delta, and transfer only the missing event nodes. This is how anything gossip dropped — during a
+partition, an outage, or message loss — eventually gets caught.
+
+**3. DHT routing and targeted pulls (discovery).** To find who holds a given patient's events,
+peers exchange DHT records that map a *tokenized* subgraph key to peer IDs — again, tokens, not
+demographics. Once a peer learns which peers hold a subgraph, it makes a targeted
+point-to-point request for the actual event nodes. A **Portable Authorization Artifact** (a
+signed `AuthorizationGrant` in CBOR) can travel this way too — detached and handed to a relying
+party so it can verify authorization locally.
+
+**What never crosses the wire.** Cleartext PHI. Demographics are tokenized before anything is
+gossiped, the DHT only ever sees tokenized keys, and clinical payloads never enter the trust
+graph at all. Everything that moves between peers is one of: a signed CBOR event node (with
+tokenized content), a set of UUIDs and Merkle roots for reconciliation, or DHT routing records —
+all inside encrypted, mutually-authenticated Noise channels.
+
 ## Technology at a glance
 
 | Layer | Choice |
