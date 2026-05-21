@@ -23,8 +23,17 @@ else
 fi
 
 echo
-echo "== doctests =="
-cargo test --workspace --doc --quiet
+# Doctests run separately because nextest does not execute them. Today no crate has runnable
+# `///` code examples, so this is a no-op — but keeping it means the moment someone adds (or
+# breaks) a doc example, it is actually compiled and tested. Stay quiet on success; show detail
+# only on failure, so a 0-doctest run adds just one line.
+if doc_output="$(cargo test --workspace --doc --quiet 2>&1)"; then
+  echo "doctests: ok"
+else
+  printf '%s\n' "$doc_output"
+  echo "doctests: FAILED"
+  exit 1
+fi
 
 echo
 echo "⚓ anchor creda: complete — see the rolled-up summary above."
