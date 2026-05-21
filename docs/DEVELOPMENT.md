@@ -46,8 +46,14 @@ anchor creda      # the known-good full run: workspace tests, single-threaded (=
 ```
 
 `anchor creda` is the run to trust when you want a definitive green: it builds everything and
-runs the whole suite single-threaded, which keeps the RocksDB from-source compile within a
-memory-limited Docker VM (no OOM). Equivalently, `make anchor` does the same without the wrapper.
+runs the whole suite single-threaded (keeping the RocksDB from-source compile within a
+memory-limited Docker VM, no OOM) and prints **one rolled-up summary** — not a separate result
+block per test binary. It uses [cargo-nextest](https://nexte.st), which runs the whole workspace
+and reports a single workspace-wide total; `--status-level fail` suppresses the per-passing-test
+rows, so on success you see just the build plus one `Summary: N tests run: N passed` line (plus a
+separate doctest line). If nextest is somehow unavailable it falls back to plain `cargo test`.
+The logic lives in `tools/anchor-run.sh`. Equivalently, `make anchor` (or `make summary`) runs it
+without the wrapper.
 
 To make `anchor creda` work from anywhere, put the script on your PATH — either symlink it:
 

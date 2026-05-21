@@ -50,6 +50,17 @@ RUN set -eux; \
         rustup component add rustfmt clippy 2>/dev/null || true; \
     fi
 
+# cargo-nextest — gives a single rolled-up, workspace-wide test summary (instead of one block
+# per test binary). Installed as a prebuilt binary into the shared cargo bin, arch-detected.
+RUN set -eux; \
+    case "$(uname -m)" in \
+      x86_64) nt=linux ;; \
+      aarch64|arm64) nt=linux-arm ;; \
+      *) nt=linux ;; \
+    esac; \
+    curl -LsSf "https://get.nexte.st/latest/$nt" | tar zxf - -C /usr/local/cargo/bin; \
+    chmod a+rx /usr/local/cargo/bin/cargo-nextest
+
 # Non-root user for the VS Code devcontainer path. The Makefile path overrides the user with the
 # host UID/GID via `docker run --user`, so file ownership stays correct either way. (Note: at
 # runtime the Makefile sets CARGO_HOME=/work/.cargo-cache for the dependency cache; the toolchain

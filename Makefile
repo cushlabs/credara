@@ -5,8 +5,8 @@
 # dependencies — so no developer installs cargo/rustc/clippy by hand. See docs/DEVELOPMENT.md.
 #
 # Usage:
-#   make anchor      # full suite, single-threaded — the "known-good" run (= test JOBS=1).
-#                    #   Also available as `anchor creda` (see the ./anchor wrapper).
+#   make anchor      # the known-good run: whole workspace, single-threaded build, with ONE
+#                    #   rolled-up test summary (cargo-nextest). Also `make summary` / `anchor creda`.
 #   make test        # full workspace test suite (PQC algorithms included)
 #   make test-fast   # Ed25519-only fast path (no pqcrypto / C build)
 #   make fmt         # apply rustfmt
@@ -50,15 +50,20 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor dev-image test test-fast fmt fmt-check clippy build shell ci clean
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
 
-# The "anchor" run: full workspace suite, single-threaded so the RocksDB from-source compile
-# stays within a memory-limited Docker VM (the known-good command). Same as `anchor creda`.
+# The "anchor" run (= `anchor creda`): build + test the whole workspace single-threaded (so the
+# RocksDB from-source compile stays within a memory-limited Docker VM) and print ONE rolled-up
+# summary via cargo-nextest (failures-only + a workspace-wide total) instead of a result block
+# per test binary. Falls back to `cargo test` if nextest is missing. See tools/anchor-run.sh.
 anchor: dev-image
-	$(RUN) cargo test --workspace --jobs 1
+	$(RUN) bash tools/anchor-run.sh
+
+# Alias.
+summary: anchor
 
 test: dev-image
 	$(RUN) cargo test --workspace $(CARGO_JOBS)
