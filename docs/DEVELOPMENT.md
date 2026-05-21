@@ -120,13 +120,14 @@ The bridge (`bridge/`) is the one non-Rust component, so it builds separately fr
 — Docker-only, no local JDK needed:
 
 ```sh
-make bridge      # builds bridge/ in a gradle:8.10-jdk21 container
+make bridge        # builds bridge/ on the Fedora+OpenJDK+Gradle parity image (DQ-6)
+make bridge-stock  # fallback: build on the prebuilt Debian gradle image, if the Fedora image hiccups
 ```
 
 It runs as your host user, caches Gradle/Maven in a gitignored `./.gradle-cache/`, and mounts the
-repo root (the bridge generates its gRPC stubs from `crates/creda-core/proto`). It's a scaffold
-that hasn't been compiled yet (see `bridge/README.md`), so expect to iterate on HAPI/grpc-java
-version reconciliation.
+repo root (the bridge generates its gRPC stubs from `crates/creda-core/proto`). Per the build/prod
+parity principle (DQ-6), the build image is Fedora + OpenJDK + Gradle — the same OS family as the
+shipped Hummingbird OpenJDK image — built from `.devcontainer/bridge.Dockerfile`.
 
 ## Notes for the `creda-events` crate (M1)
 

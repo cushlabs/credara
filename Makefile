@@ -33,9 +33,13 @@ DEV_DOCKERFILE := .devcontainer/Dockerfile
 #   make DEV_BASE=docker.io/library/rust:1-bookworm anchor
 DEV_BASE ?= registry.fedoraproject.org/fedora:41
 
-# Image for the FHIR Bridge build (M7): a stock Gradle + JDK image, so the bridge builds with
-# only Docker (no local JDK; the Rust dev image has no Java). Pins the Gradle version.
-BRIDGE_IMAGE ?= docker.io/library/gradle:8.10-jdk21
+# FHIR Bridge build image (M7): Fedora + OpenJDK + Gradle, built from .devcontainer/bridge.Dockerfile
+# for build/prod parity (DQ-6 — same OS family as the shipped Hummingbird OpenJDK image). The
+# prebuilt Debian-based gradle image remains a fallback via `make bridge-stock`.
+BRIDGE_DEV_IMAGE   ?= creda-bridge-dev:local
+BRIDGE_DOCKERFILE  := .devcontainer/bridge.Dockerfile
+BRIDGE_BASE        ?= registry.fedoraproject.org/fedora:41
+BRIDGE_STOCK_IMAGE ?= docker.io/library/gradle:8.10-jdk21
 
 # Optional cap on build parallelism. Empty = use all cores (fastest). Set JOBS=1 (or 2) to
 # bound peak memory when compiling RocksDB on a memory-limited Docker VM. A single `-j` also
@@ -55,7 +59,7 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean bridge
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean bridge bridge-image bridge-stock
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
@@ -98,16 +102,28 @@ shell: dev-image
 		--user $(UID):$(GID) \
 		$(DEV_IMAGE) bash
 
-# Build the HAPI FHIR Bridge (M7) in a Gradle+JDK container — the bridge is the one Java/Kotlin
-# component and is NOT part of `anchor creda`. Runs as the host user; the Gradle/Maven cache lives
-# in a gitignored in-repo dir. The repo root is mounted because the bridge generates its gRPC
-# stubs from the shared proto under crates/creda-core/proto.
-bridge:
+# Build the HAPI FHIR Bridge (M7) — the one Java/Kotlin component, NOT part of `anchor creda`.
+# Default builds on the Fedora+OpenJDK+Gradle parity image (DQ-6). Runs as the host user; the
+# Gradle/Maven cache lives in a gitignored in-repo dir; the repo root is mounted because the bridge
+# generates its gRPC stubs from the shared proto under crates/creda-core/proto.
+bridge-image:
+	docker build -t $(BRIDGE_DEV_IMAGE) --build-arg BASE=$(BRIDGE_BASE) -f $(BRIDGE_DOCKERFILE) .
+
+bridge: bridge-image
 	docker run --rm \
 		-v "$(CURDIR)":/work -w /work/bridge \
 		-e GRADLE_USER_HOME=/work/.gradle-cache -e HOME=/work/.gradle-cache \
 		--user $(UID):$(GID) \
-		$(BRIDGE_IMAGE) gradle build --no-daemon
+		$(BRIDGE_DEV_IMAGE) gradle build --no-daemon
+
+# Fallback: build on the prebuilt Debian-based gradle image (no custom image build) if the Fedora
+# parity image ever hiccups.
+bridge-stock:
+	docker run --rm \
+		-v "$(CURDIR)":/work -w /work/bridge \
+		-e GRADLE_USER_HOME=/work/.gradle-cache -e HOME=/work/.gradle-cache \
+		--user $(UID):$(GID) \
+		$(BRIDGE_STOCK_IMAGE) gradle build --no-daemon
 
 clean:
 	rm -rf target .cargo-cache bridge/build bridge/.gradle .gradle-cache

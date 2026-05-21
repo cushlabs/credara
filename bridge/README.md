@@ -19,12 +19,14 @@ framework, validator, Subscription and Bulk Data support.
 > **Critical constraint:** the Bridge is a TRANSLATOR, NOT A REASONER (§10.4.2). All identity
 > logic, confidence computation, traversal, and authorization evaluation live in Creda Core.
 
-## Status: scaffold (M7) — separate toolchain, not yet compiled
+## Status: M7 scaffold — builds green ✓ (logic stubs are follow-ups)
 
 This is the one **Java/Kotlin** component (Spring Boot + HAPI FHIR R4 + grpc-java, built with
-Gradle). It builds **separately** from the Rust workspace — `anchor creda` does not touch it — and
-it was authored without a JDK in the build environment, so it has **not been compiled**.
-Version-sensitive spots are marked `TODO(bridge-verify)`; reconcile them on first `gradle build`.
+Gradle). It builds **separately** from the Rust workspace — `anchor creda` does not touch it; use
+`make bridge`. `gradle build` is **green** (the project compiles and the gRPC stubs generate from
+the shared proto). The FHIR↔CBOR encoders/mappers and the remaining operations are runtime
+`TODO(bridge-verify)` stubs (they throw `TODO()` until implemented), so the build compiles but
+those operations are not yet functional — see below.
 
 ### Layout
 - `build.gradle.kts` / `gradle.properties` — deps (HAPI, Spring Boot, grpc-java, netty UDS) and
