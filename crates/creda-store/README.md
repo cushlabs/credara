@@ -12,10 +12,12 @@ index rebuild-on-startup.
 **Assemble:** rust-rocksdb. **Scaffold:** a libgit2-backed `Store` impl behind the same trait —
 `TODO(open-question-13.1)`, the storage-substrate trade study is unresolved.
 
-## Status: implemented (M2), tests pending local run
+## Status: implemented and verified (M2) ✓
 
-Registered as a workspace member; verify with `make test` (Docker-only) or `cargo test -p
-creda-store`.
+Registered as a workspace member; full suite (incl. the RocksDB backend) passes. Re-run with
+`make test` (Docker-only) or `cargo test -p creda-store`. RocksDB compiles from source and is
+memory-hungry — on a constrained Docker VM use `make test JOBS=1` or raise Docker's memory
+(see `docs/DEVELOPMENT.md`). Verified versions: `rocksdb 0.22.0` (`librocksdb-sys 0.16.0+8.10.0`).
 
 ### Backends
 - `MemoryStore` — always available; in-memory, for tests and for downstream crates that don't
