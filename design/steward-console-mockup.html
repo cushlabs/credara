@@ -402,7 +402,7 @@ function dagLegend(){
   return `<div class="legend">${items.map(([n,c])=>`<span class="it"><span class="sw" style="background:${c}"></span>${n}</span>`).join('')}</div>`;
 }
 function dagSVG(c){
-  const W=620,H=290,nodeW=150,nodeH=52;
+  const nodeW=150,nodeH=52,margin=18;
   const byId=Object.fromEntries(c.events.map(e=>[e.id,e]));
   let edges='';
   c.events.forEach(e=>e.parents.forEach(pid=>{
@@ -413,13 +413,18 @@ function dagSVG(c){
   const nodes=c.events.map(e=>{
     const col=TYPE_COLORS[e.type]||'var(--ink-2)';
     const sub=e.conf?('match '+e.conf):(e.method?e.method:(e.vm?e.vm:e.when));
+    // Just-recorded steward events get a dashed light border to mark them as new + pending replication.
+    const mark=e._new?' stroke="#fff" stroke-dasharray="4 3" stroke-width="2"':'';
     return `<g class="node" onclick="showEvent('${c.id}','${e.id}')">
-        <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${col}"/>
+        <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${col}"${mark}/>
         <text x="${e.x+12}" y="${e.y+21}">${e.type}</text>
         <text class="sub" x="${e.x+12}" y="${e.y+38}">${trunc(e.inst,18)}</text>
         <text class="sub" x="${e.x+nodeW-12}" y="${e.y+38}" text-anchor="end">${trunc(sub,16)}</text>
       </g>`;
   }).join('');
+  // Size the canvas to its contents so appended nodes are never clipped.
+  const W=Math.max(620, ...c.events.map(e=>e.x+nodeW))+margin;
+  const H=Math.max(290, ...c.events.map(e=>e.y+nodeH))+margin;
   return `<svg class="dag" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMin meet">${edges}${nodes}</svg>`;
 }
 function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+'…':s;}
@@ -470,9 +475,25 @@ function askAction(cid,idx){
 function commit(){
   const {cid,a}=PENDING;
   RESOLVED[cid]=a.label;
+  if(a.ev) appendEvent(cid,a.ev,a.label);  // reflect the written event in the provenance graph
   closeModal();
   openCase(cid);
   toast(a.ev?`${a.ev} recorded — propagating to peers`:'Case cleared');
+}
+
+/* Append the steward's just-signed event as a new node in the case's provenance graph,
+   linked to the event(s) under review (the Link if present, otherwise the latest event). */
+function appendEvent(cid,type,label){
+  const c=CASES.find(x=>x.id===cid);
+  const parent=c.events.find(e=>e.type==='Link') || c.events[c.events.length-1];
+  const priorNew=c.events.filter(e=>e._new).length;
+  const rightmost=Math.max(...c.events.map(e=>e.x));
+  c.events.push({
+    id:'n'+(priorNew+1), type, inst:'Mercy General (you)', when:'just now',
+    parents:parent?[parent.id]:[], _new:true,
+    x:rightmost+190, y:70+priorNew*78,
+    summary:'Recorded by the steward — '+label+'.'
+  });
 }
 function closeModal(){$('modal').classList.remove('on');PENDING=null;}
 
