@@ -1,0 +1,92 @@
+---
+# Deploy Creda onto an EXISTING Kubernetes cluster (DQ-2, spec §10.6). Does NOT provision the
+# cluster or OS. Idempotent: validates prerequisites, installs Creda's cluster dependencies
+# (cert-manager + SPIRE), deploys the Creda Helm release with non-root values, and verifies
+# rollout.
+#
+# Requires the kubernetes.core collection + the `kubernetes` Python package (see requirements.yml)
+# and a working kubeconfig. Run:
+#   ansible-playbook -i inventory.ini deploy.yml -e @group_vars/all.yml
+- name: Deploy Creda onto an existing cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    creda_namespace: creda
+    cert_manager_version: v1.15.1
+    spire_version: 0.21.0
+    creda_chart_path: "{{ playbook_dir }}/../helm/creda"
+    creda_values: {}   # override per-deployment (image repos/tags, posture, persistence, ...)
+
+  tasks:
+    # ---- Step 1: prerequisites (fail fast, §10.6) ----
+    - name: Ensure kubeconfig is set
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.env', 'KUBECONFIG') | length > 0 or (ansible_env.HOME is defined)
+        fail_msg: "No kubeconfig available — set KUBECONFIG."
+    - name: Ensure helm is installed
+      ansible.builtin.command: helm version --short
+      changed_when: false
+
+    - name: Create the Creda namespace with the restricted Pod Security Standard (DQ-1)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ creda_namespace }}"
+            labels:
+              pod-security.kubernetes.io/enforce: restricted
+
+    # ---- Step 2: cluster dependencies (idempotent) ----
+    - name: Install cert-manager (UDAP cert rotation, §7.4.6)
+      kubernetes.core.helm:
+        name: cert-manager
+        chart_ref: cert-manager
+        chart_repo_url: https://charts.jetstack.io
+        release_namespace: cert-manager
+        create_namespace: true
+        chart_version: "{{ cert_manager_version }}"
+        set_values:
+          - { value: "crds.enabled=true" }
+        wait: true
+
+    - name: Install SPIRE (SPIFFE workload identity, §6.1.1)
+      kubernetes.core.helm:
+        name: spire
+        chart_ref: spire
+        chart_repo_url: https://spiffe.github.io/helm-charts-hardened
+        release_namespace: spire-system
+        create_namespace: true
+        chart_version: "{{ spire_version }}"
+        wait: true
+
+    # ---- Step 3: deploy Creda (with non-root values, DQ-1) ----
+    - name: Deploy the Creda peer Helm release
+      kubernetes.core.helm:
+        name: creda
+        chart_ref: "{{ creda_chart_path }}"
+        release_namespace: "{{ creda_namespace }}"
+        values: "{{ creda_values }}"
+        wait: true
+        timeout: 10m
+
+    # ---- Step 4: verify rollout ----
+    - name: Wait for the Creda StatefulSet to be ready
+      kubernetes.core.k8s_info:
+        kind: StatefulSet
+        namespace: "{{ creda_namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=creda
+      register: creda_sts
+      until: >-
+        creda_sts.resources | length > 0 and
+        (creda_sts.resources[0].status.readyReplicas | default(0)) ==
+        (creda_sts.resources[0].spec.replicas | default(1))
+      retries: 30
+      delay: 10
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: "Creda deployed to namespace '{{ creda_namespace }}' and rollout is ready."

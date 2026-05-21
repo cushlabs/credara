@@ -1,0 +1,12 @@
+# Peer configuration as CREDA_* env vars (consumed by creda-core's hierarchical config, §10.1.6).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "creda.fullname" . }}-config
+  labels: {{- include "creda.labels" . | nindent 4 }}
+data:
+  CREDA_DATA_DIR: {{ .Values.config.dataDir | quote }}
+  CREDA_GRPC_SOCKET: {{ .Values.config.grpcSocket | quote }}
+  CREDA_LIBP2P_LISTEN: {{ .Values.config.libp2pListen | quote }}
+  CREDA_DEFAULT_POSTURE: {{ .Values.config.defaultPosture | quote }}
+  CREDA_SNAPSHOT_INTERVAL_SECS: {{ .Values.config.snapshotIntervalSecs | quote }}

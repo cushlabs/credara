@@ -30,3 +30,30 @@
 > `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`,
 > `capabilities.drop: [ALL]`, `seccompProfile: RuntimeDefault`. The chart must install
 > under the **restricted** Pod Security Standard. CI fails on any root container.
+
+## Status: implemented (M8) — artifacts written; full verification on the test bed (DQ-3)
+
+These are deployment manifests/Dockerfiles (no compile), so they're authored faithfully but not
+runtime-verified here (no k8s/Docker in the authoring environment). End-to-end verification —
+`helm install` on kind/k3d, peers joining and replicating — lives in `testbed/` (DQ-3, M9).
+
+Concrete files:
+- `docker/core.Dockerfile`, `docker/bridge.Dockerfile` — multi-stage; Hummingbird FIPS runtime
+  bases (DQ-4), non-root. Built from the **repo root** (they need the workspace / shared proto).
+- `helm/creda/` — `Chart.yaml`, `values.yaml`, and templates: `statefulset` (Core + Bridge
+  containers sharing an `emptyDir` UDS at `/var/run/creda`, §10.5.1; data PVC; full non-root
+  `securityContext`; `/livez` `/readyz` probes), `service` (FHIR ClusterIP + libp2p NodePort/LB +
+  headless), `configmap`, `rbac` (minimal Role + ServiceAccount), `networkpolicy`,
+  `poddisruptionbudget`, `cronjob-snapshot`.
+- `compose/docker-compose.yml` — laptop dev (Core + Bridge + optional MinIO via `--profile storage`).
+- `ansible/deploy.yml` — deploy onto an existing cluster (DQ-2): restricted-PSS namespace →
+  cert-manager + SPIRE (idempotent) → Creda Helm release → verify rollout. `requirements.yml`,
+  `inventory.example.ini`, `group_vars/all.example.yml`.
+
+### Known reconciliation items (TODO)
+- Pin exact Hummingbird FIPS image references/digests (DQ-4) — placeholders today.
+- The core image build enables `--features grpc,libp2p`; that needs the libp2p adapter reconciled
+  and protoc in the builder — Compose defaults to `FEATURES=grpc` for now. The deployment layer is
+  intentionally ahead of the in-daemon gRPC-serve socket + libp2p-transport wiring (tracked).
+- Snapshot CronJob vs. RWO PVC: lightweight snapshots run in-daemon (§10.5.2); the CronJob's
+  trigger mechanism is a TODO (see the template).

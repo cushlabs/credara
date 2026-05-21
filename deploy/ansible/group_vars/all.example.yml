@@ -1,0 +1,20 @@
+---
+# Copy to group_vars/all.yml and adjust. These override deploy.yml's defaults.
+creda_namespace: creda
+cert_manager_version: v1.15.1
+spire_version: 0.21.0
+
+# Values passed to the Creda Helm chart (see deploy/helm/creda/values.yaml for all knobs).
+creda_values:
+  image:
+    core:
+      repository: ghcr.io/REPLACE_ME/creda-core
+      tag: "0.1.0"
+    bridge:
+      repository: ghcr.io/REPLACE_ME/creda-bridge
+      tag: "0.1.0"
+  config:
+    defaultPosture: treatment-presumed
+  persistence:
+    size: 50Gi
+    storageClass: ""   # "" = cluster default; set for cloud (e.g. gp3) or on-prem

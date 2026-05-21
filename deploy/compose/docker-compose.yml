@@ -1,0 +1,55 @@
+# Laptop / single-node development (spec §7.4.7, §6.4.3). Same images and config as the Helm
+# chart — only values differ. Core + Bridge share a volume for the Unix domain socket (§10.5.1).
+# Build context is the REPO ROOT.
+services:
+  core:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/core.Dockerfile
+      args:
+        FEATURES: grpc   # libp2p added once the adapter is reconciled (see core.Dockerfile)
+    image: creda-core:dev
+    volumes:
+      - uds:/var/run/creda
+      - data:/var/lib/creda
+    environment:
+      CREDA_DATA_DIR: /var/lib/creda
+      CREDA_GRPC_SOCKET: /var/run/creda/core.sock
+      CREDA_LIBP2P_LISTEN: /ip4/0.0.0.0/tcp/4001
+      CREDA_DEFAULT_POSTURE: treatment-presumed
+    ports:
+      - "4001:4001"   # libp2p
+      - "9090:9090"   # /livez /readyz /metrics
+
+  bridge:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/bridge.Dockerfile
+    image: creda-bridge:dev
+    depends_on: [core]
+    volumes:
+      - uds:/var/run/creda
+    environment:
+      CREDA_CORE_SOCKET: /var/run/creda/core.sock
+    ports:
+      - "8080:8080"   # FHIR HTTP
+
+  # Optional in-cluster object storage for snapshots (§7.4.4). Enable with:
+  #   docker compose --profile storage up
+  minio:
+    image: quay.io/minio/minio:latest
+    profiles: ["storage"]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: creda
+      MINIO_ROOT_PASSWORD: creda-dev-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio:/data
+
+volumes:
+  uds: {}
+  data: {}
+  minio: {}

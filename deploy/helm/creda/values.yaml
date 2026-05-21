@@ -1,0 +1,93 @@
+# Creda peer Helm values (spec §10.6.5). Every reasonable knob is exposed here.
+#
+# SECURITY (DQ-1): the chart is non-root throughout and is designed to install into a namespace
+# labeled with the RESTRICTED Pod Security Standard:
+#   kubectl label namespace <ns> pod-security.kubernetes.io/enforce=restricted
+# Images are Fedora Hummingbird FIPS distroless (DQ-4).
+
+replicaCount: 1  # one StatefulSet replica = one peer; most institutions run 1-3 (§10.6.2)
+
+image:
+  core:
+    repository: ghcr.io/REPLACE_ME/creda-core   # TODO(DQ-4): Hummingbird-based core image
+    tag: ""                                      # defaults to .Chart.appVersion
+    pullPolicy: IfNotPresent
+  bridge:
+    repository: ghcr.io/REPLACE_ME/creda-bridge  # TODO(DQ-4): Hummingbird OpenJDK image
+    tag: ""
+    pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# --- Peer configuration (rendered into the ConfigMap; mirrors creda-core's CredaConfig) ---
+config:
+  dataDir: /var/lib/creda
+  grpcSocket: /var/run/creda/core.sock   # shared emptyDir UDS between Core and Bridge (§10.5.1)
+  libp2pListen: /ip4/0.0.0.0/tcp/4001
+  defaultPosture: treatment-presumed     # or deny-by-default (§9.3.2)
+  snapshotIntervalSecs: 21600            # 6h (§7.3.3)
+  subscribedBuckets: []
+
+# Secrets are referenced, never embedded (§10.6.5): create these k8s Secrets out-of-band.
+secrets:
+  udapCertSecret: creda-udap-cert        # institutional UDAP certificate + key
+  signingKeySecret: creda-signing-key    # event signing key (HSM/KMS preferred, §10.1.4)
+  registryKeySecret: creda-registry-key  # coordinator's public key (trust anchor)
+
+ports:
+  http: 8080      # HAPI FHIR (Bridge), ClusterIP
+  libp2p: 4001    # peer-to-peer (NodePort/LoadBalancer)
+  health: 9090    # /livez /readyz /metrics (§10.5.3)
+libp2pService:
+  type: NodePort  # or LoadBalancer for cloud
+
+# Resource baselines (§10.6.4): Core ~1 core/1Gi, Bridge ~1 core/3Gi (Java heap).
+resources:
+  core:
+    requests: { cpu: "1", memory: 1Gi }
+    limits: { cpu: "2", memory: 2Gi }
+  bridge:
+    requests: { cpu: "1", memory: 3Gi }
+    limits: { cpu: "2", memory: 6Gi }
+
+persistence:
+  enabled: true
+  size: 50Gi          # §10.6.3
+  storageClass: ""    # "" = cluster default
+  accessMode: ReadWriteOnce
+
+# Non-root hardening (DQ-1). Applied at pod and container level; chart installs under the
+# restricted Pod Security Standard.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop: ["ALL"]
+
+networkPolicy:
+  enabled: true     # restrict Core to libp2p peers + Bridge; Bridge to authorized FHIR clients (§10.6.5)
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1   # keep at least one peer during voluntary disruptions (§10.6.5)
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Snapshot CronJob (§7.5 / §10.5.2 — the process-isolated variant; lightweight snapshots may
+# instead run in-daemon). Calls `creda snapshot`.
+snapshotCronJob:
+  enabled: true
+  schedule: "0 */6 * * *"   # every 6h
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

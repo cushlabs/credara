@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "creda.fullname" . }}
+  labels:
+    {{- include "creda.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "creda.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "creda.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "creda.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Re-roll pods when the config changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "creda.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        # ---- Creda Core (Rust peer daemon) ----
+        - name: creda-core
+          image: {{ include "creda.coreImage" . }}
+          imagePullPolicy: {{ .Values.image.core.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          args: ["serve"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "creda.fullname" . }}-config
+          ports:
+            - { name: libp2p, containerPort: {{ .Values.ports.libp2p }} }
+            - { name: health, containerPort: {{ .Values.ports.health }} }
+          livenessProbe:
+            httpGet: { path: /livez, port: health }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            # NotReady until bootstrap completes, so it doesn't take traffic early (§10.5.3).
+            httpGet: { path: /readyz, port: health }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.core | nindent 12 }}
+          volumeMounts:
+            - { name: uds, mountPath: /var/run/creda }
+            - { name: data, mountPath: {{ .Values.config.dataDir }} }
+            - { name: tmp, mountPath: /tmp }
+        # ---- HAPI FHIR Bridge (Java) ----
+        - name: hapi-bridge
+          image: {{ include "creda.bridgeImage" . }}
+          imagePullPolicy: {{ .Values.image.bridge.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - { name: CREDA_CORE_SOCKET, value: {{ .Values.config.grpcSocket | quote }} }
+          ports:
+            - { name: http, containerPort: {{ .Values.ports.http }} }
+          readinessProbe:
+            httpGet: { path: /fhir/metadata, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.bridge | nindent 12 }}
+          volumeMounts:
+            - { name: uds, mountPath: /var/run/creda }
+            - { name: tmp-bridge, mountPath: /tmp }
+      volumes:
+        # Shared Unix domain socket between Core and Bridge (§10.5.1).
+        - { name: uds, emptyDir: {} }
+        # readOnlyRootFilesystem (DQ-1) requires explicit writable scratch.
+        - { name: tmp, emptyDir: {} }
+        - { name: tmp-bridge, emptyDir: {} }
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["{{ .Values.persistence.accessMode }}"]
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

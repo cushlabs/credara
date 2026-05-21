@@ -1,0 +1,17 @@
+apiVersion: v2
+name: creda
+description: >-
+  A Creda peer — Creda Core (Rust) plus the HAPI FHIR Bridge (Java), one pod per peer — for
+  cross-institutional patient identity provenance and portable authorization (spec §10.6.5).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://creda.health
+keywords:
+  - fhir
+  - healthcare
+  - identity
+  - provenance
+# Optional sub-charts (MinIO for on-prem snapshot storage, a Prometheus exporter) are documented
+# in values.yaml and added as dependencies when enabled (§10.6.5). The same chart targets a
+# laptop (Compose is the lighter path), on-prem k8s, and cloud k8s — only values change (§7.4.7).

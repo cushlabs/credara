@@ -1,0 +1,36 @@
+{{- if .Values.snapshotCronJob.enabled }}
+# Snapshot to object storage (§7.5). NOTE: lightweight snapshots also run in-daemon as a tokio
+# task (§10.5.2); this CronJob is the process-isolated variant. CAVEAT: with an RWO data PVC the
+# snapshot must read the store the peer holds, so this job is most appropriate when snapshots are
+# produced by the daemon and this CronJob instead triggers/uploads, or when the store is on RWX.
+# TODO: wire the trigger mechanism (gRPC call to the peer) rather than mounting the RWO PVC.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "creda.fullname" . }}-snapshot
+  labels: {{- include "creda.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.snapshotCronJob.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "creda.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: OnFailure
+          containers:
+            - name: snapshot
+              image: {{ include "creda.coreImage" . }}
+              securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              args: ["snapshot"]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "creda.fullname" . }}-config
+              volumeMounts:
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: tmp, emptyDir: {} }
+{{- end }}
