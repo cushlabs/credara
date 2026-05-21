@@ -40,15 +40,14 @@ class PatientResourceProvider(
     /** read = project the effective identity for this subgraph (§5.2.4). */
     @Read
     fun read(@IdParam id: IdType): Patient {
-        val debug = core.effectiveIdentityDebug(listOf(id.idPart.toByteArray()))
-        // TODO(bridge-verify): build a CredaPatient (US Core Patient + subgraph-identifier slice,
-        // per-field confidence + disputed-value extensions, §8.1.2-§8.1.4) once Core returns a
-        // structured projection. For now, surface the projection text as a stub.
-        return Patient().apply {
-            this.id = id.idPart
-            addExtension("http://creda.health/StructureDefinition/effective-identity-debug", null)
-            this.text.div.setValueAsString("<div>$debug</div>")
-        }
+        // Project the effective identity from Core. TODO(bridge-verify): build a structured
+        // CredaPatient (US Core Patient + subgraph-identifier slice, per-field confidence +
+        // disputed-value extensions, §8.1.2-§8.1.4) once Core returns a structured projection;
+        // today GetEffectiveIdentity returns a debug rendering (see creda-core/src/grpc.rs).
+        core.effectiveIdentityDebug(listOf(id.idPart.toByteArray()))
+        val patient = Patient()
+        patient.id = id.idPart
+        return patient
     }
 
     /** search by demographic token (§8.2.11): `Patient?_creda-token=...` -> MatchByTokens. */
