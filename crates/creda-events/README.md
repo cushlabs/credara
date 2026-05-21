@@ -15,22 +15,22 @@ algorithm-agile `CryptoSignature` (Ed25519 + ML-DSA-65 + SLH-DSA + hybrid).
 
 > AuthorizationRevocation is a DISTINCT event type from Tombstone — never collapse them.
 
-## Status: implemented (M1), tests pending local run
+## Status: implemented and verified (M1) ✓
 
-Source and tests are complete and registered as a workspace member. They were authored in an
-environment without a Rust toolchain (see `docs/DESIGN_QUEUE.md` build notes / project memory),
-so they have **not yet been compiled or run here**. Verify locally:
+Source and tests are complete, registered as a workspace member, and **passing** (verified
+locally with no source changes needed; exact dependency versions pinned in the workspace
+`Cargo.lock`). Re-run anytime:
 
 ```sh
-cargo test -p creda-events                    # default (includes PQC: ML-DSA-65, SLH-DSA, hybrid)
-cargo test -p creda-events --no-default-features   # Ed25519-only fast path (no pqcrypto)
-cargo fmt -p creda-events -- --check
-cargo clippy -p creda-events --all-targets -- -D warnings
+make test          # full suite incl. PQC (Docker-only; see docs/DEVELOPMENT.md)
+make test-fast     # Ed25519-only path
+# or natively, if you maintain your own toolchain:
+cargo test -p creda-events
 ```
 
-The PQC algorithms are behind the default-on `pqc` feature. The single most likely first-build
-adjustment is a pqcrypto crate/module name or version — all such interaction is isolated in
-`src/crypto/pqc.rs` (notably the SLH-DSA module path `sphincssha2256ssimple`).
+The PQC algorithms are behind the default-on `pqc` feature, isolated in `src/crypto/pqc.rs`.
+Verified-good versions (pinned in `Cargo.lock`): `pqcrypto-mldsa 0.1.2`,
+`pqcrypto-sphincsplus 0.7.2`, `ed25519-dalek 2.2.0`, `ciborium 0.2.2`.
 
 ### Module map
 
