@@ -684,6 +684,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "creda-export-gate"
+version = "0.1.0"
+dependencies = [
+ "creda-events",
+ "creda-graph",
+ "creda-store",
+ "thiserror 1.0.69",
+ "time",
+]
+
+[[package]]
 name = "creda-graph"
 version = "0.1.0"
 dependencies = [
@@ -714,6 +725,16 @@ dependencies = [
  "git2",
  "rocksdb",
  "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "creda-verifier"
+version = "0.1.0"
+dependencies = [
+ "creda-events",
+ "creda-graph",
+ "creda-store",
  "thiserror 1.0.69",
 ]
 
