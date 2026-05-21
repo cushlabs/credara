@@ -11,8 +11,8 @@
 //! Governing specification sections (see `docs/creda-technical-spec.md`):
 //! - §3  Identity Model — the seven identity event types and the signature model.
 //! - §4  Portable Authorization — the three authorization event types.
-//! - §5  Data Structures — the event node schema, PQC requirements, payload schemas,
-//!       UUIDv7 generation, and the Demographics struct.
+//! - §5  Data Structures — the event node schema, PQC requirements, payload schemas, UUIDv7
+//!   generation, and the Demographics struct.
 //!
 //! ## Determinism is load-bearing
 //!

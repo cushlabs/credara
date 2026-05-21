@@ -347,39 +347,27 @@ impl IdentityEventNode {
                     ));
                 }
             }
-            EventPayload::Attest {
-                target_event_ids, ..
-            } => {
-                if target_event_ids.is_empty() {
-                    return Err(Error::Validation(
-                        "Attest must reference at least one target event".into(),
-                    ));
-                }
+            EventPayload::Attest { target_event_ids, .. } if target_event_ids.is_empty() => {
+                return Err(Error::Validation(
+                    "Attest must reference at least one target event".into(),
+                ));
             }
-            EventPayload::Tombstone {
-                target_event_ids, ..
-            } => {
-                if target_event_ids.is_empty() {
-                    return Err(Error::Validation(
-                        "Tombstone must reference at least one target event".into(),
-                    ));
-                }
+            EventPayload::Tombstone { target_event_ids, .. } if target_event_ids.is_empty() => {
+                return Err(Error::Validation(
+                    "Tombstone must reference at least one target event".into(),
+                ));
             }
-            EventPayload::Amend {
-                amendment_reason, ..
-            } => {
-                if amendment_reason.trim().is_empty() {
-                    return Err(Error::Validation(
-                        "Amend must carry a non-empty amendment_reason".into(),
-                    ));
-                }
+            EventPayload::Amend { amendment_reason, .. } if amendment_reason.trim().is_empty() => {
+                return Err(Error::Validation(
+                    "Amend must carry a non-empty amendment_reason".into(),
+                ));
             }
-            EventPayload::DeceasedDeclaration { date_of_death, .. } => {
-                if date_of_death.trim().is_empty() {
-                    return Err(Error::Validation(
-                        "DeceasedDeclaration must carry a date_of_death".into(),
-                    ));
-                }
+            EventPayload::DeceasedDeclaration { date_of_death, .. }
+                if date_of_death.trim().is_empty() =>
+            {
+                return Err(Error::Validation(
+                    "DeceasedDeclaration must carry a date_of_death".into(),
+                ));
             }
             _ => {}
         }
