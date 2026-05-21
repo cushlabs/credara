@@ -167,6 +167,42 @@ distroless base is now specifically Fedora Hummingbird.
 
 ---
 
+## DQ-5 — Reproducible developer environment: Docker-only, deps auto-provisioned — REQUIRED
+
+**Requirement.** A developer (or CI) must be able to build and test Creda **without manually
+installing a toolchain**. The Rust toolchain, the C compiler (for pqcrypto), and all
+dependencies are evaluated and provisioned by the environment, not by a human following a
+checklist. The only host prerequisite is Docker.
+
+**Decided shape.**
+- A **dev/build container** (`docker/dev.Dockerfile`) carries the full toolchain.
+- A **task runner** (`Makefile`) runs `cargo` inside that container as the host user
+  (`make test`, `test-fast`, `fmt`, `fmt-check`, `clippy`, `build`, `ci`, `shell`, `clean`).
+- A **devcontainer** (`.devcontainer/devcontainer.json`) gives VS Code / Codespaces users
+  the same environment automatically, running as a non-root `dev` user.
+- The dev base image defaults to the **official Rust image** (so the workflow works the
+  moment Docker is present) with a documented one-line switch (`DEV_BASE=...`) to the Fedora
+  Hummingbird Rust image for parity. The **shipped** images remain Hummingbird (DQ-4); this
+  item governs only the local build/test environment.
+- The dependency cache lives in a gitignored in-repo dir to avoid named-volume permission
+  issues with a non-root container user.
+
+**Why.** "No manual install steps for devs" was an explicit requirement. A containerized,
+single-command workflow is reproducible, matches our container-first posture, and gives
+developers and CI identical environments.
+
+**Attaches to.** Cross-cutting / developer tooling; underpins every milestone's "Done when"
+(tests must run). CI (M0 `ci-rust.yml`) should converge on the same container path over time.
+
+**Acceptance criteria.** On a machine with only Docker installed, `make test` builds the dev
+image and runs the workspace test suite green; `make ci` reproduces the CI gates locally;
+opening the repo in a Dev Container yields a working `rust-analyzer` setup with no local Rust
+install.
+
+**Docs.** `docs/DEVELOPMENT.md`.
+
+---
+
 ## Decisions log (for these items)
 
 | Item | Decision | Date |
@@ -175,3 +211,4 @@ distroless base is now specifically Fedora Hummingbird.
 | DQ-2 | Ansible automates **deploy onto existing cluster** (not host provisioning) | 2026-05-20 |
 | DQ-3 | Test bed provides **both** Compose (fast) and kind/k3d (production-like) paths | 2026-05-20 |
 | DQ-4 | Base images = **Fedora Hummingbird**, **FIPS by default**, **container images only** (host OS = operator's choice) | 2026-05-20 |
+| DQ-5 | Dev environment = **Docker-only**, deps auto-provisioned (dev container + Makefile + devcontainer); dev base defaults to official Rust image, switchable to Hummingbird | 2026-05-20 |

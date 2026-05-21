@@ -2,6 +2,8 @@
 /target
 **/target
 *.rs.bk
+# In-repo Cargo cache used by the Docker dev workflow (make / devcontainer).
+/.cargo-cache/
 # Cargo.lock IS committed for the workspace (binaries + reproducible builds).
 # If a member crate is a pure library published to crates.io, it may ignore its own lock.
 

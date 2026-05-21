@@ -35,6 +35,11 @@ creda/
 ├── CODE_OF_CONDUCT.md         # Contributor Covenant.
 ├── SECURITY.md                # Private vulnerability disclosure (healthcare infrastructure).
 ├── .gitignore                 # Rust / Java / Node / OS-editor cruft.
+├── Makefile                   # Docker-only task runner: make test / fmt / clippy / ci (DQ-5).
+│
+├── .devcontainer/             # Reproducible dev environment — Docker is the only host
+│   ├── devcontainer.json      #   prerequisite (DQ-5). VS Code / Codespaces config.
+│   └── Dockerfile             #   Dev/build image (NOT shipped); base switchable to Hummingbird.
 │
 ├── .github/
 │   └── workflows/
@@ -48,7 +53,9 @@ creda/
 │   ├── creda-technical-spec.pdf  # Rendered spec for non-technical reviewers.
 │   ├── COWORK_CONTEXT.md         # Context & decision history (the "why").
 │   ├── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
-│   └── DESIGN_QUEUE.md           # Queued design reqs (DQ-1 non-root, DQ-2 ansible, DQ-3 testbed).
+│   ├── DESIGN_QUEUE.md           # Queued design reqs (DQ-1..DQ-5: non-root, ansible, testbed,
+│   │                             #   Hummingbird images, Docker-only dev env).
+│   └── DEVELOPMENT.md            # Docker-only developer workflow (DQ-5).
 │
 ├── crates/                    # The Rust workspace members (Core, Export Gate, Verifier).
 │   ├── creda-events/          # M1 — event node schema, 10 event types, canonical CBOR,

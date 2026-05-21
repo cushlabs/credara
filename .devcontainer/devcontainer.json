@@ -1,0 +1,28 @@
+{
+  "name": "Creda Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "BASE": "docker.io/library/rust:1-bookworm"
+    }
+  },
+  "remoteUser": "dev",
+  "containerEnv": {
+    "CARGO_HOME": "/work/.cargo-cache"
+  },
+  "workspaceFolder": "/work",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/work,type=bind",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.features": "all"
+      }
+    }
+  },
+  "postCreateCommand": "cargo fetch || true"
+}

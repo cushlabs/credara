@@ -32,6 +32,14 @@ guide before opening a pull request.
   defensible default, mark it `TODO(open-question-13.x)`, and **open a tracking issue**.
   Do not silently pick a permanent answer.
 
+## Getting set up
+
+The only thing you install is **Docker**. The Rust toolchain, the C compiler, and all
+dependencies live in a dev container, so there is no manual toolchain setup. From the repo
+root, `make test` builds the dev image and runs the suite; `make ci` runs every gate.
+Full details — including the VS Code / Codespaces dev container — are in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
 ## Build order
 
 Components are built in strict dependency order (M0→M9); see
@@ -44,9 +52,9 @@ creda-net → creda-core` chain (M1→M5) is a dependency spine and is not paral
 - [ ] My change references the governing spec section in the commit message(s).
 - [ ] I read that spec section before writing the code.
 - [ ] I reused existing libraries per Appendix C rather than reimplementing them.
-- [ ] Tests cover the new behavior and pass locally (`cargo test --workspace` for Rust;
-      Gradle for the bridge).
-- [ ] `cargo fmt` and `cargo clippy -- -D warnings` are clean (Rust).
+- [ ] Tests cover the new behavior and pass locally — run `make test` (no toolchain install
+      needed; Docker only — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
+- [ ] `make fmt-check` and `make clippy` are clean. `make ci` runs all three gates at once.
 - [ ] Any deferred decision is marked `TODO(open-question-13.x)` with a linked issue.
 - [ ] No secrets, credentials, or real PHI are included — synthetic data only.
 - [ ] My commits are signed off (DCO — see below).
