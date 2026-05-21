@@ -12,7 +12,16 @@
 # The only host prerequisite is Docker (see docs/DEVELOPMENT.md).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve the script's real location, following symlinks, so `creda` works when symlinked onto
+# PATH (e.g. /usr/local/bin/creda -> .../Creda/creda). Portable for macOS bash 3.2 (no
+# `readlink -f`).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  case "$SOURCE" in /*) ;; *) SOURCE="$DIR/$SOURCE" ;; esac
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 cmd="${1:-help}"
 [ "$#" -gt 0 ] && shift || true
 
