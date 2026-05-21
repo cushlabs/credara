@@ -33,8 +33,11 @@ class ProvenanceResourceProvider(
     /** `$creda-contest` (§8.2.7): contest a Link Provenance. Party-of-subgraph is enforced in Core. */
     @Operation(name = "\$creda-contest")
     fun contest(@IdParam linkId: IdType, @ResourceParam params: Parameters): Provenance {
-        val payloadCbor = TODO("bridge-verify: encode a Contest EventPayload (reason) as CBOR") as ByteArray
+        val payloadCbor = encodeContest(params)
         val eventCbor = core.createEvent(payloadCbor, listOf(linkId.idPart.toByteArray()))
         return ProvenanceMapper.fromEventCbor(eventCbor)
     }
 }
+
+internal fun encodeContest(@Suppress("UNUSED_PARAMETER") params: Parameters): ByteArray =
+    TODO("bridge-verify: encode a Contest EventPayload (reason) as canonical CBOR")
