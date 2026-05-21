@@ -1,0 +1,30 @@
+[package]
+name = "creda-store"
+description = "Creda storage layer: the Store trait, a RocksDB-backed implementation with the secondary indexes from spec §5.2.5, an in-memory store for testing, and a scaffolded libgit2 backend (open question 13.1)."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# RocksDB is the default backend (spec §7.4.1). It is feature-gated so downstream crates
+# (e.g. creda-graph, M3) can depend on creda-store with `default-features = false` to get just
+# the Store trait + MemoryStore, avoiding the heavy RocksDB/C++ compile in their test builds.
+default = ["rocksdb"]
+rocksdb = ["dep:rocksdb"]
+# libgit2 backend — open question 13.1 (storage-substrate trade study). Scaffold only.
+libgit2 = ["dep:git2"]
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+thiserror = "1"
+rocksdb = { version = "0.22", optional = true }
+git2 = { version = "0.18", optional = true }
+
+[dev-dependencies]
+# Build sample events in the contract tests (integration tests need it as a dev-dep too).
+creda-events = { path = "../creda-events" }
+# Temp dirs for RocksDB contract tests.
+tempfile = "3"

@@ -11,8 +11,18 @@
 ARG BASE=docker.io/library/rust:1-bookworm
 FROM ${BASE}
 
-# The official Rust image is Debian-based and already ships gcc/make for building C deps
-# (needed by pqcrypto). Ensure the components our workflow uses are present (idempotent).
+# The official Rust image is Debian-based and ships gcc/make for building C deps (pqcrypto).
+# Add the C++ toolchain + libclang that rust-rocksdb's librocksdb-sys needs at build time
+# (it compiles RocksDB from source and runs bindgen). This is a build-time dependency of the
+# dev/build image only; it is not part of any shipped artifact.
+RUN if command -v apt-get >/dev/null 2>&1; then \
+        apt-get update && \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang libclang-dev llvm-dev g++ cmake pkg-config && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Ensure the toolchain components our workflow uses are present (idempotent).
 RUN rustup component add rustfmt clippy 2>/dev/null || true
 
 # A non-root user for the VS Code devcontainer path. The Makefile path overrides the user

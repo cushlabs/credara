@@ -4,6 +4,7 @@
 resolver = "2"
 members = [
     "crates/creda-events", # M1 — event model (spec §3, §4, §5)
+    "crates/creda-store",  # M2 — storage layer (spec §5.2, §7.3)
 ]
 
 [workspace.package]
