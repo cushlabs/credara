@@ -35,7 +35,7 @@ Completes the M1→M5 spine. Same isolation discipline as the rest of the worksp
   replication into the engine + the multi-peer harness lands in `testbed/` (DQ-3).
 
 ### Verify
-`cargo test -p creda-core` (or `creda anchor`) exercises the engine, config, and signer — the
+`cargo test -p creda-core` (or `anchor creda`) exercises the engine, config, and signer — the
 default build pulls neither tonic nor libp2p. Build the gRPC server with
 `cargo build -p creda-core --features grpc` (requires protoc; provisioned in the dev image).
 Sixth and final spine workspace member.

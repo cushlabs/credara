@@ -36,6 +36,8 @@ creda/
 ├── SECURITY.md                # Private vulnerability disclosure (healthcare infrastructure).
 ├── .gitignore                 # Rust / Java / Node / OS-editor cruft.
 ├── Makefile                   # Docker-only task runner: make test / fmt / clippy / ci (DQ-5).
+├── anchor                     # `anchor creda` — settle the workspace into a known-good state
+│                              #   (full suite, single-threaded; = make anchor / test JOBS=1).
 │
 ├── .devcontainer/             # Reproducible dev environment — Docker is the only host
 │   ├── devcontainer.json      #   prerequisite (DQ-5). VS Code / Codespaces config.

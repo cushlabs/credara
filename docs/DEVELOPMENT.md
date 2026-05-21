@@ -36,33 +36,33 @@ Every target runs `cargo` inside the dev container **as your host user**, so fil
 (`target/`, the cache) are owned by you, not root. The dependency cache lives in a gitignored
 `./.cargo-cache/` directory.
 
-## The `creda` command and the anchor run
+## `anchor creda` — settling the workspace into a known-good state
 
-`creda` (a script at the repo root) is a thin wrapper over `make`, so you can run dev commands
-by name from anywhere. The headline one:
+`anchor` (a script at the repo root) settles a project into a known-good state by running its
+definitive build + test. For this repo:
 
 ```sh
-creda anchor      # the known-good full run: workspace tests, single-threaded (= make test JOBS=1)
+anchor creda      # the known-good full run: workspace tests, single-threaded (= make test JOBS=1)
 ```
 
-`creda anchor` is the run to trust when you want a definitive green: it builds everything and
+`anchor creda` is the run to trust when you want a definitive green: it builds everything and
 runs the whole suite single-threaded, which keeps the RocksDB from-source compile within a
-memory-limited Docker VM (no OOM). Other subcommands (`creda test`, `creda ci`, `creda fmt`,
-`creda clippy`, `creda shell`, …) map to the matching `make` targets; `creda help` lists them.
+memory-limited Docker VM (no OOM). Equivalently, `make anchor` does the same without the wrapper.
 
-To make `creda anchor` work globally, put the script on your PATH — either symlink it:
+To make `anchor creda` work from anywhere, put the script on your PATH — either symlink it:
 
 ```sh
-ln -s "$(pwd)/creda" /usr/local/bin/creda     # or ~/.local/bin/creda, if that's on your PATH
+ln -s "$(pwd)/anchor" /usr/local/bin/anchor    # or ~/.local/bin/anchor, if that's on your PATH
 ```
 
 or add a shell alias to `~/.zshrc`:
 
 ```sh
-alias creda="$HOME/Documents/projects/Creda/creda"
+alias anchor="$HOME/Documents/projects/Creda/anchor"
 ```
 
-Equivalently, `make anchor` does the same thing without the wrapper.
+Other dev tasks are plain `make` targets from the repo root — `make test`, `make ci`, `make fmt`,
+`make clippy`, `make shell` (see the task-runner table above).
 
 ## VS Code / Codespaces
 

@@ -6,7 +6,7 @@
 #
 # Usage:
 #   make anchor      # full suite, single-threaded — the "known-good" run (= test JOBS=1).
-#                    #   Also available as `creda anchor` (see the ./creda wrapper).
+#                    #   Also available as `anchor creda` (see the ./anchor wrapper).
 #   make test        # full workspace test suite (PQC algorithms included)
 #   make test-fast   # Ed25519-only fast path (no pqcrypto / C build)
 #   make fmt         # apply rustfmt
@@ -56,7 +56,7 @@ dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
 
 # The "anchor" run: full workspace suite, single-threaded so the RocksDB from-source compile
-# stays within a memory-limited Docker VM (the known-good command). Same as `creda anchor`.
+# stays within a memory-limited Docker VM (the known-good command). Same as `anchor creda`.
 anchor: dev-image
 	$(RUN) cargo test --workspace --jobs 1
 

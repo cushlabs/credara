@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# anchor — settle a project into a known-good state by running its definitive build + test.
+#
+#   anchor creda   Run the full Creda workspace test suite single-threaded — the known-good
+#                  "settle it in" run. Single-threaded keeps the RocksDB from-source compile
+#                  within a memory-limited Docker VM (no OOM). Equivalent to `make anchor`.
+#
+# The only host prerequisite is Docker (see docs/DEVELOPMENT.md). Put `anchor` on your PATH so
+# `anchor creda` works from anywhere, e.g.:
+#   ln -s "$(pwd)/anchor" /usr/local/bin/anchor      # or ~/.local/bin/anchor (on your PATH)
+# or add a shell alias to ~/.zshrc:
+#   alias anchor="$(pwd)/anchor"
+set -euo pipefail
+
+# Resolve the script's real location, following symlinks, so `anchor` works when symlinked onto
+# PATH. Portable for macOS bash 3.2 (no `readlink -f`).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  case "$SOURCE" in /*) ;; *) SOURCE="$DIR/$SOURCE" ;; esac
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+
+target="${1:-}"
+case "$target" in
+  creda)
+    echo "⚓ Anchoring Creda — settling the workspace into a known-good state (full suite, single-threaded)…"
+    exec make -C "$ROOT" anchor
+    ;;
+  "" | -h | --help | help)
+    cat <<'EOF'
+anchor — settle a project into a known-good state (definitive build + test).
+
+Usage:
+  anchor creda    Run the full Creda workspace test suite single-threaded — the known-good
+                  "settle it in" run (bounded memory; avoids the RocksDB OOM).
+
+Other dev tasks are plain make targets from the repo root: make test, make ci, make fmt,
+make clippy, make shell. See docs/DEVELOPMENT.md.
+EOF
+    ;;
+  *)
+    echo "anchor: unknown target '$target' (did you mean 'anchor creda'?)" >&2
+    exit 2
+    ;;
+esac
