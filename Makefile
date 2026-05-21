@@ -5,6 +5,8 @@
 # dependencies — so no developer installs cargo/rustc/clippy by hand. See docs/DEVELOPMENT.md.
 #
 # Usage:
+#   make anchor      # full suite, single-threaded — the "known-good" run (= test JOBS=1).
+#                    #   Also available as `creda anchor` (see the ./creda wrapper).
 #   make test        # full workspace test suite (PQC algorithms included)
 #   make test-fast   # Ed25519-only fast path (no pqcrypto / C build)
 #   make fmt         # apply rustfmt
@@ -47,10 +49,15 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: dev-image test test-fast fmt fmt-check clippy build shell ci clean
+.PHONY: anchor dev-image test test-fast fmt fmt-check clippy build shell ci clean
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
+
+# The "anchor" run: full workspace suite, single-threaded so the RocksDB from-source compile
+# stays within a memory-limited Docker VM (the known-good command). Same as `creda anchor`.
+anchor: dev-image
+	$(RUN) cargo test --workspace --jobs 1
 
 test: dev-image
 	$(RUN) cargo test --workspace $(CARGO_JOBS)

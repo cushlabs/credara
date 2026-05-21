@@ -36,6 +36,34 @@ Every target runs `cargo` inside the dev container **as your host user**, so fil
 (`target/`, the cache) are owned by you, not root. The dependency cache lives in a gitignored
 `./.cargo-cache/` directory.
 
+## The `creda` command and the anchor run
+
+`creda` (a script at the repo root) is a thin wrapper over `make`, so you can run dev commands
+by name from anywhere. The headline one:
+
+```sh
+creda anchor      # the known-good full run: workspace tests, single-threaded (= make test JOBS=1)
+```
+
+`creda anchor` is the run to trust when you want a definitive green: it builds everything and
+runs the whole suite single-threaded, which keeps the RocksDB from-source compile within a
+memory-limited Docker VM (no OOM). Other subcommands (`creda test`, `creda ci`, `creda fmt`,
+`creda clippy`, `creda shell`, …) map to the matching `make` targets; `creda help` lists them.
+
+To make `creda anchor` work globally, put the script on your PATH — either symlink it:
+
+```sh
+ln -s "$(pwd)/creda" /usr/local/bin/creda     # or ~/.local/bin/creda, if that's on your PATH
+```
+
+or add a shell alias to `~/.zshrc`:
+
+```sh
+alias creda="$HOME/Documents/projects/Creda/creda"
+```
+
+Equivalently, `make anchor` does the same thing without the wrapper.
+
 ## VS Code / Codespaces
 
 Open the repo in VS Code with the Dev Containers extension (or in a GitHub Codespace) and
