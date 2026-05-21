@@ -8,7 +8,10 @@ import health.creda.grpc.CredaGrpc
 import health.creda.grpc.Empty
 import health.creda.grpc.EntryPoints
 import health.creda.grpc.GetEventRequest
+import health.creda.grpc.GrantPurpose
 import health.creda.grpc.MatchRequest
+import health.creda.grpc.RequesterContext
+import health.creda.grpc.UseMode
 import io.grpc.netty.NettyChannelBuilder
 import io.netty.channel.epoll.EpollDomainSocketChannel
 import io.netty.channel.epoll.EpollEventLoopGroup
@@ -69,12 +72,32 @@ class CredaCoreClient(
         return stub.matchByTokens(req).idsList.map { it.toByteArray() }
     }
 
-    /** EvaluateAuthorization (§4.6). NOTE: Core's gRPC wiring for this is a follow-up (returns
-     *  UNIMPLEMENTED today); the engine path is implemented and tested directly. */
-    fun evaluateAuthorization(entryPoints: List<ByteArray>, queryCbor: ByteArray): AuthReply {
+    /**
+     * EvaluateAuthorization (§4.6): run Core's seven-step evaluation for a requesting institution
+     * against the patient subgraph. The query is a structured request (Core's `AuthorizationQuery`
+     * is not serde-serializable, so the contract is explicit protobuf rather than opaque CBOR).
+     */
+    fun evaluateAuthorization(
+        entryPoints: List<ByteArray>,
+        requesterFingerprint: ByteArray,
+        purpose: GrantPurpose,
+        useMode: UseMode,
+        requestedEventTypes: List<String> = emptyList(),
+        requestedSegments: List<ByteArray> = emptyList(),
+        requestedDataCategories: List<String> = emptyList(),
+    ): AuthReply {
         val req = AuthRequest.newBuilder()
             .apply { entryPoints.forEach { addEntryPoints(ByteString.copyFrom(it)) } }
-            .setQueryCbor(ByteString.copyFrom(queryCbor))
+            .setRequester(
+                RequesterContext.newBuilder()
+                    .setFingerprint(ByteString.copyFrom(requesterFingerprint))
+                    .build(),
+            )
+            .setPurpose(purpose)
+            .setUseMode(useMode)
+            .addAllRequestedEventTypes(requestedEventTypes)
+            .apply { requestedSegments.forEach { addRequestedSegments(ByteString.copyFrom(it)) } }
+            .addAllRequestedDataCategories(requestedDataCategories)
             .build()
         return stub.evaluateAuthorization(req)
     }

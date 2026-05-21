@@ -13,6 +13,8 @@
 #   make fmt-check   # check formatting (CI parity)
 #   make clippy      # lint with warnings-as-errors (CI parity)
 #   make build       # release build of the workspace
+#   make grpc        # build + lint + test creda-core with the opt-in gRPC feature (needs protoc;
+#                    #   the dev image carries it). Not part of `anchor creda`'s default build.
 #   make bridge      # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle+JDK container (M7)
 #   make shell       # interactive shell in the dev container
 #   make clean       # remove build artifacts and the dependency cache
@@ -59,7 +61,7 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean bridge bridge-image bridge-stock
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc shell ci clean bridge bridge-image bridge-stock
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
@@ -91,6 +93,13 @@ clippy: dev-image
 
 build: dev-image
 	$(RUN) cargo build --workspace --release $(CARGO_JOBS)
+
+# Build + lint + test the opt-in gRPC server (feature `grpc`). Compiles the proto via protoc
+# (present in the dev image) and runs the grpc.rs unit + UDS-serve tests. Kept separate from
+# `anchor creda` so the default build stays fast and protoc-free.
+grpc: dev-image
+	$(RUN) cargo clippy -p creda-core --features grpc --all-targets $(CARGO_JOBS) -- -D warnings
+	$(RUN) cargo test -p creda-core --features grpc $(CARGO_JOBS)
 
 # Everything CI checks, in one go.
 ci: fmt-check clippy test

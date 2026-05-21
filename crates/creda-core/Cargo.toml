@@ -15,7 +15,7 @@ authors.workspace = true
 # write-blind-risky adapters are reconciled only when their feature is deliberately enabled.
 [features]
 default = []
-grpc = ["dep:tonic", "dep:prost", "dep:tokio"]
+grpc = ["dep:tonic", "dep:prost", "dep:tokio", "dep:tokio-stream"]
 libp2p = ["creda-net/libp2p", "dep:tokio"]
 
 [[bin]]
@@ -38,7 +38,9 @@ time = { version = "0.3", features = ["formatting"] }
 tonic = { version = "0.12", optional = true }
 prost = { version = "0.13", optional = true }
 # Async runtime, needed by both the gRPC server and the libp2p transport.
-tokio = { version = "1", optional = true, features = ["rt-multi-thread", "macros", "net", "sync", "signal"] }
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "macros", "net", "sync", "signal", "time"] }
+# Wraps a tokio UnixListener as a Stream for tonic's `serve_with_incoming_shutdown` (gRPC UDS).
+tokio-stream = { version = "0.1", optional = true, features = ["net"] }
 
 [build-dependencies]
 # Used only when the `grpc` feature is enabled (build.rs guards on CARGO_FEATURE_GRPC); compiles

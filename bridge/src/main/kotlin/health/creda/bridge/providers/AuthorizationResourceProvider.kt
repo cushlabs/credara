@@ -5,6 +5,8 @@ import ca.uhn.fhir.rest.annotation.Operation
 import ca.uhn.fhir.rest.annotation.ResourceParam
 import ca.uhn.fhir.rest.server.IResourceProvider
 import health.creda.bridge.grpc.CredaCoreClient
+import health.creda.grpc.GrantPurpose
+import health.creda.grpc.UseMode
 import org.hl7.fhir.r4.model.Consent
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Parameters
@@ -42,8 +44,13 @@ class AuthorizationResourceProvider(
      */
     @Operation(name = "\$creda-verify")
     fun verify(@IdParam patient: IdType, @ResourceParam params: Parameters): Parameters {
-        val queryCbor = encodeAuthQuery(params) // TODO(bridge-verify)
-        val reply = core.evaluateAuthorization(listOf(patient.idPart.toByteArray()), queryCbor)
+        val q = parseAuthQuery(params) // TODO(bridge-verify)
+        val reply = core.evaluateAuthorization(
+            entryPoints = listOf(patient.idPart.toByteArray()),
+            requesterFingerprint = q.requesterFingerprint,
+            purpose = q.purpose,
+            useMode = q.useMode,
+        )
         return Parameters().apply {
             addParameter().setName("decision")
                 .setValue(org.hl7.fhir.r4.model.CodeType(if (reply.authorized) "authorized" else "denied"))
@@ -64,5 +71,12 @@ internal object ConsentMapper {
 internal fun encodeGrant(@Suppress("UNUSED_PARAMETER") params: Parameters): ByteArray =
     TODO("bridge-verify: encode an AuthorizationGrant EventPayload as canonical CBOR")
 
-internal fun encodeAuthQuery(@Suppress("UNUSED_PARAMETER") params: Parameters): ByteArray =
-    TODO("bridge-verify: encode the authorization query (requester/purpose/use-mode/scope) as CBOR")
+/** The structured pieces of a `$creda-verify` request, parsed from the FHIR Parameters. */
+internal data class AuthQuery(
+    val requesterFingerprint: ByteArray,
+    val purpose: GrantPurpose,
+    val useMode: UseMode,
+)
+
+internal fun parseAuthQuery(@Suppress("UNUSED_PARAMETER") params: Parameters): AuthQuery =
+    TODO("bridge-verify: parse requester fingerprint / purpose / use-mode from the \$creda-verify Parameters")

@@ -648,6 +648,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "creda-conformance"
+version = "0.1.0"
+dependencies = [
+ "creda-events",
+ "creda-graph",
+ "creda-store",
+]
+
+[[package]]
 name = "creda-core"
 version = "0.1.0"
 dependencies = [

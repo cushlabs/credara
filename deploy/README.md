@@ -53,7 +53,9 @@ Concrete files:
 ### Known reconciliation items (TODO)
 - Pin exact Hummingbird FIPS image references/digests (DQ-4) — placeholders today.
 - The core image build enables `--features grpc,libp2p`; that needs the libp2p adapter reconciled
-  and protoc in the builder — Compose defaults to `FEATURES=grpc` for now. The deployment layer is
-  intentionally ahead of the in-daemon gRPC-serve socket + libp2p-transport wiring (tracked).
+  and protoc in the builder — Compose defaults to `FEATURES=grpc` for now. The in-daemon
+  gRPC-serve socket is now wired (`creda serve` binds the Unix domain socket at `grpc_socket`,
+  default `/run/creda/creda.sock`; verify with `make grpc`); the **libp2p-transport** wiring is
+  still ahead of the daemon (tracked).
 - Snapshot CronJob vs. RWO PVC: lightweight snapshots run in-daemon (§10.5.2); the CronJob's
   trigger mechanism is a TODO (see the template).

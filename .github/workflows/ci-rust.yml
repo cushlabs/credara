@@ -31,6 +31,15 @@ jobs:
       - name: Test
         if: steps.members.outputs.empty == 'false'
         run: cargo test --workspace
+      - name: Install protoc (gRPC feature)
+        if: steps.members.outputs.empty == 'false'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Clippy (gRPC feature)
+        if: steps.members.outputs.empty == 'false'
+        run: cargo clippy -p creda-core --features grpc --all-targets -- -D warnings
+      - name: Test (gRPC feature)
+        if: steps.members.outputs.empty == 'false'
+        run: cargo test -p creda-core --features grpc
       - name: Release build
         if: steps.members.outputs.empty == 'false'
         run: cargo build --workspace --release

@@ -39,10 +39,49 @@ message EffectiveIdentityReply {
 message MatchRequest { repeated string tokens = 1; }
 message MatchReply { repeated bytes ids = 1; }
 
+// Grant purpose (§4.3.1). Mirrors creda_events::GrantPurpose; UNSPECIFIED is rejected so a
+// client that forgets to set a purpose fails loudly rather than defaulting silently.
+enum GrantPurpose {
+  GRANT_PURPOSE_UNSPECIFIED = 0;
+  TREATMENT = 1;
+  PAYMENT = 2;
+  OPERATIONS = 3;
+  PUBLIC_HEALTH = 4;
+  RESEARCH = 5;
+  AI_TRAINING = 6;
+  AI_INFERENCE = 7;
+  FEDERAL_PROGRAM = 8;
+}
+
+// Use-mode constraint on a grant (§4.3.1). Mirrors creda_events::UseMode.
+enum UseMode {
+  USE_MODE_UNSPECIFIED = 0;
+  READ_ONLY = 1;
+  READ_AND_RELY = 2;
+  READ_AND_EXPORT = 3;
+}
+
+// The requesting institution and the audience memberships it satisfies (§4.6 step 3). Class /
+// wildcard membership normally comes from the Participant Registry and is supplied by the caller.
+message RequesterContext {
+  // The requester's UDAP certificate fingerprint (raw fingerprint bytes, not a public key).
+  bytes fingerprint = 1;
+  repeated string classes = 2;    // e.g. "any-tefca-qhin"
+  repeated string wildcards = 3;  // e.g. "active-baa"
+}
+
 message AuthRequest {
+  // Entry-point event ids identifying the patient subgraph to evaluate against.
   repeated bytes entry_points = 1;
-  // Canonical-CBOR-encoded authorization query (see grpc.rs for the wire shape).
-  bytes query_cbor = 2;
+  RequesterContext requester = 2;
+  GrantPurpose purpose = 3;
+  UseMode use_mode = 4;
+  // IdentityEventType variant names (e.g. "Assert", "AuthorizationGrant"); empty = any.
+  repeated string requested_event_types = 5;
+  // Requested subgraph segments by entry-point event id; empty = any.
+  repeated bytes requested_segments = 6;
+  // Requested data categories; empty = any.
+  repeated string requested_data_categories = 7;
 }
 message AuthReply {
   bool authorized = 1;
