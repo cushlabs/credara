@@ -43,7 +43,8 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN set -eux; \
     if ! command -v cargo >/dev/null 2>&1; then \
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-            sh -s -- -y --profile minimal --default-toolchain stable --component rustfmt clippy; \
+            sh -s -- -y --profile minimal --default-toolchain stable; \
+        rustup component add rustfmt clippy; \
         chmod -R a+rwX "$RUSTUP_HOME" "$CARGO_HOME"; \
     else \
         rustup component add rustfmt clippy 2>/dev/null || true; \
