@@ -1,0 +1,51 @@
+[package]
+name = "creda-core"
+description = "Creda Core: the peer daemon that composes the event model, store, graph reasoning, and networking into one process with a gRPC API and CLI (spec §10.1)."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# Same isolation discipline as the rest of the workspace: the composed engine, config, signer,
+# and CLI are the default build and are unit-testable without heavy/unverifiable dependencies.
+# The gRPC server (tonic — needs `protoc`, heavy codegen) and real libp2p networking are OPT-IN
+# features, so `cargo build` / `creda anchor` stay green and fast, and the two
+# write-blind-risky adapters are reconciled only when their feature is deliberately enabled.
+[features]
+default = []
+grpc = ["dep:tonic", "dep:prost", "dep:tokio"]
+libp2p = ["creda-net/libp2p", "dep:tokio"]
+
+[[bin]]
+name = "creda"
+path = "src/main.rs"
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store" }
+creda-graph = { path = "../creda-graph" }
+creda-net = { path = "../creda-net", default-features = false }
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+time = { version = "0.3", features = ["formatting"] }
+
+# gRPC server (feature = "grpc"). tonic/prost are the heavy, codegen-coupled deps; optional so
+# they are absent from the default build.
+tonic = { version = "0.12", optional = true }
+prost = { version = "0.13", optional = true }
+# Async runtime, needed by both the gRPC server and the libp2p transport.
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "macros", "net", "sync", "signal"] }
+
+[build-dependencies]
+# Used only when the `grpc` feature is enabled (build.rs guards on CARGO_FEATURE_GRPC); compiles
+# without protoc, and protoc is invoked only during a `--features grpc` build.
+tonic-build = "0.12"
+
+[dev-dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store" }
+creda-graph = { path = "../creda-graph" }

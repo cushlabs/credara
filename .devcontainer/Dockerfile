@@ -18,7 +18,8 @@ FROM ${BASE}
 RUN if command -v apt-get >/dev/null 2>&1; then \
         apt-get update && \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            clang libclang-dev llvm-dev g++ cmake pkg-config && \
+            clang libclang-dev llvm-dev g++ cmake pkg-config \
+            protobuf-compiler && \
         rm -rf /var/lib/apt/lists/*; \
     fi
 
