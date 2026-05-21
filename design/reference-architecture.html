@@ -25,6 +25,7 @@
     --north:  #b45309;
     --fed:    #be185d;
     --ext:    #0e7490;
+    --patient:#15803d;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -138,7 +139,7 @@
 const LAYER_COLORS = {
   north: 'var(--north)', engine: 'var(--engine)', img: 'var(--img)',
   pod: 'var(--pod)', k8s: 'var(--k8s)', infra: 'var(--infra)',
-  fed: 'var(--fed)', ext: 'var(--ext)'
+  fed: 'var(--fed)', ext: 'var(--ext)', patient: 'var(--patient)'
 };
 
 /* ---- Single-cluster stack: top (north interfaces) down to infrastructure ---- */
@@ -282,12 +283,14 @@ const INFO = {
   // Federation
   substrate:{layer:'fed', t:'libp2p P2P substrate', role:'The connective tissue between institutions. There is no central server — peers gossip signed, content-addressed events directly to one another.',
     facts:['gossipsub propagation · Kademlia DHT discovery · anti-entropy repair','Peers subscribe to buckets (a shard of the keyspace), not the whole graph','Every event is signed; signature verification is mandatory at ingest','Eventually consistent — a partitioned peer catches up via anti-entropy'], spec:'Spec §6'},
-  authz:{layer:'fed', t:'Portable authorization', role:'Consent travels with the data. An AuthorizationGrant (and its Revocation) are themselves events in the DAG, so every peer can decide locally what it may serve.',
-    facts:['Patient-centric: the grant is bound to the patient subgraph, non-transferable','Each peer runs the same seven-step evaluation locally (§4.6)','Revocation propagates as an event; bounded revocation latency is a target (§4.7)'], spec:'Spec §4'},
+  authz:{layer:'fed', t:'Portable authorization', role:'Consent travels with the data. An AuthorizationGrant (and its Revocation) are themselves signed events in the DAG, so every peer can decide locally what it may serve.',
+    facts:['Patient-centric: the grant is bound to the patient subgraph, non-transferable','Consent can originate from any peer — but a patient typically manages it from their own patient peer client','Each peer runs the same seven-step evaluation locally (§4.6)','Revocation propagates as an event; bounded revocation latency is a target (§4.7)'], spec:'Spec §4'},
   trust:{layer:'fed', t:'Trust & data boundaries', role:'What keeps a decentralized health network safe: cryptographic provenance, data minimization, and dual control at the edges.',
     facts:['UDAP certificate fingerprints identify every event’s author','Tokenized demographics; clinical payloads never enter the trust graph','Export Gate (egress) + Verifier (ingest) form dual control at institution boundaries'], spec:'Spec §3.2, §4.5, §9'},
   peer:{layer:'fed', t:'Institution peer', role:'Each participating institution runs its own Creda cluster (the stack in the other tab). Hospitals, clinics, labs, HIEs/QHINs — all equal peers.',
     facts:['Self-sovereign: owns its keys, its store, and its policy posture','Connects to others only over libp2p; no shared database','Serves its own clinicians via the FHIR Bridge'], spec:'Spec §6, §10'},
+  patientpeer:{layer:'patient', t:'Patient peer (consent client)', role:'A patient-controlled peer where a person manages their own authorization — granting and revoking access to their identity subgraph. Likely a lightweight client rather than a full institutional cluster.',
+    facts:['Holds the patient’s own signing key; Grants and Revocations are signed by the patient','Consent can originate from any peer, but this is the natural home for a patient to manage it','Sees only tokenized identity and authorization events — never others’ clinical data','Revocations gossip like any event and are enforced locally by every responding peer (§4.6, §4.7)'], spec:'Spec §4, §9.3'},
 };
 
 /* ---------------- rendering ---------------- */
@@ -347,14 +350,16 @@ function renderStack(){
 }
 
 function renderFed(){
-  // Five institution peers in a ring around the substrate; "this cluster" highlighted.
+  // Institution peers + a patient consent client, in a ring around the substrate;
+  // "this deployment" highlighted.
   const W=760, H=460, cx=W/2, cy=H/2-10, R=150;
   const peers = [
     {id:'peer', nm:'Mercy General', sub:'this deployment', hi:true},
-    {nm:'Northside Clinic', sub:'peer'},
-    {nm:'Lakeside Hospital', sub:'peer'},
-    {nm:'State HIE / QHIN', sub:'peer'},
-    {nm:'Reference Lab', sub:'peer'},
+    {nm:'Northside Clinic', sub:'institution peer'},
+    {nm:'Lakeside Hospital', sub:'institution peer'},
+    {nm:'State HIE / QHIN', sub:'institution peer'},
+    {nm:'Reference Lab', sub:'institution peer'},
+    {nm:'Patient', sub:'consent client', info:'patientpeer', patient:true},
   ];
   const pts = peers.map((p,i)=>{ const a=-Math.PI/2 + i*2*Math.PI/peers.length; return {...p, x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}; });
 
@@ -371,11 +376,15 @@ function renderFed(){
     </g>`;
 
   const nodes = pts.map(p=>{
+    const info   = p.info || 'peer';
+    const stroke = p.patient ? 'var(--patient)' : LAYER_COLORS.fed;
+    const op     = p.hi ? 1 : (p.patient ? 0.9 : 0.5);
+    const dash   = p.patient ? ' stroke-dasharray="5 4"' : '';
     const fill = p.hi ? 'var(--primary)' : '#fff';
     const ink  = p.hi ? '#fff' : 'var(--ink)';
     const sub  = p.hi ? 'rgba(255,255,255,.85)' : 'var(--ink-3)';
-    return `<g class="fnode" data-id="peer" onclick="show('peer')">
-        <rect class="ring" x="${p.x-72}" y="${p.y-26}" width="144" height="52" rx="12" fill="${fill}" stroke="${LAYER_COLORS.fed}" stroke-opacity="${p.hi?1:0.5}" stroke-width="${p.hi?2.5:1.5}"/>
+    return `<g class="fnode" data-id="${info}" onclick="show('${info}')">
+        <rect class="ring" x="${p.x-72}" y="${p.y-26}" width="144" height="52" rx="12" fill="${fill}" stroke="${stroke}" stroke-opacity="${op}" stroke-width="${p.hi?2.5:1.5}"${dash}/>
         <text x="${p.x}" y="${p.y-2}" text-anchor="middle" style="fill:${ink}">${p.nm}</text>
         <text class="sub" x="${p.x}" y="${p.y+13}" text-anchor="middle" style="fill:${sub}">${p.sub}</text>
       </g>`;
@@ -411,7 +420,7 @@ function tint(){ return 'var(--surface-2)'; }
 function renderLegend(){
   const items = view==='stack'
     ? [['INTERFACES','north'],['APPLICATION','engine'],['CONTAINERS','img'],['POD','pod'],['KUBERNETES','k8s'],['INFRASTRUCTURE','infra']]
-    : [['Peer (institution)','fed'],['P2P fabric','fed']];
+    : [['Institution peer','fed'],['Patient consent client','patient'],['P2P fabric','fed']];
   $('legend').innerHTML = items.map(([n,k])=>`<span class="it"><span class="sw" style="background:${LAYER_COLORS[k]}"></span>${n}</span>`).join('');
 }
 
