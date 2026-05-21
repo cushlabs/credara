@@ -10,6 +10,8 @@
 # ---- Java / Kotlin / Gradle (bridge/) ----
 bridge/build/
 bridge/.gradle/
+# In-repo Gradle/Maven cache used by the Dockerized `make bridge` build.
+/.gradle-cache/
 **/build/
 *.class
 *.jar

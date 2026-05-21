@@ -13,6 +13,7 @@
 #   make fmt-check   # check formatting (CI parity)
 #   make clippy      # lint with warnings-as-errors (CI parity)
 #   make build       # release build of the workspace
+#   make bridge      # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle+JDK container (M7)
 #   make shell       # interactive shell in the dev container
 #   make clean       # remove build artifacts and the dependency cache
 #
@@ -32,6 +33,10 @@ DEV_DOCKERFILE := .devcontainer/Dockerfile
 #   make DEV_BASE=docker.io/library/rust:1-bookworm anchor
 DEV_BASE ?= registry.fedoraproject.org/fedora:41
 
+# Image for the FHIR Bridge build (M7): a stock Gradle + JDK image, so the bridge builds with
+# only Docker (no local JDK; the Rust dev image has no Java). Pins the Gradle version.
+BRIDGE_IMAGE ?= docker.io/library/gradle:8.10-jdk21
+
 # Optional cap on build parallelism. Empty = use all cores (fastest). Set JOBS=1 (or 2) to
 # bound peak memory when compiling RocksDB on a memory-limited Docker VM. A single `-j` also
 # limits the cc crate's parallel C/C++ compiles (it derives NUM_JOBS from cargo's job count).
@@ -50,7 +55,7 @@ RUN  = docker run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build shell ci clean bridge
 
 dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
@@ -93,5 +98,16 @@ shell: dev-image
 		--user $(UID):$(GID) \
 		$(DEV_IMAGE) bash
 
+# Build the HAPI FHIR Bridge (M7) in a Gradle+JDK container — the bridge is the one Java/Kotlin
+# component and is NOT part of `anchor creda`. Runs as the host user; the Gradle/Maven cache lives
+# in a gitignored in-repo dir. The repo root is mounted because the bridge generates its gRPC
+# stubs from the shared proto under crates/creda-core/proto.
+bridge:
+	docker run --rm \
+		-v "$(CURDIR)":/work -w /work/bridge \
+		-e GRADLE_USER_HOME=/work/.gradle-cache -e HOME=/work/.gradle-cache \
+		--user $(UID):$(GID) \
+		$(BRIDGE_IMAGE) gradle build --no-daemon
+
 clean:
-	rm -rf target .cargo-cache
+	rm -rf target .cargo-cache bridge/build bridge/.gradle .gradle-cache

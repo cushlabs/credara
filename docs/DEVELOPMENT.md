@@ -114,6 +114,20 @@ is large and its parallel compile is memory-hungry. Fixes, in order of preferenc
    which exercises `creda-events` and the `creda-store` MemoryStore contract without compiling
    RocksDB at all.
 
+## The FHIR Bridge (Java/Kotlin)
+
+The bridge (`bridge/`) is the one non-Rust component, so it builds separately from `anchor creda`
+— Docker-only, no local JDK needed:
+
+```sh
+make bridge      # builds bridge/ in a gradle:8.10-jdk21 container
+```
+
+It runs as your host user, caches Gradle/Maven in a gitignored `./.gradle-cache/`, and mounts the
+repo root (the bridge generates its gRPC stubs from `crates/creda-core/proto`). It's a scaffold
+that hasn't been compiled yet (see `bridge/README.md`), so expect to iterate on HAPI/grpc-java
+version reconciliation.
+
 ## Notes for the `creda-events` crate (M1)
 
 The PQC algorithms (ML-DSA-65, SLH-DSA-256s, hybrid) are behind the default-on `pqc` feature.
