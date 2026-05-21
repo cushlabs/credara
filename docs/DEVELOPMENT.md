@@ -73,20 +73,20 @@ and the LLDB debugger preconfigured — no local Rust install. The container run
 
 ## The dev image vs. the shipped images
 
-The dev/build container (`.devcontainer/Dockerfile`) defaults to the official Rust image so
-the workflow works the moment Docker is present. This is **only** the local build/test
-environment.
+The dev/build container (`.devcontainer/Dockerfile`) is built on **Fedora**, for parity with
+the **shipped** product images (the M8 Dockerfiles that produce Core, Export Gate, Verifier, and
+the Bridge), which use **Fedora Hummingbird** hardened distroless base images, FIPS by default
+(`docs/DESIGN_QUEUE.md` DQ-4). Building dev/CI on the same OS family we ship on means glibc,
+system libraries, and packaging behave the same in development as in production. The Fedora base
+bootstraps the Rust toolchain via rustup; this is **only** the local build/test environment, not
+a shipped artifact.
 
-The **shipped** product images (the M8 Dockerfiles that produce Core, Export Gate, Verifier,
-and the Bridge) are built on **Fedora Hummingbird** hardened distroless base images, FIPS by
-default — see `docs/DESIGN_QUEUE.md` DQ-4. To build and test locally against the same
-Hummingbird Rust base for full parity, point the dev base at it:
+The Dockerfile is package-manager-agnostic, so if the Fedora path ever hiccups you can fall back
+to the prebuilt official Debian Rust image instantly:
 
 ```sh
-make DEV_BASE=<fedora-hummingbird-rust-image> test
+make DEV_BASE=docker.io/library/rust:1-bookworm anchor
 ```
-
-(Replace with the pinned Hummingbird Rust image reference once chosen.)
 
 ## Native builds (optional)
 

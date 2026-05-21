@@ -26,10 +26,11 @@
 DEV_IMAGE      ?= creda-dev:local
 DEV_DOCKERFILE := .devcontainer/Dockerfile
 
-# Base image for the dev/build container. Default = official Rust image (works with only
-# Docker). For full parity with the shipped images (DQ-4), set:
-#   make DEV_BASE=<fedora-hummingbird-rust-image> test
-DEV_BASE ?= docker.io/library/rust:1-bookworm
+# Base image for the dev/build container. Default = Fedora, for parity with the shipped images
+# (Fedora Hummingbird family, DQ-4). The Dockerfile is package-manager-agnostic, so you can fall
+# back to the prebuilt official Debian Rust image instantly if needed:
+#   make DEV_BASE=docker.io/library/rust:1-bookworm anchor
+DEV_BASE ?= registry.fedoraproject.org/fedora:41
 
 # Optional cap on build parallelism. Empty = use all cores (fastest). Set JOBS=1 (or 2) to
 # bound peak memory when compiling RocksDB on a memory-limited Docker VM. A single `-j` also

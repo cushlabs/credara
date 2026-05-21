@@ -180,10 +180,12 @@ checklist. The only host prerequisite is Docker.
   (`make test`, `test-fast`, `fmt`, `fmt-check`, `clippy`, `build`, `ci`, `shell`, `clean`).
 - A **devcontainer** (`.devcontainer/devcontainer.json`) gives VS Code / Codespaces users
   the same environment automatically, running as a non-root `dev` user.
-- The dev base image defaults to the **official Rust image** (so the workflow works the
-  moment Docker is present) with a documented one-line switch (`DEV_BASE=...`) to the Fedora
-  Hummingbird Rust image for parity. The **shipped** images remain Hummingbird (DQ-4); this
-  item governs only the local build/test environment.
+- The dev base image is **Fedora** (parity with the Hummingbird/Fedora shipped images, DQ-4):
+  building dev/CI on the same OS family we ship on keeps glibc/system-library/packaging behavior
+  consistent dev↔prod. The Dockerfile is package-manager-agnostic, so `DEV_BASE` can fall back to
+  the official Debian Rust image (`docker.io/library/rust:1-bookworm`) instantly if needed. The
+  **shipped** images remain hardened distroless Hummingbird (DQ-4); this item governs only the
+  local build/test environment.
 - The dependency cache lives in a gitignored in-repo dir to avoid named-volume permission
   issues with a non-root container user.
 
@@ -211,4 +213,4 @@ install.
 | DQ-2 | Ansible automates **deploy onto existing cluster** (not host provisioning) | 2026-05-20 |
 | DQ-3 | Test bed provides **both** Compose (fast) and kind/k3d (production-like) paths | 2026-05-20 |
 | DQ-4 | Base images = **Fedora Hummingbird**, **FIPS by default**, **container images only** (host OS = operator's choice) | 2026-05-20 |
-| DQ-5 | Dev environment = **Docker-only**, deps auto-provisioned (dev container + Makefile + devcontainer); dev base defaults to official Rust image, switchable to Hummingbird | 2026-05-20 |
+| DQ-5 | Dev environment = **Docker-only**, deps auto-provisioned (dev container + Makefile + devcontainer); dev base = **Fedora** (parity with Hummingbird family), Debian Rust image as fallback via `DEV_BASE` | 2026-05-20 |

@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
-      "BASE": "docker.io/library/rust:1-bookworm"
+      "BASE": "registry.fedoraproject.org/fedora:41"
     }
   },
   "remoteUser": "dev",
