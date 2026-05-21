@@ -14,11 +14,12 @@ amplification, temporal decay).
 **Assemble:** the Fellegi-Sunter record-linkage math (port from published references — do not
 invent). **Write:** traversal, projection, authorization evaluation, per-field confidence.
 
-## Status: implemented (M3), tests pending local run
+## Status: implemented and verified (M3) ✓
 
-Registered as a workspace member. Reads from a `creda_store::Store` (depends on `creda-store`
-with `default-features = false`, so the graph crate **never compiles RocksDB** — its tests use
-the `MemoryStore` and stay fast). Verify with `make test` or `cargo test -p creda-graph`.
+Registered as a workspace member; suite passes. Reads from a `creda_store::Store` (depends on
+`creda-store` with `default-features = false`, so the graph crate **never compiles RocksDB** —
+its tests use the `MemoryStore` and stay fast: `cargo test -p creda-graph` needs no C/RocksDB
+build). Re-run with `make test` or `cargo test -p creda-graph`.
 
 ### Modules
 - `subgraph.rs` — `Subgraph::materialize` (transitive closure from entry points), roots, leaves,
