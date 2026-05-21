@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creda · Reference Architecture</title>
+<style>
+  :root {
+    --bg: #eef2f6;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --ink: #0f1b2d;
+    --ink-2: #475569;
+    --ink-3: #7c8aa0;
+    --line: #dde4ee;
+    --primary: #0e6e8e;
+    --shadow: 0 1px 2px rgba(15,27,45,.06), 0 8px 24px rgba(15,27,45,.07);
+    --radius: 12px;
+
+    --infra:  #475569;
+    --k8s:    #2563eb;
+    --pod:    #0891b2;
+    --img:    #7c3aed;
+    --engine: #15803d;
+    --north:  #b45309;
+    --fed:    #be185d;
+    --ext:    #0e7490;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  .appbar { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: var(--ink); color: #fff; position: sticky; top: 0; z-index: 20; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+  .brand .mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg,#19b3d6,#0e6e8e); display: grid; place-items: center; font-size: 14px; font-weight: 800; }
+  .appbar .ctx { color: #aebfd4; font-size: 12.5px; }
+  .appbar .spacer { flex: 1; }
+
+  .toolbar { background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px 20px; display: flex; align-items: center; gap: 14px; position: sticky; top: 56px; z-index: 19; }
+  .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .seg button.on { background: var(--primary); color: #fff; }
+  .toolbar .hint { color: var(--ink-3); font-size: 12.5px; margin-left: auto; }
+
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 18px; max-width: 1280px; margin: 0 auto; padding: 20px; align-items: start; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .detail { position: static !important; } }
+
+  .stagewrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+
+  /* ---- Stack view ---- */
+  .axis { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+  .axis .arrow { color: var(--primary); font-weight: 800; }
+
+  .band { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 12px; overflow: hidden; }
+  .band:last-child { margin-bottom: 0; }
+  .band .bhd { display: flex; align-items: center; gap: 10px; padding: 9px 13px; }
+  .band .bhd .tag { font-size: 10.5px; font-weight: 800; color: #fff; padding: 2px 8px; border-radius: 6px; letter-spacing: .4px; }
+  .band .bhd .nm { font-weight: 700; font-size: 13.5px; }
+  .band .bhd .dsc { color: var(--ink-3); font-size: 12px; }
+  .band .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 13px 13px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: transform .06s ease, border-color .12s ease, background .12s ease; }
+  .chip:hover { transform: translateY(-1px); border-color: #b9c6d8; }
+  .chip.sel { background: #fff; box-shadow: 0 0 0 2px var(--primary) inset; }
+  .chip .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .chip .meta { color: var(--ink-3); font-weight: 500; font-size: 11px; }
+
+  .bandtint { background: linear-gradient(0deg, transparent, transparent); }
+
+  /* ---- Federation view ---- */
+  .fed { width: 100%; height: auto; display: block; }
+  .fnode { cursor: pointer; }
+  .fnode:hover .ring { stroke-opacity: 1; }
+  .fnode text { font-size: 11px; font-weight: 700; fill: var(--ink); }
+  .fnode .sub { font-size: 9.5px; font-weight: 500; fill: var(--ink-3); }
+  .fedge { stroke: #c4b0c8; stroke-width: 2; fill: none; }
+  .fedge.dim { stroke: #d9e0ea; }
+  .extbox { cursor: pointer; }
+  .extbox:hover rect { filter: brightness(1.04); }
+  .extbox text { font-size: 10.5px; font-weight: 650; fill: #fff; }
+
+  /* ---- Detail panel ---- */
+  .detail { position: sticky; top: 116px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .detail .dhd { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .detail .dhd .pill { font-size: 10.5px; font-weight: 800; color: #fff; padding: 3px 9px; border-radius: 999px; letter-spacing: .3px; }
+  .detail .dhd h3 { margin: 0; font-size: 15px; }
+  .detail .dbd { padding: 16px; }
+  .detail .role { font-size: 13.5px; color: var(--ink); }
+  .detail .facts { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .detail .facts li { display: flex; gap: 9px; font-size: 12.5px; color: var(--ink-2); }
+  .detail .facts li::before { content: "▸"; color: var(--primary); flex: none; }
+  .detail .spec { margin-top: 14px; font-size: 11.5px; color: var(--ink-3); border-top: 1px dashed var(--line); padding-top: 10px; }
+  .detail .intro { color: var(--ink-2); font-size: 13px; }
+  .detail .intro b { color: var(--ink); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); font-size: 12px; color: var(--ink-2); }
+  .legend .it { display: flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 11px; height: 11px; border-radius: 3px; }
+  .flowline { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Reference Architecture</span></div>
+    <div class="spacer"></div>
+    <div class="ctx">Decentralized cross-institution identity provenance &amp; portable authorization</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="seg" id="seg">
+      <button data-v="stack" class="on">Single cluster · Kubernetes up</button>
+      <button data-v="fed">Cross-institution federation</button>
+    </div>
+    <span class="hint">Click any component for detail →</span>
+  </div>
+
+  <div class="layout">
+    <div class="stagewrap" id="stage"></div>
+    <div>
+      <div class="detail" id="detail"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================================
+   Creda reference architecture (interactive). Single-file, fake-data-free —
+   it documents the actual system: a per-institution Kubernetes deployment
+   (Core + FHIR Bridge + dual-control Export Gate / Verifier) and the
+   cross-institution libp2p P2P substrate they federate over.
+   Spec references are to docs/creda-technical-spec.md.
+============================================================================ */
+
+const LAYER_COLORS = {
+  north: 'var(--north)', engine: 'var(--engine)', img: 'var(--img)',
+  pod: 'var(--pod)', k8s: 'var(--k8s)', infra: 'var(--infra)',
+  fed: 'var(--fed)', ext: 'var(--ext)'
+};
+
+/* ---- Single-cluster stack: top (north interfaces) down to infrastructure ---- */
+const BANDS = [
+  {
+    layer:'north', tag:'INTERFACES', nm:'North & east–west interfaces', dsc:'how the world talks to this peer',
+    chips:[
+      {id:'fhir', nm:'FHIR R4 API', meta:'EHRs / clients', },
+      {id:'libp2p-if', nm:'libp2p peer API', meta:'other institutions'},
+      {id:'grpc-if', nm:'gRPC over UDS', meta:'Bridge → Core (internal)'},
+      {id:'obs', nm:'Metrics / health', meta:'Prometheus · OTel'},
+    ]
+  },
+  {
+    layer:'engine', tag:'APPLICATION', nm:'Creda Core engine', dsc:'the domain logic — what makes Creda Creda',
+    chips:[
+      {id:'engine', nm:'Engine (creda-core)', meta:'composes everything'},
+      {id:'events', nm:'Event model (creda-events)', meta:'signed DAG'},
+      {id:'graph', nm:'Graph reasoning (creda-graph)', meta:'identity + authz'},
+      {id:'store', nm:'Store (creda-store)', meta:'RocksDB + indexes'},
+      {id:'net', nm:'Networking (creda-net)', meta:'libp2p replication'},
+      {id:'grpcsrv', nm:'gRPC server', meta:'tonic, on the UDS'},
+    ]
+  },
+  {
+    layer:'img', tag:'CONTAINERS', nm:'Containers (images)', dsc:'Fedora Hummingbird FIPS distroless · non-root · multi-arch',
+    chips:[
+      {id:'core-c', nm:'Core', meta:'Rust peer daemon'},
+      {id:'bridge-c', nm:'FHIR Bridge', meta:'Java/Kotlin · HAPI'},
+      {id:'gate-c', nm:'Export Gate', meta:'source-side control'},
+      {id:'verifier-c', nm:'Verifier', meta:'relying-side control'},
+    ]
+  },
+  {
+    layer:'pod', tag:'POD', nm:'Pod', dsc:'one peer = Core + Bridge sharing a Unix domain socket',
+    chips:[
+      {id:'uds', nm:'Shared UDS', meta:'emptyDir @ /var/run/creda'},
+      {id:'secctx', nm:'securityContext', meta:'non-root, read-only rootfs'},
+      {id:'probes', nm:'Probes', meta:'/livez · /readyz'},
+    ]
+  },
+  {
+    layer:'k8s', tag:'KUBERNETES', nm:'Kubernetes objects (Helm chart)', dsc:'same chart runs on laptop, on-prem, and cloud — config only',
+    chips:[
+      {id:'sts', nm:'StatefulSet', meta:'stable peer identity'},
+      {id:'svc', nm:'Services', meta:'FHIR · libp2p · headless'},
+      {id:'pvc', nm:'PVC', meta:'event store volume'},
+      {id:'cm', nm:'ConfigMap', meta:'hierarchical config'},
+      {id:'secret', nm:'Secret', meta:'signing key material'},
+      {id:'rbac', nm:'RBAC', meta:'minimal Role + SA'},
+      {id:'netpol', nm:'NetworkPolicy', meta:'ingress/egress fences'},
+      {id:'pdb', nm:'PodDisruptionBudget', meta:'availability'},
+      {id:'cron', nm:'CronJobs', meta:'snapshot · prune · decay'},
+    ]
+  },
+  {
+    layer:'infra', tag:'INFRASTRUCTURE', nm:'Cluster & platform', dsc:'any conformant Kubernetes — bring-your-own',
+    chips:[
+      {id:'ns', nm:'Namespace', meta:'restricted Pod Security'},
+      {id:'identity', nm:'cert-manager + SPIRE', meta:'workload identity / TLS'},
+      {id:'storage', nm:'Object storage', meta:'S3 / MinIO snapshots'},
+      {id:'nodes', nm:'Nodes', meta:'x86_64 / aarch64'},
+    ]
+  },
+];
+
+/* ---- Detail content for every component ---- */
+const INFO = {
+  // North interfaces
+  fhir:{layer:'north', t:'FHIR R4 API', role:'The clinical front door. EHRs and applications speak standard HL7 FHIR R4 to the Bridge — Creda meets healthcare where it already is.',
+    facts:['HAPI FHIR “Plain Server” (not a full datastore) — translator, not reasoner','Patient / Consent / Provenance / AuditEvent resources + custom $creda-* operations','US Core profiles; clinical reads serve the effective identity projection','Test-data records are filtered from clinical responses (§11.4.1)'], spec:'Spec §8, §10.4'},
+  'libp2p-if':{layer:'north', t:'libp2p peer API', role:'The peer-to-peer face. This is how this institution’s peer exchanges signed events with peers at other institutions — no central hub.',
+    facts:['gossipsub for event propagation, Kademlia DHT for discovery','Anti-entropy reconciliation repairs gaps (Merkle root over the UUID set)','Exposed via a NodePort / LoadBalancer Service','Off-by-default build feature; enabled in the shipped image'], spec:'Spec §6'},
+  'grpc-if':{layer:'north', t:'gRPC over a Unix domain socket', role:'The internal contract between the Bridge and Core. It never leaves the pod — it rides a shared in-memory socket, so there is no network hop and no TLS to manage between them.',
+    facts:['Bridge (client) → Core (server) over /var/run/creda/creda.sock','Events cross as canonical-CBOR bytes; authorization as a structured request','Confidentiality is the pod boundary, not TLS','This is the serve path the daemon now binds on startup'], spec:'Spec §10.1.3, §10.5.1'},
+  obs:{layer:'north', t:'Metrics & health', role:'Operational visibility. Liveness/readiness for Kubernetes, plus metrics and traces for operators.',
+    facts:['/livez and /readyz probes drive pod lifecycle','Prometheus metrics · OpenTelemetry traces · Grafana dashboards'], spec:'Spec §11'},
+
+  // Engine
+  engine:{layer:'engine', t:'Engine — creda-core', role:'The synchronous heart of a peer. It composes the event model, store, graph reasoning, and networking into the operations the gRPC API exposes.',
+    facts:['create/get events, materialize subgraph, project effective identity','evaluate authorization (uses the configured default posture)','snapshot / load-snapshot for bootstrap','Transport-free and unit-testable; gRPC and libp2p are thin adapters on top'], spec:'Spec §10.1'},
+  events:{layer:'engine', t:'Event model — creda-events', role:'The shared substrate: one signed DAG event node, ten event types spanning identity continuity and portable authorization.',
+    facts:['Canonical (deterministic) CBOR · Blake3 content hashing · UUIDv7 ids','Algorithm-agile signatures: Ed25519 + post-quantum ML-DSA / SLH-DSA + hybrid','Tokenized demographics — raw PII never enters the graph','Test-data tag lets synthetic events propagate yet stay out of clinical views'], spec:'Spec §3, §4, §5'},
+  graph:{layer:'engine', t:'Graph reasoning — creda-graph', role:'The first layer that interprets events: it answers “who is this patient?” (advisory) and “what is permitted?” (enforced).',
+    facts:['Effective-identity projection with per-field confidence and disagreement flagging','Seven-step authorization evaluation, fully local — no callback, no central consent','Graph-dependent invariants (Contest party-of-subgraph, Amend originating-institution)','Identity is advisory; authorization is enforced — same subgraph, different questions'], spec:'Spec §5.2.4, §4.6, §5.3'},
+  store:{layer:'engine', t:'Store — creda-store', role:'Backend-agnostic persistence. All identity logic lives above it; the store only persists and indexes events.',
+    facts:['RocksDB backend (default) + the four secondary indexes from §5.2.5','In-memory store for fast tests; libgit2 store scaffold for an open question','Idempotent writes; indexes rebuildable from the event store','Signature/validation happen above the store, not in it'], spec:'Spec §5.2.5, §7.3'},
+  net:{layer:'engine', t:'Networking — creda-net', role:'Replication and discovery across peers. Pure protocol logic with the real libp2p transport quarantined behind a build feature.',
+    facts:['Bucketed subscription (Blake3(key) mod 1024) so peers carry a shard, not everything','Anti-entropy over the UUID set; snapshot format for bootstrap','Gossip batching with bounded dedup','NetworkTransport trait is the seam; libp2p adapter is opt-in'], spec:'Spec §6, §7'},
+  grpcsrv:{layer:'engine', t:'gRPC server (tonic)', role:'The async adapter that exposes the engine on the Unix domain socket the Bridge connects to.',
+    facts:['Binds the UDS on startup; graceful SIGINT/SIGTERM shutdown','Each engine call runs on a blocking task so the runtime stays responsive','Structured EvaluateAuthorization contract (requester / purpose / use-mode / scope)','TCP fallback for laptop development'], spec:'Spec §10.1.3'},
+
+  // Containers
+  'core-c':{layer:'img', t:'Core container', role:'The Rust peer daemon — the engine plus its gRPC and libp2p adapters in one process.',
+    facts:['Hummingbird FIPS distroless, non-root, read-only root filesystem','Owns the RocksDB volume and the libp2p endpoint','Speaks gRPC to the Bridge over the shared socket'], spec:'Spec §10.5, DQ-4'},
+  'bridge-c':{layer:'img', t:'FHIR Bridge container', role:'The Java/Kotlin HAPI FHIR server. A pure translator: every operation maps FHIR ⇄ Core gRPC and contains no identity logic of its own.',
+    facts:['Spring Boot + HAPI FHIR R4 Plain Server','gRPC client to Core over the in-pod Unix domain socket','Hummingbird OpenJDK base image (non-root)'], spec:'Spec §8, §10.4'},
+  'gate-c':{layer:'img', t:'Export Gate (source side)', role:'Half of dual control. Before any data leaves the source institution, the gate evaluates authorization and emits a signed ExportReceipt.',
+    facts:['Reuses the same graph authorization evaluation as the engine','Deny-by-default for egress; refuses expired / revoked / out-of-audience requests','Emits an ExportReceipt recording grant, requester, and released scope'], spec:'Spec §4.5.1, §10.2'},
+  'verifier-c':{layer:'img', t:'Verifier (relying side)', role:'The other half of dual control. The relying institution independently verifies what it received — offline, against its local copy.',
+    facts:['Three-part check: authorized · identity continuity · provenance intact','Offline by construction; can report staleness vs. a freshness threshold','Same evaluation logic as the Export Gate and engine'], spec:'Spec §4.5.2, §10.3'},
+
+  // Pod
+  uds:{layer:'pod', t:'Shared Unix domain socket', role:'How Core and the Bridge talk inside one pod. An emptyDir volume mounted into both containers carries the gRPC socket — fast, and never on the network.',
+    facts:['emptyDir mounted at /var/run/creda in both containers','Socket bound 0o660 so the Bridge (same pod fsGroup) can connect','No TCP, no TLS between Bridge and Core — the pod is the trust boundary'], spec:'Spec §10.5.1'},
+  secctx:{layer:'pod', t:'Pod / container securityContext', role:'The hard non-root posture applied to every container in every environment.',
+    facts:['runAsNonRoot, fixed non-zero UID/GID/fsGroup','readOnlyRootFilesystem, allowPrivilegeEscalation: false','All Linux capabilities dropped; seccomp RuntimeDefault','CI fails the build on any root container (DQ-1)'], spec:'Spec §6, DQ-1'},
+  probes:{layer:'pod', t:'Health probes', role:'Let Kubernetes manage the peer’s lifecycle safely.',
+    facts:['/livez — restart if the process wedges','/readyz — hold traffic until the store is open and the socket is bound'], spec:'Spec §10.5'},
+
+  // Kubernetes
+  sts:{layer:'k8s', t:'StatefulSet', role:'A Creda peer is stateful — it owns an event store and a stable identity — so it is deployed as a StatefulSet, not a Deployment.',
+    facts:['Stable network identity + ordered, persistent storage per peer','Core and Bridge run as two containers in the same pod','Bound to the data PVC'], spec:'Spec §10.5, §10.6'},
+  svc:{layer:'k8s', t:'Services', role:'Three distinct front doors for three distinct traffic types.',
+    facts:['ClusterIP for FHIR (north / clinical clients)','NodePort or LoadBalancer for libp2p (east–west / peers)','Headless Service for peer discovery'], spec:'Spec §10.6'},
+  pvc:{layer:'k8s', t:'PersistentVolumeClaim', role:'Durable home for the event store and local state.',
+    facts:['Default 50Gi; storageClass left to the cluster (gp3 on cloud, etc.)','Holds the RocksDB event store and indexes','Snapshots can also be pushed to object storage for bootstrap'], spec:'Spec §7.3'},
+  cm:{layer:'k8s', t:'ConfigMap', role:'Non-secret configuration for the peer.',
+    facts:['Feeds the hierarchical config (defaults → TOML → env → flags)','Default authorization posture lives here (e.g. treatment-presumed)','Validated at startup — fails loudly on bad config'], spec:'Spec §10.1.6'},
+  secret:{layer:'k8s', t:'Secret', role:'The institution’s signing key material — referenced, never baked into an image.',
+    facts:['Ed25519 / PQC signing key sourced into Core at startup','Path to an HSM / KMS later without touching the engine (Signer trait)'], spec:'Spec §10.1.4'},
+  rbac:{layer:'k8s', t:'RBAC', role:'Least privilege for the workload’s own service account.',
+    facts:['Minimal Role + ServiceAccount — only what the peer needs','No cluster-wide privileges'], spec:'Spec §10.6'},
+  netpol:{layer:'k8s', t:'NetworkPolicy', role:'Explicit fences around what the pod may talk to.',
+    facts:['Restricts ingress to the FHIR and libp2p Services','Restricts egress to peers, object storage, and DNS'], spec:'Spec §6, §10.6'},
+  pdb:{layer:'k8s', t:'PodDisruptionBudget', role:'Keeps the peer available during voluntary disruptions (node drains, upgrades).',
+    facts:['Caps how many peer replicas can be down at once'], spec:'Spec §10.6'},
+  cron:{layer:'k8s', t:'CronJobs', role:'Scheduled operational tasks that keep a peer healthy over time.',
+    facts:['Snapshot generation (bootstrap + backup)','Retention pruning','Reputation decay'], spec:'Spec §11'},
+
+  // Infrastructure
+  ns:{layer:'infra', t:'Namespace (restricted PSS)', role:'The deployment installs under the “restricted” Pod Security Standard — the strictest tier.',
+    facts:['Enforces the non-root, no-privilege posture cluster-side','Set up idempotently by the Ansible play (DQ-2)'], spec:'DQ-1, DQ-2'},
+  identity:{layer:'infra', t:'cert-manager + SPIRE', role:'Platform identity and certificates, installed as prerequisites before the Creda release.',
+    facts:['Workload identity (SPIFFE/SPIRE) and certificate lifecycle (cert-manager)','Underpins UDAP-style institutional identity','Installed by the Ansible play onto an existing cluster'], spec:'Spec §10.6, DQ-2'},
+  storage:{layer:'infra', t:'Object storage (S3 / MinIO)', role:'Where snapshots live. The same chart uses bundled MinIO on-prem or S3 in cloud — config only.',
+    facts:['Snapshot push/pull for fast peer bootstrap','MinIO on-prem, S3 in cloud — identical image and chart'], spec:'Spec §6.2.5, §6'},
+  nodes:{layer:'infra', t:'Cluster nodes', role:'Any conformant Kubernetes. Creda is bring-your-own-cluster.',
+    facts:['Multi-arch images: x86_64 and aarch64','Runs on a laptop (Compose), on-prem k8s, or cloud k8s'], spec:'Spec §6, §10.6'},
+
+  // Federation
+  substrate:{layer:'fed', t:'libp2p P2P substrate', role:'The connective tissue between institutions. There is no central server — peers gossip signed, content-addressed events directly to one another.',
+    facts:['gossipsub propagation · Kademlia DHT discovery · anti-entropy repair','Peers subscribe to buckets (a shard of the keyspace), not the whole graph','Every event is signed; signature verification is mandatory at ingest','Eventually consistent — a partitioned peer catches up via anti-entropy'], spec:'Spec §6'},
+  authz:{layer:'fed', t:'Portable authorization', role:'Consent travels with the data. An AuthorizationGrant (and its Revocation) are themselves events in the DAG, so every peer can decide locally what it may serve.',
+    facts:['Patient-centric: the grant is bound to the patient subgraph, non-transferable','Each peer runs the same seven-step evaluation locally (§4.6)','Revocation propagates as an event; bounded revocation latency is a target (§4.7)'], spec:'Spec §4'},
+  trust:{layer:'fed', t:'Trust & data boundaries', role:'What keeps a decentralized health network safe: cryptographic provenance, data minimization, and dual control at the edges.',
+    facts:['UDAP certificate fingerprints identify every event’s author','Tokenized demographics; clinical payloads never enter the trust graph','Export Gate (egress) + Verifier (ingest) form dual control at institution boundaries'], spec:'Spec §3.2, §4.5, §9'},
+  peer:{layer:'fed', t:'Institution peer', role:'Each participating institution runs its own Creda cluster (the stack in the other tab). Hospitals, clinics, labs, HIEs/QHINs — all equal peers.',
+    facts:['Self-sovereign: owns its keys, its store, and its policy posture','Connects to others only over libp2p; no shared database','Serves its own clinicians via the FHIR Bridge'], spec:'Spec §6, §10'},
+};
+
+/* ---------------- rendering ---------------- */
+const $ = id => document.getElementById(id);
+let view = 'stack';
+let selected = null;
+
+function show(id){
+  selected = id;
+  const i = INFO[id];
+  const c = LAYER_COLORS[i.layer];
+  $('detail').innerHTML = `
+    <div class="dhd"><span class="pill" style="background:${c}">${i.layer.toUpperCase()}</span><h3>${i.t}</h3></div>
+    <div class="dbd">
+      <div class="role">${i.role}</div>
+      <ul class="facts">${i.facts.map(f=>`<li>${f}</li>`).join('')}</ul>
+      <div class="spec">${i.spec}</div>
+    </div>`;
+  document.querySelectorAll('.chip,.fnode,.extbox').forEach(el=>el.classList.toggle('sel', el.dataset.id===id));
+  syncSelectedStroke();
+}
+
+function intro(){
+  selected = null;
+  $('detail').innerHTML = `
+    <div class="dhd"><span class="pill" style="background:var(--primary)">OVERVIEW</span><h3>${view==='stack'?'One institution, Kubernetes up':'A network of peers'}</h3></div>
+    <div class="dbd">
+      <div class="intro">${view==='stack'
+        ? 'Each institution runs <b>one self-contained Kubernetes deployment</b>. Read it bottom-to-top: a conformant cluster, then the Helm-managed Kubernetes objects, the pod, the containers, and finally the <b>Creda Core engine</b> that does the real work — exposed northward via FHIR and a gRPC socket, and east–west to peers via libp2p. <br><br>Click any block for what it is and why it’s there.'
+        : 'There is <b>no central server</b>. Every institution runs the cluster from the other tab, and the peers federate directly over a <b>libp2p</b> substrate — gossiping signed, content-addressed events. Authorization is <b>portable</b> (it travels with the data), trust is cryptographic, and dual control guards every boundary. <br><br>Click a peer or a fabric layer for detail.'}
+      </div>
+    </div>`;
+  document.querySelectorAll('.chip,.fnode,.extbox').forEach(el=>el.classList.remove('sel'));
+  syncSelectedStroke();
+}
+
+function renderStack(){
+  const html = [`<div class="axis"><span class="arrow">▲</span> up the stack &nbsp;·&nbsp; from Kubernetes (bottom) to the application interfaces (top)</div>`];
+  for(const b of BANDS){
+    const col = LAYER_COLORS[b.layer];
+    html.push(`<div class="band" style="border-color:${hexFade(col)}">
+      <div class="bhd" style="background:${tint(col)}">
+        <span class="tag" style="background:${col}">${b.tag}</span>
+        <span class="nm">${b.nm}</span><span class="dsc">— ${b.dsc}</span>
+      </div>
+      <div class="chips">
+        ${b.chips.map(ch=>`<div class="chip" data-id="${ch.id}" onclick="show('${ch.id}')">
+            <span class="dot" style="background:${col}"></span>${ch.nm}
+            ${ch.meta?`<span class="meta">· ${ch.meta}</span>`:''}
+          </div>`).join('')}
+      </div>
+    </div>`);
+  }
+  $('stage').innerHTML = html.join('');
+  $('stage').insertAdjacentHTML('beforeend',
+    `<div class="flowline">Flow: clinician → <b>FHIR</b> → Bridge → <b>gRPC/UDS</b> → Core engine → <b>RocksDB</b>; peers exchange events over <b>libp2p</b>.</div>`);
+}
+
+function renderFed(){
+  // Five institution peers in a ring around the substrate; "this cluster" highlighted.
+  const W=760, H=460, cx=W/2, cy=H/2-10, R=150;
+  const peers = [
+    {id:'peer', nm:'Mercy General', sub:'this deployment', hi:true},
+    {nm:'Northside Clinic', sub:'peer'},
+    {nm:'Lakeside Hospital', sub:'peer'},
+    {nm:'State HIE / QHIN', sub:'peer'},
+    {nm:'Reference Lab', sub:'peer'},
+  ];
+  const pts = peers.map((p,i)=>{ const a=-Math.PI/2 + i*2*Math.PI/peers.length; return {...p, x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}; });
+
+  let edges='';
+  for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+    const dim = !(pts[i].hi||pts[j].hi);
+    edges += `<line class="fedge ${dim?'dim':''}" x1="${pts[i].x}" y1="${pts[i].y}" x2="${pts[j].x}" y2="${pts[j].y}"/>`;
+  }
+
+  const hub = `<g class="fnode" data-id="substrate" onclick="show('substrate')">
+      <circle class="ring" cx="${cx}" cy="${cy}" r="46" fill="${LAYER_COLORS.fed}" fill-opacity="0.12" stroke="${LAYER_COLORS.fed}" stroke-opacity="0.6"/>
+      <text x="${cx}" y="${cy-2}" text-anchor="middle">libp2p</text>
+      <text class="sub" x="${cx}" y="${cy+12}" text-anchor="middle">P2P substrate</text>
+    </g>`;
+
+  const nodes = pts.map(p=>{
+    const fill = p.hi ? 'var(--primary)' : '#fff';
+    const ink  = p.hi ? '#fff' : 'var(--ink)';
+    const sub  = p.hi ? 'rgba(255,255,255,.85)' : 'var(--ink-3)';
+    return `<g class="fnode" data-id="peer" onclick="show('peer')">
+        <rect class="ring" x="${p.x-72}" y="${p.y-26}" width="144" height="52" rx="12" fill="${fill}" stroke="${LAYER_COLORS.fed}" stroke-opacity="${p.hi?1:0.5}" stroke-width="${p.hi?2.5:1.5}"/>
+        <text x="${p.x}" y="${p.y-2}" text-anchor="middle" style="fill:${ink}">${p.nm}</text>
+        <text class="sub" x="${p.x}" y="${p.y+13}" text-anchor="middle" style="fill:${sub}">${p.sub}</text>
+      </g>`;
+  }).join('');
+
+  // External shared systems + cross-cutting concerns as side chips.
+  const side = [
+    {id:'authz', nm:'Portable authorization', x:40, y:36, w:200},
+    {id:'trust', nm:'Trust & data boundaries', x:W-240, y:36, w:200},
+  ].map(s=>`<g class="extbox" data-id="${s.id}" onclick="show('${s.id}')">
+      <rect x="${s.x}" y="${s.y}" width="${s.w}" height="34" rx="9" fill="${LAYER_COLORS.fed}"/>
+      <text x="${s.x+s.w/2}" y="${s.y+21}" text-anchor="middle">${s.nm}</text>
+    </g>`).join('');
+
+  $('stage').innerHTML =
+    `<div class="axis"><span class="arrow">↔</span> peers federate directly — no central authority</div>
+     <svg class="fed" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+       ${edges}${hub}${nodes}${side}
+     </svg>
+     <div class="flowline">Each peer is a full Creda cluster (other tab). Signed events propagate by gossip; gaps heal by anti-entropy; consent rides along as events.</div>`;
+}
+
+function syncSelectedStroke(){
+  document.querySelectorAll('.fnode .ring, .extbox rect').forEach(el=>{
+    const g = el.closest('[data-id]');
+    if(g && g.dataset.id===selected) el.setAttribute('stroke-width', '3');
+  });
+}
+
+function hexFade(){ return 'var(--line)'; }
+function tint(){ return 'var(--surface-2)'; }
+
+function renderLegend(){
+  const items = view==='stack'
+    ? [['INTERFACES','north'],['APPLICATION','engine'],['CONTAINERS','img'],['POD','pod'],['KUBERNETES','k8s'],['INFRASTRUCTURE','infra']]
+    : [['Peer (institution)','fed'],['P2P fabric','fed']];
+  $('legend').innerHTML = items.map(([n,k])=>`<span class="it"><span class="sw" style="background:${LAYER_COLORS[k]}"></span>${n}</span>`).join('');
+}
+
+function setView(v){
+  view = v;
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+  if(v==='stack') renderStack(); else renderFed();
+  renderLegend();
+  intro();
+}
+
+document.getElementById('seg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(b) setView(b.dataset.v);
+});
+
+setView('stack');
+</script>
+</body>
+</html>

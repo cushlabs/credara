@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creda · Clinical Identity Review (mockup)</title>
+<style>
+  :root {
+    --bg: #eef2f6;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --ink: #0f1b2d;
+    --ink-2: #475569;
+    --ink-3: #7c8aa0;
+    --line: #dde4ee;
+    --primary: #0e6e8e;
+    --primary-ink: #ffffff;
+    --assert: #2563eb;
+    --attest: #15803d;
+    --link: #7c3aed;
+    --contest: #c2410c;
+    --amend: #b45309;
+    --auth: #0891b2;
+    --good: #15803d;
+    --warn: #b45309;
+    --bad: #b91c1c;
+    --shadow: 0 1px 2px rgba(15,27,45,.06), 0 6px 20px rgba(15,27,45,.06);
+    --radius: 12px;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  .muted { color: var(--ink-3); }
+
+  /* ---- App shell ---- */
+  .appbar {
+    height: 56px; display: flex; align-items: center; gap: 14px;
+    padding: 0 20px; background: var(--ink); color: #fff;
+    position: sticky; top: 0; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: .2px; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, #19b3d6, #0e6e8e); display: grid; place-items: center;
+    font-size: 14px; font-weight: 800;
+  }
+  .appbar .ctx { color: #aebfd4; font-size: 12.5px; }
+  .appbar .spacer { flex: 1; }
+  .appbar .who { font-size: 12.5px; color: #cdd8e8; display: flex; align-items: center; gap: 8px; }
+  .appbar .who .dot { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; }
+
+  .viewbanner {
+    background: #e8f3f7; color: #0e6e8e; border-bottom: 1px solid #c8e2ea;
+    font-size: 12.5px; padding: 7px 20px; display: flex; align-items: center; gap: 8px;
+  }
+  .viewbanner b { font-weight: 650; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
+
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); margin-bottom: 14px; }
+  .crumbs a { color: var(--primary); text-decoration: none; cursor: pointer; }
+  .crumbs a:hover { text-decoration: underline; }
+
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  h2 { font-size: 14.5px; margin: 0 0 12px; letter-spacing: .2px; }
+  .section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .section .hd { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .section .hd h2 { margin: 0; }
+  .section .bd { padding: 16px; }
+
+  /* ---- Worklist ---- */
+  .searchrow { display: flex; gap: 10px; margin-bottom: 16px; }
+  .searchrow input {
+    flex: 1; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14px; background: var(--surface);
+  }
+  .searchrow input:focus { outline: 2px solid #bfe0ec; border-color: var(--primary); }
+
+  .plist { display: grid; gap: 10px; }
+  .pcard {
+    display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; box-shadow: var(--shadow); cursor: pointer; transition: transform .06s ease, border-color .12s ease;
+  }
+  .pcard:hover { transform: translateY(-1px); border-color: #c3d2e6; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .pcard .nm { font-weight: 640; font-size: 15px; }
+  .pcard .sub { color: var(--ink-3); font-size: 12.5px; }
+  .pcard .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .badge .d { width: 7px; height: 7px; border-radius: 50%; }
+  .b-good { background: #e7f6ec; color: #15803d; }
+  .b-warn { background: #fdf1e3; color: #b45309; }
+  .b-info { background: #e7f1fb; color: #2563eb; }
+  .b-neutral { background: #eef2f6; color: #475569; }
+
+  .conf { display: flex; align-items: center; gap: 8px; }
+  .meter { width: 90px; height: 7px; border-radius: 999px; background: #e7edf4; overflow: hidden; }
+  .meter > span { display: block; height: 100%; border-radius: 999px; }
+  .conf .pct { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); width: 34px; text-align: right; }
+
+  /* ---- Patient detail layout ---- */
+  .phead {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 16px; display: grid;
+    grid-template-columns: 56px 1fr auto; gap: 16px; align-items: center;
+  }
+  .phead .avatar { width: 56px; height: 56px; font-size: 19px; }
+  .phead .nm { font-size: 20px; font-weight: 700; }
+  .phead .meta { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .phead .meta b { color: var(--ink); font-weight: 600; }
+  .phead .score { text-align: right; }
+  .phead .score .lab { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .5px; }
+  .phead .score .val { font-size: 26px; font-weight: 750; line-height: 1.1; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 920px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* identity fields */
+  .field { padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .field:last-child { border-bottom: 0; }
+  .field .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .field .key { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .5px; }
+  .field .value { font-size: 15px; font-weight: 600; margin-top: 1px; }
+  .field .srcs { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+  .field.disputed { background: #fdf6ee; margin: 0 -16px; padding: 11px 16px; border-bottom: 1px solid #f0e1cc; }
+  .conflict { margin-top: 8px; display: grid; gap: 6px; }
+  .conflict .opt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; background: #fff; border: 1px solid #f0d9bd; border-radius: 8px; padding: 6px 9px; }
+  .conflict .opt .v { font-weight: 600; }
+
+  /* ---- DAG ---- */
+  .dagwrap { padding: 6px; }
+  .dag { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px 16px 0; font-size: 12px; color: var(--ink-2); }
+  .legend .it { display: flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 11px; height: 11px; border-radius: 3px; }
+  .node { cursor: pointer; }
+  .node rect, .node circle { transition: filter .1s ease; }
+  .node:hover rect, .node:hover circle { filter: brightness(1.06); }
+  .node text { font-size: 11px; fill: #fff; font-weight: 600; pointer-events: none; }
+  .node .sub { font-size: 9.5px; fill: rgba(255,255,255,.85); font-weight: 500; }
+  .edge { stroke: #b9c6d8; stroke-width: 2; fill: none; }
+  .edge.contest { stroke: var(--contest); stroke-dasharray: 5 4; }
+
+  /* ---- Challenges ---- */
+  .chq { border: 1px solid var(--line); border-radius: 11px; padding: 14px; margin-bottom: 12px; background: var(--surface-2); }
+  .chq:last-child { margin-bottom: 0; }
+  .chq.resolved { opacity: .65; }
+  .chq .qt { font-weight: 660; display: flex; align-items: center; gap: 8px; }
+  .chq .qp { color: var(--ink-2); font-size: 13px; margin: 6px 0 12px; }
+  .chq .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip-tag { font-size: 11px; font-weight: 650; padding: 2px 8px; border-radius: 6px; }
+
+  .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 13px; border-radius: 9px; font-size: 13px; font-weight: 600; }
+  .btn:hover { border-color: #b9c6d8; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn.attest { background: #e7f6ec; border-color: #bfe3c9; color: #15803d; }
+  .btn.contest { background: #fdeee5; border-color: #f3cdb3; color: #c2410c; }
+  .btn.amend { background: #fbf2e2; border-color: #ecd6ab; color: #b45309; }
+  .btn.auth { background: #e3f4f8; border-color: #b6dfe8; color: #0e6e8e; }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .empty { color: var(--ink-3); font-size: 13px; padding: 8px 2px; }
+
+  .log .row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .log .row:last-child { border-bottom: 0; }
+  .log .ic { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; flex: none; }
+
+  /* ---- Slide-over (event detail) ---- */
+  .scrim { position: fixed; inset: 0; background: rgba(15,27,45,.38); opacity: 0; pointer-events: none; transition: opacity .15s ease; z-index: 40; }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; top: 0; right: 0; height: 100%; width: 420px; max-width: 92vw; background: #fff; z-index: 50;
+    box-shadow: -10px 0 40px rgba(15,27,45,.18); transform: translateX(100%); transition: transform .2s ease; display: flex; flex-direction: column;
+  }
+  .sheet.on { transform: translateX(0); }
+  .sheet .sh-hd { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .sheet .sh-bd { padding: 18px; overflow: auto; }
+  .sheet .x { margin-left: auto; border: 0; background: transparent; font-size: 20px; color: var(--ink-3); line-height: 1; }
+  .kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 13px; margin-top: 6px; }
+  .kv .k { color: var(--ink-3); }
+  .kv .v { font-weight: 550; word-break: break-word; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #fff; padding: 3px 9px; border-radius: 999px; }
+
+  /* ---- Modal ---- */
+  .modal { position: fixed; inset: 0; display: grid; place-items: center; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+  .modal.on { opacity: 1; pointer-events: auto; }
+  .modal .card { width: 480px; max-width: 94vw; background: #fff; border-radius: 14px; box-shadow: 0 24px 70px rgba(15,27,45,.32); overflow: hidden; }
+  .modal .m-hd { padding: 16px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+  .modal .m-bd { padding: 18px; }
+  .modal .m-ft { padding: 14px 18px; background: var(--surface-2); display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--line); }
+  .codecard { background: #0f1b2d; color: #cfe3ee; border-radius: 10px; padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.6; margin-top: 12px; white-space: pre; overflow:auto; }
+  .codecard .kk { color: #7fd4ec; }
+  .codecard .vv { color: #f5d49b; }
+
+  /* ---- Toast ---- */
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 11px 16px; border-radius: 10px; font-size: 13px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: all .2s ease; z-index: 70; display: flex; align-items: center; gap: 9px; }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Clinical Identity</span></div>
+    <div class="spacer"></div>
+    <div class="who"><span class="dot"></span> Dr. A. Reyes · Mercy General (signing institution)</div>
+  </div>
+  <div class="viewbanner">
+    <span>🔒</span><b>Clinical view.</b><span>Synthetic / test-tagged records are hidden (spec §11.4). Demographics shown are detokenized at point of care via the FHIR bridge.</span>
+  </div>
+
+  <div class="wrap" id="app"></div>
+
+  <!-- Slide-over for event detail -->
+  <div class="scrim" id="scrim" onclick="closeSheet()"></div>
+  <aside class="sheet" id="sheet">
+    <div class="sh-hd" id="sheetHd"></div>
+    <div class="sh-bd" id="sheetBd"></div>
+  </aside>
+
+  <!-- Action modal -->
+  <div class="modal" id="modal">
+    <div class="card">
+      <div class="m-hd" id="modalHd"></div>
+      <div class="m-bd" id="modalBd"></div>
+      <div class="m-ft">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" id="modalConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   Creda clinician review — interactive mockup (fake data only).
+   Everything below is illustrative: it shows how a treating clinician would
+   read a patient's effective identity + provenance DAG, resolve point-of-care
+   "challenge questions", and take actions that map to real Creda event types.
+---------------------------------------------------------------------------- */
+
+const TYPE_COLORS = {
+  Assert: 'var(--assert)', Attest: 'var(--attest)', Link: 'var(--link)',
+  Contest: 'var(--contest)', Amend: 'var(--amend)', AuthorizationGrant: 'var(--auth)'
+};
+const TYPE_DESC = {
+  Assert: 'An institution asserted demographics for this patient (§3.4.1).',
+  Attest: 'An institution recorded reliance on this identity chain for a stated purpose (§3.4.4).',
+  Link: 'Two subgraphs were asserted to be the same person (§3.4.2).',
+  Contest: 'A party to the subgraph disputed a link (§3.4.3).',
+  Amend: 'The originating institution corrected demographics (§3.4.5).',
+  AuthorizationGrant: 'The patient granted an institution access for a purpose (§4.3).'
+};
+
+function avatarColor(name){
+  const palette = ['#2563eb','#0e6e8e','#7c3aed','#15803d','#b45309','#be185d'];
+  let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0;
+  return palette[h % palette.length];
+}
+function initials(name){ return name.split(' ').filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase(); }
+function confColor(p){ return p>=85 ? 'var(--good)' : p>=60 ? 'var(--warn)' : 'var(--bad)'; }
+
+/* -------- Fake patients -------- */
+const PATIENTS = [
+  {
+    id:'p1', name:'Maria Gonzalez', dob:'1984-03-12', sex:'Female',
+    mrns:['Mercy General · MRN 5582019','Northside Clinic · MRN A-7741'],
+    confidence:96, summary:'Single consistent identity across two institutions.',
+    fields:[
+      {key:'Legal name', value:'Maria Elena Gonzalez', conf:97, sources:['Mercy General','Northside Clinic']},
+      {key:'Date of birth', value:'1984-03-12', conf:98, sources:['Mercy General','Northside Clinic']},
+      {key:'Sex', value:'Female', conf:99, sources:['Mercy General']},
+      {key:'Address', value:'418 Larkspur Ave, Madison', conf:88, sources:['Northside Clinic']},
+    ],
+    events:[
+      {id:'e1', type:'Assert', inst:'Mercy General', when:'2021-06-02', vm:'Government photo ID', x:120, y:70, parents:[], summary:'Initial registration at Mercy General.'},
+      {id:'e2', type:'Assert', inst:'Northside Clinic', when:'2022-11-18', vm:'Insurance card', x:120, y:230, parents:[], summary:'Registration at Northside Clinic.'},
+      {id:'e3', type:'Link', inst:'Mercy General', when:'2022-11-20', conf:'94%', x:360, y:150, parents:['e1','e2'], summary:'Algorithmic match linked the two records.'},
+      {id:'e4', type:'Attest', inst:'Mercy General', when:'2023-02-10', purpose:'Treatment', x:600, y:150, parents:['e3'], summary:'Treatment reliance recorded.'},
+    ],
+    challenges:[]
+  },
+  {
+    id:'p2', name:'James Whitfield', dob:'—', sex:'Male',
+    mrns:['Mercy General · MRN 6610042','Lakeside Hospital · MRN LH-3098'],
+    confidence:64, summary:'Two institutions disagree on date of birth — needs point-of-care confirmation.',
+    needsReview:true,
+    fields:[
+      {key:'Legal name', value:'James R. Whitfield', conf:93, sources:['Mercy General','Lakeside Hospital']},
+      {key:'Date of birth', value:'conflicting', conf:48, disputed:true,
+        options:[ {inst:'Mercy General', v:'1971-08-04', vm:'Government photo ID'},
+                  {inst:'Lakeside Hospital', v:'1971-08-14', vm:'Self-reported'} ]},
+      {key:'Sex', value:'Male', conf:99, sources:['Mercy General','Lakeside Hospital']},
+      {key:'Address', value:'92 Birchwood Ct, Franklin', conf:81, sources:['Mercy General']},
+    ],
+    events:[
+      {id:'e1', type:'Assert', inst:'Mercy General', when:'2020-01-09', vm:'Government photo ID', dob:'1971-08-04', x:120, y:70, parents:[], summary:'DOB 1971-08-04, verified by photo ID.'},
+      {id:'e2', type:'Assert', inst:'Lakeside Hospital', when:'2023-07-22', vm:'Self-reported', dob:'1971-08-14', x:120, y:230, parents:[], summary:'DOB 1971-08-14, self-reported at intake.'},
+      {id:'e3', type:'Link', inst:'Lakeside Hospital', when:'2023-07-23', conf:'82%', x:360, y:150, parents:['e1','e2'], summary:'Records linked despite DOB mismatch (name + address match).'},
+    ],
+    challenges:[
+      {id:'c1', kind:'dob', tag:'Conflicting DOB',
+       title:'Which date of birth matches the patient in front of you?',
+       prompt:'Mercy General has 1971-08-04 (photo ID). Lakeside Hospital has 1971-08-14 (self-reported). Confirm against the patient or their ID.',
+       options:[
+         {label:'1971-08-04 is correct', action:'Attest', eventType:'Attest', note:'Records a treatment-purpose attestation affirming the photo-ID-verified DOB.'},
+         {label:'1971-08-14 is correct', action:'Amend', eventType:'Amend', note:'Requests an amendment so the effective DOB reflects 1971-08-14.'},
+         {label:'Neither / unsure', action:'Flag', eventType:'Contest', note:'Flags the demographic conflict for identity review without asserting a value.'}
+       ]}
+    ]
+  },
+  {
+    id:'p3', name:'Robert Chen', dob:'1990-05-27', sex:'Male',
+    mrns:['Mercy General · MRN 7700318','Eastgate Urgent Care · MRN EG-1188'],
+    confidence:71, summary:'A low-confidence link suggests these may be the same person — confirm before relying.',
+    needsReview:true,
+    fields:[
+      {key:'Legal name', value:'Robert Chen  /  “Bob” Chen', conf:70, sources:['Mercy General','Eastgate Urgent Care']},
+      {key:'Date of birth', value:'1990-05-27', conf:90, sources:['Mercy General','Eastgate Urgent Care']},
+      {key:'Sex', value:'Male', conf:99, sources:['Mercy General']},
+      {key:'Address', value:'2 records differ (Madison / Clinton)', conf:55, sources:['Mercy General','Eastgate Urgent Care']},
+    ],
+    events:[
+      {id:'e1', type:'Assert', inst:'Mercy General', when:'2019-09-14', vm:'Government photo ID', x:120, y:70, parents:[], summary:'Robert Chen, Madison address.'},
+      {id:'e2', type:'Assert', inst:'Eastgate Urgent Care', when:'2024-03-30', vm:'Self-reported', x:120, y:230, parents:[], summary:'"Bob" Chen, Clinton address.'},
+      {id:'e3', type:'Link', inst:'Eastgate Urgent Care', when:'2024-03-30', conf:'63%', x:360, y:150, parents:['e1','e2'], summary:'Probabilistic match (same DOB, similar name). Low confidence.'},
+    ],
+    challenges:[
+      {id:'c1', kind:'link', tag:'Possible duplicate',
+       title:'Are these the same person?',
+       prompt:'A 63% match links a Mercy General record (Robert Chen, Madison) with an Eastgate record ("Bob" Chen, Clinton). Confirm identity with the patient before relying on the merged history.',
+       options:[
+         {label:'Yes — same person', action:'Attest', eventType:'Attest', note:'Records a treatment attestation affirming the link; downstream confidence rises.'},
+         {label:'No — different people', action:'Contest', eventType:'Contest', note:'Contests the link; the projection will sever it and stop merging the two histories.'},
+         {label:'Need more info', action:'Defer', eventType:null, note:'Leaves the link unresolved and routes to the identity team. No event is written.'}
+       ]}
+    ]
+  },
+  {
+    id:'p4', name:'Eleanor Petrova', dob:'1949-12-01', sex:'Female',
+    mrns:['Mercy General · MRN 4471290'],
+    confidence:79, summary:'Identity is consistent but verification is 4+ years old.',
+    needsReview:true,
+    fields:[
+      {key:'Legal name', value:'Eleanor Petrova', conf:88, sources:['Mercy General']},
+      {key:'Date of birth', value:'1949-12-01', conf:84, sources:['Mercy General']},
+      {key:'Sex', value:'Female', conf:99, sources:['Mercy General']},
+      {key:'Address', value:'17 Cedar Hollow, Salem', conf:62, sources:['Mercy General'], stale:true},
+    ],
+    events:[
+      {id:'e1', type:'Assert', inst:'Mercy General', when:'2019-08-15', vm:'Birth certificate', x:120, y:150, parents:[], summary:'Verified by birth certificate in 2019; not re-verified since.'},
+    ],
+    challenges:[
+      {id:'c1', kind:'stale', tag:'Stale verification',
+       title:'Re-verify identity?',
+       prompt:'The last verification event is from 2019-08-15 (over 4 years ago). Confirm the patient’s identity to refresh confidence.',
+       options:[
+         {label:'Re-confirm now', action:'Attest', eventType:'Attest', note:'Records a fresh attestation, refreshing the confidence decay clock.'},
+         {label:'Address has changed', action:'Amend', eventType:'Amend', note:'Requests an amendment to update the address on record.'}
+       ]}
+    ]
+  }
+];
+
+/* -------- Per-session resolution + action log -------- */
+const RESOLVED = {};          // challengeKey -> chosen option label
+const ACTIONLOG = {};         // patientId -> [ {eventType, summary, when} ]
+PATIENTS.forEach(p => ACTIONLOG[p.id] = []);
+
+const state = { view:'worklist', patientId:null };
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ---------------- Worklist ---------------- */
+function renderWorklist(filter=''){
+  state.view='worklist'; state.patientId=null;
+  const f = filter.trim().toLowerCase();
+  const rows = PATIENTS.filter(p => !f || p.name.toLowerCase().includes(f) || p.mrns.join(' ').toLowerCase().includes(f));
+  const needs = PATIENTS.filter(p=>p.needsReview).length;
+  app.innerHTML = `
+    <h1>Patient identity worklist</h1>
+    <div class="muted" style="margin-bottom:16px">${PATIENTS.length} patients in view · <b style="color:var(--warn)">${needs} need confirmation</b></div>
+    <div class="searchrow">
+      <input id="q" placeholder="Search by name or MRN…" value="${filter.replace(/"/g,'&quot;')}" oninput="renderWorklist(this.value)" autocomplete="off" />
+    </div>
+    <div class="plist">
+      ${rows.map(p=>cardHTML(p)).join('') || '<div class="empty">No matching patients.</div>'}
+    </div>`;
+  const q=$('q'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
+}
+function cardHTML(p){
+  const open = ACTIONLOG[p.id].length;
+  const reviewBadge = p.needsReview
+    ? `<span class="badge b-warn"><span class="d" style="background:var(--warn)"></span>Needs confirmation</span>`
+    : `<span class="badge b-good"><span class="d" style="background:var(--good)"></span>Confirmed</span>`;
+  return `
+    <div class="pcard" onclick="openPatient('${p.id}')">
+      <div class="avatar" style="background:${avatarColor(p.name)}">${initials(p.name)}</div>
+      <div>
+        <div class="nm">${p.name}</div>
+        <div class="sub">DOB ${p.dob} · ${p.sex} · ${p.mrns.length} MRN${p.mrns.length>1?'s':''}</div>
+        <div class="sub" style="margin-top:3px">${p.summary}</div>
+      </div>
+      <div class="right">
+        ${reviewBadge}
+        <div class="conf"><span class="pct">${p.confidence}%</span>
+          <div class="meter"><span style="width:${p.confidence}%;background:${confColor(p.confidence)}"></span></div>
+        </div>
+        ${open?`<span class="badge b-info">${open} action${open>1?'s':''} taken</span>`:''}
+      </div>
+    </div>`;
+}
+
+/* ---------------- Patient detail ---------------- */
+function openPatient(id){
+  const p = PATIENTS.find(x=>x.id===id);
+  state.view='patient'; state.patientId=id;
+  window.scrollTo(0,0);
+  app.innerHTML = `
+    <div class="crumbs"><a onclick="renderWorklist()">Worklist</a> ⟩ <span>${p.name}</span></div>
+    <div class="phead">
+      <div class="avatar" style="background:${avatarColor(p.name)}">${initials(p.name)}</div>
+      <div>
+        <div class="nm">${p.name}</div>
+        <div class="meta">DOB <b>${p.dob}</b> · ${p.sex}</div>
+        <div class="meta" style="margin-top:4px">${p.mrns.map(m=>`<span class="badge b-neutral" style="margin-right:6px">${m}</span>`).join('')}</div>
+      </div>
+      <div class="score">
+        <div class="lab">Identity confidence</div>
+        <div class="val" style="color:${confColor(p.confidence)}">${p.confidence}%</div>
+        <div class="conf" style="justify-content:flex-end"><div class="meter"><span style="width:${p.confidence}%;background:${confColor(p.confidence)}"></span></div></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div style="display:grid;gap:16px">
+        <div class="section">
+          <div class="hd"><h2>Effective identity</h2><span class="muted" style="font-size:12px;margin-left:auto">projected from the DAG · §5.2.4</span></div>
+          <div class="bd">${p.fields.map(fieldHTML).join('')}</div>
+        </div>
+        <div class="section">
+          <div class="hd"><h2>Actions taken this visit</h2></div>
+          <div class="bd log" id="log">${logHTML(p.id)}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:16px">
+        <div class="section">
+          <div class="hd"><h2>Challenge questions</h2>${p.challenges.length?`<span class="badge b-warn" style="margin-left:auto">${p.challenges.filter(c=>!RESOLVED[p.id+'/'+c.id]).length} open</span>`:''}</div>
+          <div class="bd">${p.challenges.length ? p.challenges.map(c=>challengeHTML(p,c)).join('') : '<div class="empty">No open questions. Identity looks consistent.</div>'}</div>
+        </div>
+        <div class="section">
+          <div class="hd"><h2>Provenance graph</h2><span class="muted" style="font-size:12px;margin-left:auto">tap a node for detail</span></div>
+          ${dagLegend()}
+          <div class="bd dagwrap">${dagSVG(p)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fieldHTML(f){
+  if(f.disputed){
+    return `
+      <div class="field disputed">
+        <div class="top"><span class="key">${f.key}</span>
+          <span class="badge b-warn"><span class="d" style="background:var(--warn)"></span>Disputed</span></div>
+        <div class="conflict">
+          ${f.options.map(o=>`<div class="opt"><span class="v">${o.v}</span><span class="muted">— ${o.inst} · ${o.vm}</span></div>`).join('')}
+        </div>
+        <div class="srcs">Resolve via the challenge question on the right.</div>
+      </div>`;
+  }
+  const stale = f.stale ? ` <span class="badge b-warn" style="margin-left:6px">stale</span>` : '';
+  return `
+    <div class="field">
+      <div class="top"><span class="key">${f.key}</span>
+        <div class="conf"><span class="pct">${f.conf}%</span><div class="meter"><span style="width:${f.conf}%;background:${confColor(f.conf)}"></span></div></div></div>
+      <div class="value">${f.value}${stale}</div>
+      <div class="srcs">Asserted by ${f.sources.join(', ')}</div>
+    </div>`;
+}
+
+function challengeHTML(p,c){
+  const key = p.id+'/'+c.id;
+  const done = RESOLVED[key];
+  return `
+    <div class="chq ${done?'resolved':''}">
+      <div class="qt"><span class="chip-tag b-warn" style="background:#fdf1e3">${c.tag}</span> ${c.title}</div>
+      <div class="qp">${c.prompt}</div>
+      ${done
+        ? `<div class="badge b-good"><span class="d" style="background:var(--good)"></span>Resolved · ${done}</div>`
+        : `<div class="acts">${c.options.map((o,i)=>{
+              const cls = o.action==='Attest'?'attest':o.action==='Contest'||o.action==='Flag'?'contest':o.action==='Amend'?'amend':'ghost';
+              return `<button class="btn ${cls}" onclick="askAction('${p.id}','${c.id}',${i})">${o.label}</button>`;
+            }).join('')}</div>`}
+    </div>`;
+}
+
+function logHTML(pid){
+  const rows = ACTIONLOG[pid];
+  if(!rows.length) return '<div class="empty">No actions recorded yet this visit.</div>';
+  return rows.map(r=>`
+    <div class="row">
+      <span class="ic" style="background:${TYPE_COLORS[r.eventType]||'var(--ink-2)'}">${r.eventType[0]}</span>
+      <div><b>${r.eventType}</b> · ${r.summary}<div class="muted" style="font-size:12px">${r.when}</div></div>
+    </div>`).join('');
+}
+
+/* ---------------- DAG rendering ---------------- */
+function dagLegend(){
+  const items = [['Assert','var(--assert)'],['Link','var(--link)'],['Attest','var(--attest)'],['Contest','var(--contest)'],['Amend','var(--amend)']];
+  return `<div class="legend">${items.map(([n,c])=>`<span class="it"><span class="sw" style="background:${c}"></span>${n}</span>`).join('')}</div>`;
+}
+function dagSVG(p){
+  const W=720, H=300, nodeW=150, nodeH=54;
+  const byId = Object.fromEntries(p.events.map(e=>[e.id,e]));
+  // edges
+  let edges='';
+  p.events.forEach(e=>{
+    e.parents.forEach(pid=>{
+      const a=byId[pid], b=e;
+      if(!a) return;
+      const x1=a.x+nodeW, y1=a.y+nodeH/2, x2=b.x, y2=b.y+nodeH/2;
+      const mx=(x1+x2)/2;
+      const cls = e.type==='Contest' ? 'edge contest' : 'edge';
+      edges += `<path class="${cls}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" />`;
+    });
+  });
+  // synthetic actions-taken nodes appended (visual only)
+  const extras = ACTIONLOG[p.id].map((r,i)=>({id:'x'+i, type:r.eventType, inst:'Mercy General (you)', when:'just now', x:600, y:40+i*70, parents:[], summary:r.summary, _new:true}));
+  const allNodes = p.events.concat(extras);
+  const nodes = allNodes.map(e=>{
+    const c = TYPE_COLORS[e.type]||'var(--ink-2)';
+    const sub = e.conf?('match '+e.conf):(e.purpose?e.purpose:(e.vm?e.vm:e.inst));
+    const dash = e._new ? ' stroke="#fff" stroke-dasharray="4 3" stroke-width="2"' : '';
+    return `<g class="node" onclick="showEvent('${p.id}','${e.id}')">
+        <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${c}"${dash}></rect>
+        <text x="${e.x+12}" y="${e.y+21}">${e.type}</text>
+        <text class="sub" x="${e.x+12}" y="${e.y+38}">${truncate(e.inst,18)}</text>
+        <text class="sub" x="${e.x+nodeW-12}" y="${e.y+38}" text-anchor="end">${truncate(sub,16)}</text>
+      </g>`;
+  }).join('');
+  const h = Math.max(H, 60 + extras.length*70);
+  return `<svg class="dag" viewBox="0 0 ${W} ${h}" preserveAspectRatio="xMidYMin meet">${edges}${nodes}</svg>`;
+}
+function truncate(s,n){ s=String(s); return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
+/* ---------------- Event detail slide-over ---------------- */
+function showEvent(pid,eid){
+  const p=PATIENTS.find(x=>x.id===pid);
+  let e=p.events.find(x=>x.id===eid);
+  if(!e){ // an extra (action-taken) node
+    const idx=parseInt(eid.slice(1),10); const r=ACTIONLOG[pid][idx];
+    e={id:eid, type:r.eventType, inst:'Mercy General (you)', when:'just now', summary:r.summary, parents:['—']};
+  }
+  const c=TYPE_COLORS[e.type]||'var(--ink-2)';
+  $('sheetHd').innerHTML = `<span class="pill" style="background:${c}">${e.type}</span>
+     <button class="x" onclick="closeSheet()">×</button>`;
+  $('sheetBd').innerHTML = `
+    <div class="muted" style="font-size:13px;margin-bottom:10px">${TYPE_DESC[e.type]||''}</div>
+    <div class="kv">
+      <div class="k">Originating</div><div class="v">${e.inst}</div>
+      <div class="k">Recorded</div><div class="v">${e.when}</div>
+      ${e.vm?`<div class="k">Verification</div><div class="v">${e.vm}</div>`:''}
+      ${e.dob?`<div class="k">Asserted DOB</div><div class="v">${e.dob}</div>`:''}
+      ${e.conf?`<div class="k">Match score</div><div class="v">${e.conf}</div>`:''}
+      ${e.purpose?`<div class="k">Purpose</div><div class="v">${e.purpose}</div>`:''}
+      <div class="k">Parents</div><div class="v">${(e.parents&&e.parents.length)?e.parents.join(', '):'root (none)'}</div>
+    </div>
+    <div style="margin-top:14px;font-size:13px">${e.summary||''}</div>
+    <div class="codecard"><span class="kk">event_type</span>: <span class="vv">"${e.type}"</span>
+<span class="kk">institution</span>:&nbsp; <span class="vv">"${e.inst}"</span>
+<span class="kk">signature</span>:&nbsp;&nbsp; <span class="vv">ed25519:verified ✓</span>
+<span class="kk">content_hash</span>: <span class="vv">blake3:…${(eid+pid).split('').reverse().join('').slice(0,8)}</span></div>`;
+  $('scrim').classList.add('on'); $('sheet').classList.add('on');
+}
+function closeSheet(){ $('scrim').classList.remove('on'); $('sheet').classList.remove('on'); }
+
+/* ---------------- Action modal (challenge resolution) ---------------- */
+let PENDING=null;
+function askAction(pid,cid,optIdx){
+  const p=PATIENTS.find(x=>x.id===pid);
+  const c=p.challenges.find(x=>x.id===cid);
+  const o=c.options[optIdx];
+  PENDING={pid,cid,o,label:o.label};
+  const willWrite = !!o.eventType;
+  const c2 = TYPE_COLORS[o.eventType]||'var(--ink-2)';
+  $('modalHd').innerHTML = willWrite
+    ? `<span class="pill" style="background:${c2}">${o.eventType}</span><b style="font-size:15px">Confirm this action</b>`
+    : `<b style="font-size:15px">Defer to identity team</b>`;
+  $('modalBd').innerHTML = `
+    <div style="font-size:14px;margin-bottom:6px"><b>${o.label}</b></div>
+    <div class="muted" style="font-size:13px">${o.note}</div>
+    ${willWrite ? `
+      <div class="codecard">A new signed event will be written to the patient subgraph:
+<span class="kk">event_type</span>:&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">"${o.eventType}"</span>
+<span class="kk">signed_by</span>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">"Mercy General · Dr. A. Reyes"</span>
+<span class="kk">purpose</span>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">"treatment"</span>
+<span class="kk">references</span>:&nbsp;&nbsp;&nbsp; <span class="vv">[ subgraph head ]</span></div>
+      <div class="muted" style="font-size:12px;margin-top:10px">This is advisory for identity; it does not alter the originating institution’s record. ${o.eventType==='Amend'?'An Amend must be accepted by the originating institution to take effect (§3.4.5).':''}</div>`
+      : `<div class="muted" style="font-size:12px;margin-top:10px">No event is written. The question is routed to the identity team for follow-up.</div>`}
+  `;
+  const btn=$('modalConfirm');
+  btn.textContent = willWrite ? `Sign & record ${o.eventType}` : 'Defer';
+  btn.onclick = ()=>commitAction();
+  $('modal').classList.add('on');
+}
+function commitAction(){
+  const {pid,cid,o,label}=PENDING;
+  RESOLVED[pid+'/'+cid]=label;
+  if(o.eventType){
+    ACTIONLOG[pid].push({eventType:o.eventType, summary:label, when:'just now · pending replication'});
+  }
+  closeModal();
+  // mark needsReview false if all challenges resolved
+  const p=PATIENTS.find(x=>x.id===pid);
+  if(p.challenges.every(c=>RESOLVED[pid+'/'+c.id])) p.needsReview=false;
+  openPatient(pid);
+  toast(o.eventType ? `${o.eventType} recorded — propagating to peers` : 'Routed to identity team');
+}
+function closeModal(){ $('modal').classList.remove('on'); PENDING=null; }
+
+/* ---------------- Toast ---------------- */
+let toastT=null;
+function toast(msg){
+  const t=$('toast'); t.innerHTML=`<span>✓</span> ${msg}`; t.classList.add('on');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeSheet(); closeModal(); }});
+renderWorklist();
+</script>
+</body>
+</html>
