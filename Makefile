@@ -13,6 +13,13 @@
 #   make build       # release build of the workspace
 #   make shell       # interactive shell in the dev container
 #   make clean       # remove build artifacts and the dependency cache
+#
+# Low-memory machines: compiling RocksDB from source (librocksdb-sys) is memory-hungry and
+# can trip the OOM killer ("Killed signal terminated program cc1plus"). Either give Docker
+# more memory (Docker Desktop -> Settings -> Resources -> Memory: 6-8 GB), or cap build
+# parallelism so fewer compilers run at once (slower, but bounded memory):
+#   make test JOBS=1     # one compiler at a time — safest on constrained Docker memory
+#   make test JOBS=2
 
 DEV_IMAGE      ?= creda-dev:local
 DEV_DOCKERFILE := .devcontainer/Dockerfile
@@ -21,6 +28,12 @@ DEV_DOCKERFILE := .devcontainer/Dockerfile
 # Docker). For full parity with the shipped images (DQ-4), set:
 #   make DEV_BASE=<fedora-hummingbird-rust-image> test
 DEV_BASE ?= docker.io/library/rust:1-bookworm
+
+# Optional cap on build parallelism. Empty = use all cores (fastest). Set JOBS=1 (or 2) to
+# bound peak memory when compiling RocksDB on a memory-limited Docker VM. A single `-j` also
+# limits the cc crate's parallel C/C++ compiles (it derives NUM_JOBS from cargo's job count).
+JOBS ?=
+CARGO_JOBS := $(if $(JOBS),--jobs $(JOBS),)
 
 # Run cargo in the container as the host user so files written to the mounted repo (target/,
 # the dependency cache) are owned by you, not root. CARGO_HOME lives in a gitignored repo
@@ -40,10 +53,10 @@ dev-image:
 	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
 
 test: dev-image
-	$(RUN) cargo test --workspace
+	$(RUN) cargo test --workspace $(CARGO_JOBS)
 
 test-fast: dev-image
-	$(RUN) cargo test --workspace --no-default-features
+	$(RUN) cargo test --workspace --no-default-features $(CARGO_JOBS)
 
 fmt: dev-image
 	$(RUN) cargo fmt --all
@@ -52,10 +65,10 @@ fmt-check: dev-image
 	$(RUN) cargo fmt --all -- --check
 
 clippy: dev-image
-	$(RUN) cargo clippy --workspace --all-targets -- -D warnings
+	$(RUN) cargo clippy --workspace --all-targets $(CARGO_JOBS) -- -D warnings
 
 build: dev-image
-	$(RUN) cargo build --workspace --release
+	$(RUN) cargo build --workspace --release $(CARGO_JOBS)
 
 # Everything CI checks, in one go.
 ci: fmt-check clippy test

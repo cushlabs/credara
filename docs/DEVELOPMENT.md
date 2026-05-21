@@ -66,6 +66,20 @@ Nothing stops you from running a native `cargo test -p creda-events` if you alre
 your own Rust toolchain — the `rust-toolchain.toml` pins the channel and components. But the
 container workflow above is the supported, reproducible path, and it's what CI runs.
 
+## Troubleshooting
+
+**`Killed signal terminated program cc1plus` / `librocksdb-sys` build fails.** This is the
+OS out-of-memory killer terminating the C++ compiler while RocksDB builds from source. RocksDB
+is large and its parallel compile is memory-hungry. Fixes, in order of preference:
+
+1. **Give Docker more memory** — Docker Desktop → Settings → Resources → Memory → 6–8 GB,
+   then re-run. This is the real fix; the build is fast with headroom.
+2. **Cap build parallelism** so fewer compilers run at once (slower, but bounded memory):
+   `make test JOBS=1` (one at a time) or `make test JOBS=2`.
+3. **Skip RocksDB while iterating** — `make test-fast` builds with `--no-default-features`,
+   which exercises `creda-events` and the `creda-store` MemoryStore contract without compiling
+   RocksDB at all.
+
 ## Notes for the `creda-events` crate (M1)
 
 The PQC algorithms (ML-DSA-65, SLH-DSA-256s, hybrid) are behind the default-on `pqc` feature.
