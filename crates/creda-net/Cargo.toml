@@ -29,6 +29,7 @@ libp2p = ["dep:libp2p", "dep:tokio", "dep:futures"]
 creda-events = { path = "../creda-events" }
 # Snapshot read/write goes through the Store trait; no RocksDB needed here.
 creda-store = { path = "../creda-store", default-features = false }
+serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 
 # --- libp2p adapter (feature = "libp2p") --------------------------------------------------------
