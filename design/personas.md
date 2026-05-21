@@ -85,9 +85,9 @@ authorization events are **enforced** (§4.8).
 - **Sees / doesn't see.** Sees who currently has access, active grants and their scope/expiry, and
   a revocation taking effect. Sees only tokenized identity + authorization events — never another
   party's clinical data.
-- **Status.** Represented in the federation view of
-  [`reference-architecture.html`](reference-architecture.html); dedicated consent-management
-  mockup planned.
+- **Status.** Mockup built — [`patient-consent-mockup.html`](patient-consent-mockup.html); also
+  represented in the federation view of
+  [`reference-architecture.html`](reference-architecture.html).
 
 ---
 
@@ -113,6 +113,7 @@ These gate what any persona's session may see. They are enforced below the UI.
 |---|---|
 | [`clinician-review-mockup.html`](clinician-review-mockup.html) | Clinician · clinical view |
 | [`steward-console-mockup.html`](steward-console-mockup.html) | Identity steward · operator view |
+| [`patient-consent-mockup.html`](patient-consent-mockup.html) | Patient · consent client |
 | [`reference-architecture.html`](reference-architecture.html) | System map (incl. the patient peer) |
 
-Planned: a patient consent-management client, and a compliance/audit reviewer surface.
+Planned: a compliance/audit reviewer surface.
