@@ -1,0 +1,22 @@
+[package]
+name = "creda-verifier"
+description = "Creda Verifier: relying-side dual-control enforcement (spec §4.5.2, §10.3). Validates authorization + identity continuity + provenance integrity locally and offline."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+# A local read-only DAG replica behind the Store trait; no RocksDB required here.
+creda-store = { path = "../creda-store", default-features = false }
+# Reuse the authorization evaluation and identity traversal — do NOT reimplement (build guide M6).
+creda-graph = { path = "../creda-graph" }
+thiserror = "1"
+
+[dev-dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store", default-features = false }
+creda-graph = { path = "../creda-graph" }

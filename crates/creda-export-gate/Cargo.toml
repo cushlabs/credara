@@ -1,0 +1,24 @@
+[package]
+name = "creda-export-gate"
+description = "Creda Export Gate: source-side dual-control enforcement (spec §4.5.1, §10.2). Validates the Portable Authorization Artifact before data egress and emits an ExportReceipt."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+# Only the Store trait is needed (the local DAG view for revocation/scope checks); no RocksDB.
+creda-store = { path = "../creda-store", default-features = false }
+# Reuse the authorization evaluation — do NOT reimplement it (build guide M6).
+creda-graph = { path = "../creda-graph" }
+thiserror = "1"
+# RFC3339 wall-clock for the emitted ExportReceipt.
+time = { version = "0.3", features = ["formatting"] }
+
+[dev-dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store", default-features = false }
+creda-graph = { path = "../creda-graph" }

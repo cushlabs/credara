@@ -10,4 +10,15 @@ integrity against a local read-only DAG replica; offline operation; stale-state 
 **Assemble:** reuse `creda-graph`'s authorization evaluation. **Write:** the local replica wiring
 and stale-state reporting. `TODO(open-question-13.4.3)` Verifier stale-state policy.
 
-Not yet registered as a Cargo workspace member; added in M6.
+## Status: implemented (M6), tests pending local run
+
+`Verifier::verify` runs the three-part point-of-use check (§10.3.2) against a local `Store`
+replica: **authorization validity** (reuses `creda_graph::evaluate`; the governing Grant must
+cover), **identity continuity** (the Grant is present/bound in the patient's subgraph), and
+**provenance integrity** (no missing parents). It is **offline by construction** — it only reads
+the local store, never the source — and reports staleness (and the DAG view's age) against a
+configurable threshold (`TODO(open-question-13.4.3)`); staleness is advisory, so `is_valid()`
+covers only the substantive checks. Tests: valid→verifies, revoked→denied, missing-parent→
+provenance broken, day-old view→stale (but still valid). Workspace member; verify with
+`anchor creda` or `cargo test -p creda-verifier`. The language bindings and the
+replication-fabric wiring of the read-only replica (§10.3.4) are follow-ups.
