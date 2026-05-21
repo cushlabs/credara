@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use creda_core::{CredaConfig, CredaCore, InMemorySigner, Result};
+use creda_core::{CredaConfig, CredaCore, InMemorySigner, Result, Signer};
 use creda_store::RocksdbStore;
 
 #[derive(Parser)]
