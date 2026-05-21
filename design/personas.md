@@ -71,7 +71,7 @@ authorization events are **enforced** (§4.8).
   adherence. Does not author identity or authorization events.
 - **Sees / doesn't see.** Sees the full authorization and provenance history (tokenized). Never
   clinical content.
-- **Status.** Planned — not yet mocked up.
+- **Status.** Mockup built — [`compliance-audit-mockup.html`](compliance-audit-mockup.html).
 
 ### 4. Patient (consent owner)
 
@@ -114,6 +114,7 @@ These gate what any persona's session may see. They are enforced below the UI.
 | [`clinician-review-mockup.html`](clinician-review-mockup.html) | Clinician · clinical view |
 | [`steward-console-mockup.html`](steward-console-mockup.html) | Identity steward · operator view |
 | [`patient-consent-mockup.html`](patient-consent-mockup.html) | Patient · consent client |
+| [`compliance-audit-mockup.html`](compliance-audit-mockup.html) | Compliance / audit reviewer · read-only |
 | [`reference-architecture.html`](reference-architecture.html) | System map (incl. the patient peer) |
 
-Planned: a compliance/audit reviewer surface.
+All four personas now have a mockup.

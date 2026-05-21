@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creda · Compliance & Audit (reviewer mockup)</title>
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#fff; --surface-2:#f7f9fc;
+    --ink:#0f1b2d; --ink-2:#46566b; --ink-3:#7c8aa0; --line:#dde4ee;
+    --primary:#4338ca;            /* audit accent: indigo */
+    --grant:#1d4ed8; --revoke:#b91c1c; --export:#0e7490;
+    --pass:#15803d; --warn:#b45309; --violation:#b91c1c;
+    --shadow:0 1px 2px rgba(15,27,45,.06), 0 6px 20px rgba(15,27,45,.06);
+    --radius:12px; font-synthesis:none;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;cursor:pointer;}
+  .muted{color:var(--ink-3);}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+
+  .appbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:30;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;}
+  .brand .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#818cf8,#4338ca);display:grid;place-items:center;font-size:14px;font-weight:800;}
+  .appbar .ctx{color:#aebfd4;font-size:12.5px;}
+  .appbar .spacer{flex:1;}
+  .appbar .who{font-size:12.5px;color:#cdd8e8;display:flex;align-items:center;gap:8px;}
+  .ro{font-size:11px;font-weight:700;background:#312e81;color:#c7d2fe;padding:3px 9px;border-radius:999px;}
+
+  .viewbanner{background:#eef0fb;color:#4338ca;border-bottom:1px solid #d6d9f5;font-size:12.5px;padding:7px 20px;display:flex;align-items:center;gap:8px;}
+  .viewbanner b{font-weight:650;}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px 20px 0;max-width:1200px;margin:0 auto;}
+  @media (max-width:760px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:13px 15px;}
+  .kpi .v{font-size:24px;font-weight:750;line-height:1.1;}
+  .kpi .l{font-size:12px;color:var(--ink-3);margin-top:3px;}
+  .kpi.flag .v{color:var(--violation);}
+
+  .toolbar{max-width:1200px;margin:14px auto 0;padding:0 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;flex-wrap:wrap;}
+  .seg button{border:0;background:transparent;padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--ink-2);}
+  .seg button.on{background:var(--primary);color:#fff;}
+  .toolbar .spacer{flex:1;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 13px;border-radius:9px;font-size:13px;font-weight:600;}
+  .btn:hover{border-color:#b9c6d8;}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+
+  .layout{max-width:1200px;margin:14px auto 0;padding:0 20px 60px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;}}
+
+  .ledger{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+  .ledger .lh{padding:12px 14px;border-bottom:1px solid var(--line);font-weight:650;font-size:13.5px;display:flex;align-items:center;gap:8px;}
+  .lrow{display:grid;grid-template-columns:34px 1fr auto;gap:11px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .lrow:last-child{border-bottom:0;}
+  .lrow:hover{background:var(--surface-2);}
+  .lrow.sel{background:#f1f0fb;box-shadow:inset 3px 0 0 var(--primary);}
+  .lrow .ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;}
+  .lrow .nm{font-weight:620;font-size:13.5px;}
+  .lrow .sm{color:var(--ink-3);font-size:12px;margin-top:1px;}
+  .lrow .rt{text-align:right;font-size:11.5px;color:var(--ink-3);white-space:nowrap;}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+  .b-pass{background:#e7f6ec;color:#15803d;}
+  .b-warn{background:#fdf1e3;color:#b45309;}
+  .b-violation{background:#fde7e7;color:#b91c1c;}
+  .b-grant{background:#e7f1fb;color:#1d4ed8;}
+  .b-revoke{background:#fdeaea;color:#b91c1c;}
+  .b-export{background:#e3f2f6;color:#0e7490;}
+
+  .detail{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .detail .dh{padding:14px 16px;border-bottom:1px solid var(--line);}
+  .detail .dh h2{margin:0;font-size:16px;}
+  .detail .db{padding:16px;}
+  .empty{padding:40px 16px;text-align:center;color:var(--ink-3);font-size:13.5px;}
+
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;font-size:13px;}
+  .kv .k{color:var(--ink-3);}
+  .kv .v{font-weight:550;word-break:break-word;}
+
+  .sub{margin-top:16px;}
+  .sub h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);margin:0 0 9px;}
+
+  /* provenance chain pills */
+  .chain{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+  .pill{font-size:11.5px;font-weight:650;color:#fff;padding:4px 10px;border-radius:8px;}
+  .arrow{color:var(--ink-3);font-weight:700;}
+  .intact{margin-top:9px;font-size:12.5px;display:flex;align-items:center;gap:7px;}
+
+  /* findings */
+  .finding{border:1px solid var(--line);border-left-width:4px;border-radius:9px;padding:11px 13px;margin-bottom:9px;background:var(--surface-2);}
+  .finding:last-child{margin-bottom:0;}
+  .finding.pass{border-left-color:var(--pass);}
+  .finding.warn{border-left-color:var(--warn);}
+  .finding.violation{border-left-color:var(--violation);}
+  .finding .ft{font-weight:650;font-size:13px;display:flex;align-items:center;gap:8px;}
+  .finding .fn{color:var(--ink-2);font-size:12.5px;margin-top:4px;}
+  .finding .fmeta{color:var(--ink-3);font-size:11.5px;margin-top:5px;}
+
+  /* modal */
+  .modal{position:fixed;inset:0;display:grid;place-items:center;z-index:60;opacity:0;pointer-events:none;transition:opacity .15s;}
+  .modal.on{opacity:1;pointer-events:auto;}
+  .modal .scrim{position:absolute;inset:0;background:rgba(15,27,45,.4);}
+  .modal .card{position:relative;width:520px;max-width:94vw;background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(15,27,45,.32);overflow:hidden;}
+  .modal .mh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .modal .mb{padding:18px;}
+  .modal .mf{padding:14px 18px;background:var(--surface-2);display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);}
+  .report .line{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px dashed var(--line);}
+  .report .line:last-child{border-bottom:0;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .2s;z-index:70;display:flex;align-items:center;gap:9px;}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Compliance &amp; Audit</span></div>
+    <div class="spacer"></div>
+    <div class="who"><span class="ro">READ-ONLY</span> R. Mensah · Compliance Officer</div>
+  </div>
+  <div class="viewbanner">
+    <span>⊜</span><b>Read-only audit view.</b><span>Authorization and provenance events across the network. Nothing is changed here — the audit log is itself the tamper-evident DAG (§9). Patient identifiers are tokenized.</span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+  <div class="toolbar">
+    <div class="seg" id="seg">
+      <button data-f="all" class="on">All events</button>
+      <button data-f="grant">Grants</button>
+      <button data-f="revoke">Revocations</button>
+      <button data-f="export">Exports</button>
+      <button data-f="findings">Findings</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn primary" onclick="openReport()">Generate report</button>
+  </div>
+
+  <div class="layout">
+    <div class="ledger" id="ledger"></div>
+    <div class="detail" id="detail"><div class="empty">Select an event from the audit ledger.</div></div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="scrim" onclick="closeModal()"></div>
+    <div class="card">
+      <div class="mh" id="mh"></div>
+      <div class="mb" id="mb"></div>
+      <div class="mf"><button class="btn" onclick="closeModal()">Close</button><button class="btn primary" id="mc">Download</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   Creda compliance & audit reviewer — interactive mockup (fake data).
+   Read-only. The reviewer examines authorization + access events across the
+   network (grants, revocations, export receipts), the provenance chain behind
+   each, and automated compliance findings — revocation enforcement (§4.7),
+   dual control (§4.5), grant scope/expiry. No graph events are authored here;
+   the audit log is the signed DAG itself (§9). Patient ids are tokenized.
+---------------------------------------------------------------------------- */
+
+const EV = {
+  grant:{label:'AuthorizationGrant', color:'var(--grant)', letter:'+', badge:'b-grant', tag:'Grant'},
+  revoke:{label:'AuthorizationRevocation', color:'var(--revoke)', letter:'–', badge:'b-revoke', tag:'Revocation'},
+  export:{label:'ExportReceipt', color:'var(--export)', letter:'↧', badge:'b-export', tag:'Export'},
+};
+const F = {pass:{cls:'pass',badge:'b-pass',word:'PASS'}, warn:{cls:'warn',badge:'b-warn',word:'WARN'}, violation:{cls:'violation',badge:'b-violation',word:'VIOLATION'}};
+const PILL = {Assert:'var(--grant)', Link:'#7c3aed', Grant:'var(--grant)', Revocation:'var(--revoke)', Export:'var(--export)', Attest:'#15803d'};
+
+/* -------- Fake audit ledger (most recent first) -------- */
+const EVENTS = [
+  {
+    id:'x1', type:'export', who:'Apex Research', patient:'tok:7f3a…c2', purpose:'Research', when:'2025-01-14 09:42',
+    requester:'Apex Research — study NCT-1142', grant:'g-apex (revoked 2025-01-14 05:10)', scope:'Identity (de-identified)',
+    chain:['Assert','Link','Grant','Revocation','Export'],
+    intact:true,
+    finding:{level:'violation', title:'Export after revocation', note:'An ExportReceipt was recorded ~4.5 h after the governing grant was revoked by the patient. The export should have been denied at the Export Gate.', meta:'Governing grant g-apex revoked 05:10 · export 09:42 · §4.6 step 2'}
+  },
+  {
+    id:'r1', type:'revoke', who:'Northside Clinic', patient:'tok:91b0…7e', purpose:'Treatment', when:'2025-01-13 18:20',
+    requester:'—', grant:'g-northside', scope:'Identity only',
+    chain:['Grant','Revocation'], intact:true,
+    finding:{level:'warn', title:'Revocation propagation latency', note:'One peer enforced this revocation 9.2 s after publication, exceeding the Bound-1 target. Within tolerance but worth monitoring.', meta:'Target ≈ 5 s · observed 9.2 s · §4.7'}
+  },
+  {
+    id:'x2', type:'export', who:'Lakeside Hospital', patient:'tok:5cc1…a9', purpose:'Treatment', when:'2025-01-13 14:05',
+    requester:'Lakeside Hospital', grant:'g-lakeside (expired 2025-01-01)', scope:'Identity + history',
+    chain:['Assert','Grant','Export'], intact:true,
+    finding:{level:'violation', title:'Export under expired grant', note:'The governing grant expired 12 days before this export. The Export Gate should have refused it on the expiration check.', meta:'Grant expired 2025-01-01 · export 2025-01-13 · §4.6 step 4'}
+  },
+  {
+    id:'x3', type:'export', who:'Mercy General Hospital', patient:'tok:7f3a…c2', purpose:'Treatment', when:'2025-01-13 11:31',
+    requester:'Mercy General Hospital', grant:'g-mercy (active)', scope:'Identity + history',
+    chain:['Assert','Link','Grant','Export'], intact:true,
+    finding:{level:'pass', title:'Authorized · dual control intact', note:'Within an active grant for the stated purpose. Matching ExportReceipt at the source and an independent Verifier check at the relying party.', meta:'§4.5 · §4.6'}
+  },
+  {
+    id:'g1', type:'grant', who:'Mercy General Hospital', patient:'tok:7f3a…c2', purpose:'Treatment', when:'2023-02-10 08:00',
+    requester:'—', grant:'g-mercy', scope:'Identity + history',
+    chain:['Assert','Grant'], intact:true,
+    finding:{level:'pass', title:'Patient-signed grant', note:'Signed by the patient key, bound to the patient subgraph (non-transferable). Purpose and scope well-formed.', meta:'§4.3'}
+  },
+  {
+    id:'g2', type:'grant', who:'Any TEFCA QHIN', patient:'tok:91b0…7e', purpose:'Treatment', when:'2023-01-01 00:00',
+    requester:'—', grant:'g-qhin', scope:'Identity only',
+    chain:['Assert','Grant'], intact:true,
+    finding:{level:'pass', title:'Class grant — membership verified', note:'Audience is an institution class; each responder verifies membership against the Participant Registry at evaluation time.', meta:'§4.6 step 3'}
+  },
+];
+
+const state = {filter:'all', sel:null};
+const $ = id=>document.getElementById(id);
+
+function counts(){
+  return {
+    total:1284, exports:37, revocations:12,
+    findings: EVENTS.filter(e=>e.finding && e.finding.level!=='pass').length,
+  };
+}
+function renderKPIs(){
+  const c=counts();
+  $('kpis').innerHTML = `
+    ${kpi(c.total.toLocaleString(),'events in window')}
+    ${kpi(c.exports,'export receipts')}
+    ${kpi(c.revocations,'revocations')}
+    ${kpi(c.findings,'open findings',true)}`;
+}
+function kpi(v,l,flag){return `<div class="kpi ${flag?'flag':''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;}
+
+function filtered(){
+  if(state.filter==='findings') return EVENTS.filter(e=>e.finding && e.finding.level!=='pass');
+  if(state.filter==='all') return EVENTS;
+  return EVENTS.filter(e=>e.type===state.filter);
+}
+function renderLedger(){
+  const rows=filtered();
+  $('ledger').innerHTML = `
+    <div class="lh">Audit ledger <span class="muted" style="font-weight:500">· ${rows.length} event${rows.length!==1?'s':''}</span></div>
+    ${rows.map(rowHTML).join('') || '<div class="empty">No events match this filter.</div>'}`;
+}
+function rowHTML(e){
+  const m=EV[e.type];
+  const fb = e.finding ? `<span class="badge ${F[e.finding.level].badge}">${F[e.finding.level].word}</span>` : '';
+  return `<div class="lrow ${state.sel===e.id?'sel':''}" onclick="openItem('${e.id}')">
+      <div class="ic" style="background:${m.color}">${m.letter}</div>
+      <div>
+        <div class="nm">${m.tag}: ${e.who}</div>
+        <div class="sm mono">${e.patient} · ${e.purpose}</div>
+      </div>
+      <div class="rt">${fb}<div style="margin-top:4px">${e.when}</div></div>
+    </div>`;
+}
+
+function openItem(id){
+  state.sel=id; renderLedger();
+  const e=EVENTS.find(x=>x.id===id); const m=EV[e.type];
+  const f=e.finding;
+  $('detail').innerHTML = `
+    <div class="dh">
+      <div style="display:flex;align-items:center;gap:9px"><span class="badge ${m.badge}">${m.label}</span>${f?`<span class="badge ${F[f.level].badge}">${F[f.level].word}</span>`:''}</div>
+      <h2 style="margin-top:8px">${m.tag}: ${e.who}</h2>
+    </div>
+    <div class="db">
+      <div class="kv">
+        <div class="k">Patient (tokenized)</div><div class="v mono">${e.patient}</div>
+        <div class="k">Purpose</div><div class="v">${e.purpose}</div>
+        <div class="k">Requester</div><div class="v">${e.requester}</div>
+        <div class="k">Governing grant</div><div class="v">${e.grant}</div>
+        <div class="k">Released scope</div><div class="v">${e.scope}</div>
+        <div class="k">Recorded</div><div class="v">${e.when}</div>
+      </div>
+
+      <div class="sub">
+        <h3>Provenance chain</h3>
+        <div class="chain">${e.chain.map((p,i)=>`${i?'<span class="arrow">→</span>':''}<span class="pill" style="background:${PILL[p]||'var(--ink-3)'}">${p}</span>`).join('')}</div>
+        <div class="intact">${e.intact?'<span style="color:var(--pass)">✓</span> chain intact — every parent resolves, signatures verified':'<span style="color:var(--violation)">✕</span> chain broken — missing parents'}</div>
+      </div>
+
+      <div class="sub">
+        <h3>Compliance findings</h3>
+        ${f?findingHTML(f):'<div class="muted" style="font-size:13px">No findings.</div>'}
+      </div>
+    </div>`;
+}
+function findingHTML(f){
+  return `<div class="finding ${F[f.level].cls}">
+      <div class="ft"><span class="badge ${F[f.level].badge}">${F[f.level].word}</span> ${f.title}</div>
+      <div class="fn">${f.note}</div>
+      <div class="fmeta mono">${f.meta}</div>
+    </div>`;
+}
+
+/* ---------- report ---------- */
+function openReport(){
+  const c=counts();
+  const v=EVENTS.filter(e=>e.finding&&e.finding.level==='violation').length;
+  const w=EVENTS.filter(e=>e.finding&&e.finding.level==='warn').length;
+  $('mh').innerHTML='<b style="font-size:15px">Compliance report — review window</b>';
+  $('mb').innerHTML=`<div class="report">
+      <div class="line"><span>Events reviewed</span><b>${c.total.toLocaleString()}</b></div>
+      <div class="line"><span>Export receipts</span><b>${c.exports}</b></div>
+      <div class="line"><span>Revocations</span><b>${c.revocations}</b></div>
+      <div class="line"><span>Violations</span><b style="color:var(--violation)">${v}</b></div>
+      <div class="line"><span>Warnings</span><b style="color:var(--warn)">${w}</b></div>
+      <div class="line"><span>Provenance integrity</span><b style="color:var(--pass)">all chains intact</b></div>
+    </div>
+    <div class="muted" style="font-size:12.5px;margin-top:12px">The report is itself derived from the signed DAG — every line is independently re-verifiable against the events. Sign-off attaches an auditor attestation (read-only review; no graph mutation).</div>`;
+  $('mc').textContent='Download PDF';
+  $('mc').onclick=()=>{closeModal();toast('Report generated (mockup) — would export a signed PDF');};
+  $('modal').classList.add('on');
+}
+function closeModal(){$('modal').classList.remove('on');}
+
+let toastT=null;
+function toast(m){const t=$('toast');t.innerHTML='<span>✓</span> '+m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2800);}
+
+$('seg').addEventListener('click',e=>{const b=e.target.closest('button');if(b){state.filter=b.dataset.f;document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x===b));renderLedger();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+renderKPIs();
+renderLedger();
+openItem('x1');
+</script>
+</body>
+</html>
