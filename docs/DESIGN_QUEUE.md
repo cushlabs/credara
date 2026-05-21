@@ -205,6 +205,31 @@ install.
 
 ---
 
+## DQ-6 — Build/prod parity everywhere (development principle) — REQUIRED
+
+**Principle.** Build and CI environments should match the OS family and runtime they ship on, so
+glibc, system libraries, packaging, and crypto behavior are the same in development as in
+production. We catch family-specific issues at build time, not at deploy time. This is a
+standing principle, applied to every component, not a one-off.
+
+**Application.**
+- **Rust crates:** dev/build image is Fedora (DQ-5), shipped images are Fedora Hummingbird
+  distroless FIPS (DQ-4). ✔
+- **FHIR Bridge (Java/Kotlin):** shipped image is Hummingbird OpenJDK FIPS (DQ-4); the **build**
+  image (`make bridge`) should likewise be a Fedora + OpenJDK base rather than a Debian-based
+  `gradle` image. Because Hummingbird is distroless (no Gradle, no shell), the *build* image is a
+  Fedora base with OpenJDK + Gradle installed (the same dev-vs-shipped split used for Rust: a
+  buildable base of the same OS family, the hardened distroless variant for shipping).
+- **General rule:** when adding any new build/CI image, default it to the Fedora/Hummingbird
+  family; a non-family fallback may exist via an override variable but is not the default.
+
+**Note on sequencing:** switching a build image is itself unverifiable here (no Docker), so when
+a component is mid-debug (e.g., the bridge's first compile), keep the known-good build image until
+it is green, then switch to the parity image — so an image-build hiccup never tangles with a
+code-debug loop.
+
+---
+
 ## Decisions log (for these items)
 
 | Item | Decision | Date |
@@ -214,3 +239,4 @@ install.
 | DQ-3 | Test bed provides **both** Compose (fast) and kind/k3d (production-like) paths | 2026-05-20 |
 | DQ-4 | Base images = **Fedora Hummingbird**, **FIPS by default**, **container images only** (host OS = operator's choice) | 2026-05-20 |
 | DQ-5 | Dev environment = **Docker-only**, deps auto-provisioned (dev container + Makefile + devcontainer); dev base = **Fedora** (parity with Hummingbird family), Debian Rust image as fallback via `DEV_BASE` | 2026-05-20 |
+| DQ-6 | **Build/prod parity everywhere** is a standing development principle: build/CI images match the OS family they ship on (Fedora/Hummingbird); applies to the bridge build image too | 2026-05-20 |

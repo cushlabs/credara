@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Component
 
 /**
- * Registers HAPI FHIR's [RestfulServer] in **Plain Server** mode (§8.3.3) at `/fhir/*`, with the
- * custom resource providers. HAPI auto-generates the [org.hl7.fhir.r4.model.CapabilityStatement]
+ * Registers HAPI FHIR's [RestfulServer] in **Plain Server** mode (§8.3.3) on the `/fhir` base
+ * path, with the custom resource providers. HAPI auto-generates the [org.hl7.fhir.r4.model.CapabilityStatement]
  * from the providers' `@Operation`/`@Search` annotations, advertising the Creda operations and
  * the `_creda-token` search parameter (§8.2.12).
  *
