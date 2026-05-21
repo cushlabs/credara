@@ -278,6 +278,7 @@ const PATIENTS = [
     id:'p1', name:'Maria Gonzalez', dob:'1984-03-12', sex:'Female',
     mrns:['Mercy General · MRN 5582019','Northside Clinic · MRN A-7741'],
     confidence:96, summary:'Single consistent identity across two institutions.',
+    consent:{state:'granted', purpose:'Treatment', use:'Read & rely', source:'Explicit patient grant', expires:'No expiry'},
     fields:[
       {key:'Legal name', value:'Maria Elena Gonzalez', conf:97, sources:['Mercy General','Northside Clinic']},
       {key:'Date of birth', value:'1984-03-12', conf:98, sources:['Mercy General','Northside Clinic']},
@@ -297,6 +298,7 @@ const PATIENTS = [
     mrns:['Mercy General · MRN 6610042','Lakeside Hospital · MRN LH-3098'],
     confidence:64, summary:'Two institutions disagree on date of birth — needs point-of-care confirmation.',
     needsReview:true,
+    consent:{state:'presumed', purpose:'Treatment', use:'Read & rely', source:'HIPAA treatment posture — no patient restriction', expires:'—'},
     fields:[
       {key:'Legal name', value:'James R. Whitfield', conf:93, sources:['Mercy General','Lakeside Hospital']},
       {key:'Date of birth', value:'conflicting', conf:48, disputed:true,
@@ -326,6 +328,7 @@ const PATIENTS = [
     mrns:['Mercy General · MRN 7700318','Eastgate Urgent Care · MRN EG-1188'],
     confidence:71, summary:'A low-confidence link suggests these may be the same person — confirm before relying.',
     needsReview:true,
+    consent:{state:'restricted', purpose:'Treatment', use:'—', source:'Patient revoked access for Mercy General', expires:'—'},
     fields:[
       {key:'Legal name', value:'Robert Chen  /  “Bob” Chen', conf:70, sources:['Mercy General','Eastgate Urgent Care']},
       {key:'Date of birth', value:'1990-05-27', conf:90, sources:['Mercy General','Eastgate Urgent Care']},
@@ -353,6 +356,7 @@ const PATIENTS = [
     mrns:['Mercy General · MRN 4471290'],
     confidence:79, summary:'Identity is consistent but verification is 4+ years old.',
     needsReview:true,
+    consent:{state:'expired', purpose:'Treatment', use:'Read & rely', source:'Patient grant expired 2024-08-15', expires:'2024-08-15'},
     fields:[
       {key:'Legal name', value:'Eleanor Petrova', conf:88, sources:['Mercy General']},
       {key:'Date of birth', value:'1949-12-01', conf:84, sources:['Mercy General']},
@@ -402,6 +406,8 @@ function renderWorklist(filter=''){
 }
 function cardHTML(p){
   const open = ACTIONLOG[p.id].length;
+  const cm = consentMeta(p.consent);
+  const consentBadge = `<span class="badge" style="background:${cm.bg};color:${cm.fg}"><span class="d" style="background:${cm.dot}"></span>${cm.ok?'Authorized':'Needs access'}</span>`;
   const reviewBadge = p.needsReview
     ? `<span class="badge b-warn"><span class="d" style="background:var(--warn)"></span>Needs confirmation</span>`
     : `<span class="badge b-good"><span class="d" style="background:var(--good)"></span>Confirmed</span>`;
@@ -414,6 +420,7 @@ function cardHTML(p){
         <div class="sub" style="margin-top:3px">${p.summary}</div>
       </div>
       <div class="right">
+        ${consentBadge}
         ${reviewBadge}
         <div class="conf"><span class="pct">${p.confidence}%</span>
           <div class="meter"><span style="width:${p.confidence}%;background:${confColor(p.confidence)}"></span></div>
@@ -446,9 +453,10 @@ function openPatient(id){
 
     <div class="grid2">
       <div style="display:grid;gap:16px">
+        ${consentCardHTML(p)}
         <div class="section">
           <div class="hd"><h2>Effective identity</h2><span class="muted" style="font-size:12px;margin-left:auto">projected from the DAG · §5.2.4</span></div>
-          <div class="bd">${p.fields.map(fieldHTML).join('')}</div>
+          <div class="bd">${consentMeta(p.consent).ok ? p.fields.map(fieldHTML).join('') : lockedIdentityHTML()}</div>
         </div>
         <div class="section">
           <div class="hd"><h2>Actions taken this visit</h2></div>
@@ -468,6 +476,42 @@ function openPatient(id){
         </div>
       </div>
     </div>`;
+}
+
+/* ---------------- Consent / authorization (patient-controlled) ---------------- */
+function consentMeta(c){
+  const M = {
+    granted:   {ok:true,  bg:'#e7f6ec', fg:'#15803d', dot:'#15803d', label:'Authorized · patient grant'},
+    presumed:  {ok:true,  bg:'#e7f6ec', fg:'#15803d', dot:'#15803d', label:'Treatment-presumed (HIPAA TPO)'},
+    restricted:{ok:false, bg:'#fde7e7', fg:'#b91c1c', dot:'#b91c1c', label:'Access revoked by patient'},
+    expired:   {ok:false, bg:'#fdf1e3', fg:'#b45309', dot:'#b45309', label:'Grant expired'},
+    none:      {ok:false, bg:'#fdf1e3', fg:'#b45309', dot:'#b45309', label:'No covering grant'},
+  };
+  return M[(c&&c.state)||'none'] || M.none;
+}
+function consentCardHTML(p){
+  const c=p.consent||{state:'none'}, m=consentMeta(c);
+  const detail = `<div class="meta" style="margin-top:2px">Purpose <b>${c.purpose||'—'}</b> · Access <b>${c.use||'—'}</b> · Basis ${c.source||'—'} · Expires ${c.expires||'—'}</div>`;
+  const foot = m.ok
+    ? `<div class="srcs" style="margin-top:10px">Access is permitted for treatment. Your reliance on this identity is recorded as an <b>Attest</b> under this authorization (§4.6).</div>`
+    : `<div class="srcs" style="margin-top:10px">The patient controls this — access is granted or revoked from their consent client, not here.</div>
+       <div style="margin-top:12px">${c.requested
+          ? '<span class="badge b-info">Access request sent — awaiting patient</span>'
+          : `<button class="btn primary" onclick="requestAccess('${p.id}')">Request access</button>`}</div>`;
+  return `<div class="section">
+      <div class="hd"><h2>Consent &amp; authorization</h2>
+        <span class="badge" style="margin-left:auto;background:${m.bg};color:${m.fg}"><span class="d" style="background:${m.dot}"></span>${m.label}</span></div>
+      <div class="bd">${detail}${foot}</div>
+    </div>`;
+}
+function lockedIdentityHTML(){
+  return `<div class="empty" style="text-align:left">🔒 Identity details are withheld until the patient authorizes Mercy General for treatment — request access above to view.</div>`;
+}
+function requestAccess(pid){
+  const p=PATIENTS.find(x=>x.id===pid);
+  if(p.consent) p.consent.requested=true;
+  openPatient(pid);
+  toast('Access request sent to the patient');
 }
 
 function fieldHTML(f){

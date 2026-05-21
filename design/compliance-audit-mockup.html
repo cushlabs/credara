@@ -121,7 +121,7 @@
     <div class="who"><span class="ro">READ-ONLY</span> R. Mensah · Compliance Officer</div>
   </div>
   <div class="viewbanner">
-    <span>⊜</span><b>Read-only audit view.</b><span>Authorization and provenance events across the network. Nothing is changed here — the audit log is itself the tamper-evident DAG (§9). Patient identifiers are tokenized.</span>
+    <span>⊜</span><b>Read-only audit view.</b><span>Authorization here originates from <b>patient consent</b> — grants and revocations are signed by the patient. Nothing is changed here; the audit log is itself the tamper-evident DAG (§9). Patient identifiers are tokenized.</span>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -225,7 +225,7 @@ function renderKPIs(){
   $('kpis').innerHTML = `
     ${kpi(c.total.toLocaleString(),'events in window')}
     ${kpi(c.exports,'export receipts')}
-    ${kpi(c.revocations,'revocations')}
+    ${kpi(c.revocations,'patient revocations')}
     ${kpi(c.findings,'open findings',true)}`;
 }
 function kpi(v,l,flag){return `<div class="kpi ${flag?'flag':''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;}
@@ -254,6 +254,11 @@ function rowHTML(e){
     </div>`;
 }
 
+function consentOrigin(e){
+  if(e.type==='grant')  return 'Patient-signed grant (§4.3)';
+  if(e.type==='revoke') return 'Patient-signed revocation — patient withdrew consent';
+  return 'Governed by a patient-signed grant';
+}
 function openItem(id){
   state.sel=id; renderLedger();
   const e=EVENTS.find(x=>x.id===id); const m=EV[e.type];
@@ -269,6 +274,7 @@ function openItem(id){
         <div class="k">Purpose</div><div class="v">${e.purpose}</div>
         <div class="k">Requester</div><div class="v">${e.requester}</div>
         <div class="k">Governing grant</div><div class="v">${e.grant}</div>
+        <div class="k">Consent origin</div><div class="v">${consentOrigin(e)}</div>
         <div class="k">Released scope</div><div class="v">${e.scope}</div>
         <div class="k">Recorded</div><div class="v">${e.when}</div>
       </div>
