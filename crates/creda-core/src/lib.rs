@@ -24,7 +24,7 @@
 //!     only with this feature (see `build.rs`).
 //!   - `libp2p` — turns on `creda-net`'s libp2p transport and wires it in (§10.1.5).
 //!
-//! Keeping gRPC and libp2p opt-in means `cargo build` / `creda anchor` stay green and fast, and
+//! Keeping gRPC and libp2p opt-in means `cargo build` / `anchor creda` stay green and fast, and
 //! the two adapters that are hardest to verify without compiling are reconciled only when their
 //! feature is deliberately enabled.
 

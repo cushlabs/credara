@@ -11,7 +11,7 @@ authors.workspace = true
 # Same isolation discipline as the rest of the workspace: the composed engine, config, signer,
 # and CLI are the default build and are unit-testable without heavy/unverifiable dependencies.
 # The gRPC server (tonic — needs `protoc`, heavy codegen) and real libp2p networking are OPT-IN
-# features, so `cargo build` / `creda anchor` stay green and fast, and the two
+# features, so `cargo build` / `anchor creda` stay green and fast, and the two
 # write-blind-risky adapters are reconciled only when their feature is deliberately enabled.
 [features]
 default = []
