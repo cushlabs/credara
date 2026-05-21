@@ -153,7 +153,7 @@
     <div class="who"><span class="dot"></span> S. Okafor · Mercy General · Identity Steward</div>
   </div>
   <div class="viewbanner">
-    <span>◑</span><b>Operator view.</b><span>Synthetic / test-tagged records are visible here and clearly flagged (they are hidden from clinical views, §11.4). You operate on tokenized values, never raw PHI.</span>
+    <span>◑</span><b>Operator view.</b><span>Synthetic / test-tagged records are visible here and clearly flagged (hidden from clinical views, §11.4). You operate on tokenized values, never raw PHI. Your actions are <b>Operations-purpose, advisory</b> graph events — resolving identity does not itself grant or revoke patient access; consent still governs what flows.</span>
   </div>
 
   <div class="layout">
@@ -198,6 +198,17 @@ const KIND = {
   stale:{tag:'Stale verification',cls:'b-stale'},
 };
 function confColor(p){return p>=85?'var(--good)':p>=60?'var(--warn)':'var(--bad)';}
+function consentMeta(c){
+  const M={
+    permitted: {bg:'#e7f6ec',fg:'#15803d',dot:'#15803d',label:'Patient permits linking'},
+    presumed:  {bg:'#e7f6ec',fg:'#15803d',dot:'#15803d',label:'Operations posture — no restriction'},
+    restricted:{bg:'#fdf1e3',fg:'#b45309',dot:'#b45309',label:'Patient restricted access'},
+    revoked:   {bg:'#fde7e7',fg:'#b91c1c',dot:'#b91c1c',label:'Patient revoked access'},
+    na:        {bg:'#eef2f6',fg:'#475569',dot:'#7c8aa0',label:'Synthetic — no consent'},
+  };
+  return M[(c&&c.state)||'na']||M.na;
+}
+function consentDot(cm){return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cm.dot};margin-right:5px"></span>`;}
 
 /* -------- Fake resolution queue -------- */
 const CASES = [
@@ -206,6 +217,7 @@ const CASES = [
     title:'Robert Chen  /  “Bob” Chen',
     summary:'A 63% probabilistic match links a Mercy General record with an Eastgate Urgent Care record — same DOB and similar name, but different city. Below the auto-merge threshold; needs a human decision.',
     insts:['Mercy General','Eastgate Urgent Care'],
+    consent:{state:'revoked', note:'The patient has revoked Mercy General’s access. Resolving this duplicate is advisory: confirming the link does not restore access the patient withdrew, and any merged history is still served only within each party’s active grants.'},
     cmp:[
       {key:'Name', a:'Robert Chen', b:'“Bob” Chen', agree:'partial'},
       {key:'Date of birth', a:'1990-05-27', b:'1990-05-27', agree:'match'},
@@ -234,6 +246,7 @@ const CASES = [
     title:'James R. Whitfield — conflicting DOB',
     summary:'Two institutions assert different dates of birth ten days apart. Mercy General verified by photo ID; Lakeside is self-reported. The effective DOB is disputed until resolved.',
     insts:['Mercy General','Lakeside Hospital'],
+    consent:{state:'presumed', note:'Treatment-presumed posture — the patient has placed no restriction on cross-institution use. Resolving the DOB conflict is an Operations-purpose graph action; it corrects the projection, not access.'},
     cmp:[
       {key:'Name', a:'James R. Whitfield', b:'James Whitfield', agree:'match'},
       {key:'Date of birth', a:'1971-08-04 (photo ID)', b:'1971-08-14 (self-report)', agree:'conflict'},
@@ -260,6 +273,7 @@ const CASES = [
     title:'Open contest — Northside disputes a link',
     summary:'Northside Clinic contested a 2023 link between two subgraphs, citing distinct patients. The projection has already severed the link; review whether the contest stands or new evidence supports re-linking.',
     insts:['Mercy General','Northside Clinic'],
+    consent:{state:'restricted', note:'The patient’s grant covers Mercy General, not Northside Clinic. Upholding or overturning the contest changes only the identity projection — it does not extend access the patient has not granted.'},
     cmp:[
       {key:'Name', a:'Maria E. Gonzalez', b:'Maria Gonzales', agree:'partial'},
       {key:'Date of birth', a:'1984-03-12', b:'1986-11-02', agree:'conflict'},
@@ -286,6 +300,7 @@ const CASES = [
     title:'Synthetic patient surfaced in triage',
     summary:'A load-test record (test-data tagged) appears in the operator view. This is expected — synthetic events propagate and replicate like real ones, but are filtered from every clinical view (§11.4.1). Confirm it is test data and dismiss.',
     insts:['conformance/load-test'],
+    consent:{state:'na', note:'Synthetic test data — no patient or consent is involved. Visible to operators, filtered from clinical and patient views (§11.4).'},
     cmp:[
       {key:'Name', a:'tok:smith / tok:james', b:'tok:smith / tok:james', agree:'match'},
       {key:'Date of birth', a:'tok:1980-01-01', b:'tok:1980-01-01', agree:'match'},
@@ -319,12 +334,16 @@ function renderQueue(){
 function qitemHTML(c){
   const k = KIND[c.kind];
   const done = RESOLVED[c.id];
+  const cm = consentMeta(c.consent);
+  const flagged = c.consent && (c.consent.state==='revoked' || c.consent.state==='restricted');
+  const consentFlag = flagged ? `<span class="badge" style="background:${cm.bg};color:${cm.fg}">${cm.label}</span>` : '';
   const meter = c.kind==='contest' ? '' :
     `<div class="meterrow"><span class="pct" style="color:${confColor(c.conf)}">${c.conf}%</span>
       <div class="meter"><span style="width:${c.conf}%;background:${confColor(c.conf)}"></span></div>
       <span class="muted" style="font-size:11px">match confidence</span></div>`;
   return `<div class="qitem ${state.caseId===c.id?'sel':''} ${done?'resolved':''}" onclick="openCase('${c.id}')">
       <div class="top"><span class="badge ${k.cls}">${k.tag}</span>
+        ${consentFlag}
         ${c.testData?'<span class="badge b-test">TEST DATA</span>':''}
         ${done?'<span class="badge b-good">resolved</span>':''}</div>
       <div class="nm">${c.title}</div>
@@ -339,6 +358,7 @@ function openCase(id){
   const c=CASES.find(x=>x.id===id);
   const k=KIND[c.kind];
   const done=RESOLVED[c.id];
+  const cm=consentMeta(c.consent);
   $('detail').innerHTML = `
     <div class="chead">
       <div style="flex:1">
@@ -372,6 +392,12 @@ function openCase(id){
     <div class="section">
       <div class="hd"><h2>Match evidence</h2><span class="muted" style="font-size:12px;margin-left:auto">Fellegi–Sunter-style weighting · §5.3</span></div>
       <div class="bd"><div class="ev">${c.evidence.map(evHTML).join('')}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="hd"><h2>Patient consent context</h2>
+        <span class="badge" style="margin-left:auto;background:${cm.bg};color:${cm.fg}">${consentDot(cm)}${cm.label}</span></div>
+      <div class="bd"><div class="muted" style="font-size:13px">${c.consent?c.consent.note:'No consent context.'}</div></div>
     </div>
 
     <div class="section">
@@ -466,7 +492,7 @@ function askAction(cid,idx){
 <span class="kk">event_type</span>:&nbsp; <span class="vv">"${a.ev}"</span>
 <span class="kk">signed_by</span>:&nbsp;&nbsp; <span class="vv">"Mercy General · S. Okafor (steward)"</span>
 <span class="kk">references</span>: <span class="vv">[ the events under review ]</span></div>
-    <div class="muted" style="font-size:12px;margin-top:10px">Identity events are advisory — this informs the projection; it does not delete another institution's record.${a.ev==='Amend'?' An Amend must be accepted by the originating institution to take effect (§3.4.5).':''}${a.ev==='Tombstone'?' Tombstoning scrubs content while preserving graph topology (§3.4.6).':''}</div>`:`<div class="muted" style="font-size:12px;margin-top:10px">No event is written; the case is simply cleared from the queue.</div>`}`;
+    <div class="muted" style="font-size:12px;margin-top:10px">Identity events are advisory — this informs the projection; it does not delete another institution's record, and it does not grant or revoke patient access (consent still governs what flows).${a.ev==='Amend'?' An Amend must be accepted by the originating institution to take effect (§3.4.5).':''}${a.ev==='Tombstone'?' Tombstoning scrubs content while preserving graph topology (§3.4.6).':''}</div>`:`<div class="muted" style="font-size:12px;margin-top:10px">No event is written; the case is simply cleared from the queue.</div>`}`;
   const btn=$('modalConfirm');
   btn.textContent=writes?`Sign & record ${a.ev}`:'Confirm';
   btn.onclick=commit;
