@@ -1,0 +1,23 @@
+[package]
+name = "creda-graph"
+description = "Creda graph reasoning: subgraph materialization, effective-identity projection (spec §5.2.4), the seven-step authorization evaluation (§4.6), per-field confidence scoring (§5.3), and the graph-dependent event invariants deferred from M1."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+creda-events = { path = "../creda-events" }
+# Only the Store trait + MemoryStore are needed here, so skip creda-store's default `rocksdb`
+# feature — the graph crate never compiles RocksDB.
+creda-store = { path = "../creda-store", default-features = false }
+thiserror = "1"
+# RFC3339 parsing for temporal decay (§5.3.3).
+time = { version = "0.3", features = ["parsing"] }
+
+[dev-dependencies]
+creda-events = { path = "../creda-events" }
+creda-store = { path = "../creda-store", default-features = false }
+time = { version = "0.3", features = ["parsing"] }
