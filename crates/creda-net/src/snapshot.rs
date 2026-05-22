@@ -36,7 +36,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// Build a snapshot from a set of events (sorted by id) and a creation time.
     pub fn build(mut events: Vec<IdentityEventNode>, created_unix_secs: i64) -> Result<Self> {
-        events.sort_by(|a, b| a.id.cmp(&b.id));
+        events.sort_by_key(|e| e.id);
         let content_hash = events_hash(&events)?;
         Ok(Self {
             manifest: SnapshotManifest {
