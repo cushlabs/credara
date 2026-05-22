@@ -62,16 +62,17 @@ fn push_name_parts(parts: &Option<Vec<creda_events::TokenizedString>>, out: &mut
 }
 
 fn collect_address(addr: &StructuredAddress, out: &mut BTreeSet<String>) {
-    for field in [
+    for v in [
         &addr.line1,
         &addr.line2,
         &addr.city,
         &addr.state,
         &addr.postal_code,
         &addr.country,
-    ] {
-        if let Some(v) = field {
-            out.insert(v.0.clone());
-        }
+    ]
+    .into_iter()
+    .flatten()
+    {
+        out.insert(v.0.clone());
     }
 }
