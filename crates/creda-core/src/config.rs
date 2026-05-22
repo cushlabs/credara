@@ -51,6 +51,11 @@ pub struct CredaConfig {
     pub snapshot_interval_secs: u64,
     /// Topic buckets this peer subscribes to (§6.2.4). Empty = none until rebalancing.
     pub subscribed_buckets: Vec<u64>,
+    /// Path to the participant key registry — a directory of admitted-participant key files used
+    /// to authenticate received events at ingest (§3.6). `None` = no participants admitted, so
+    /// inbound replication is refused. Populating it from a UDAP/TEFCA registry is an open
+    /// question (App C); see [`crate::registry`].
+    pub participant_registry: Option<String>,
 }
 
 impl Default for CredaConfig {
@@ -63,6 +68,7 @@ impl Default for CredaConfig {
             default_posture: PostureSetting::TreatmentPresumed,
             snapshot_interval_secs: 6 * 3600,
             subscribed_buckets: Vec::new(),
+            participant_registry: None,
         }
     }
 }
@@ -76,6 +82,7 @@ struct Overlay {
     default_posture: Option<PostureSetting>,
     snapshot_interval_secs: Option<u64>,
     subscribed_buckets: Option<Vec<u64>>,
+    participant_registry: Option<String>,
 }
 
 impl CredaConfig {
@@ -112,6 +119,9 @@ impl CredaConfig {
         if let Some(v) = overlay.subscribed_buckets {
             self.subscribed_buckets = v;
         }
+        if let Some(v) = overlay.participant_registry {
+            self.participant_registry = Some(v);
+        }
         Ok(())
     }
 
@@ -133,6 +143,9 @@ impl CredaConfig {
             self.snapshot_interval_secs = v
                 .parse()
                 .map_err(|_| Error::Config(format!("CREDA_SNAPSHOT_INTERVAL_SECS not a number: {v}")))?;
+        }
+        if let Ok(v) = std::env::var("CREDA_PARTICIPANT_REGISTRY") {
+            self.participant_registry = Some(v);
         }
         Ok(())
     }

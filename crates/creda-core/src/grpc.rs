@@ -358,11 +358,23 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             let (transport, mut inbound) =
                 creda_net::Libp2pTransport::generate_and_spawn(&config.libp2p_listen, Vec::new())
                     .await?;
-            // TODO(libp2p-verify): this resolver must be backed by the UDAP / participant registry
-            // (open question, App C). Until then it resolves no keys, so received events are
-            // refused — the replication data-plane is wired end to end but *inert* until key
-            // resolution lands. Do not represent inbound replication as functional before then.
-            let resolver: Arc<dyn crate::engine::VerifyingKeyResolver> = Arc::new(RegistryResolverTodo);
+            // Resolve event-author keys from the configured participant registry (§3.6). The
+            // registry's *source* (UDAP/TEFCA sync, cert-chain validation, rotation) is an open
+            // question (App C); an empty registry means no participants are admitted yet, so
+            // received events are refused at the signature gate.
+            let registry = match &config.participant_registry {
+                Some(dir) => crate::registry::KeyRegistry::load_dir(dir)?,
+                None => crate::registry::KeyRegistry::new(),
+            };
+            if registry.is_empty() {
+                eprintln!(
+                    "creda serve: WARNING — participant registry is empty (set participant_registry); \
+                     received events are refused at the signature gate until participants are admitted."
+                );
+            } else {
+                eprintln!("creda serve: participant registry loaded ({} admitted)", registry.len());
+            }
+            let resolver: Arc<dyn crate::engine::VerifyingKeyResolver> = Arc::new(registry);
             let replicator = Arc::new(crate::replication::Replicator::new(
                 core.clone(),
                 transport,
@@ -392,20 +404,6 @@ pub fn serve(config: CredaConfig) -> Result<()> {
     })
 }
 
-/// Placeholder verifying-key resolver used until the UDAP/participant-registry integration lands
-/// (open question, App C). It resolves no keys, so every received event is refused at ingest.
-#[cfg(feature = "libp2p")]
-struct RegistryResolverTodo;
-
-#[cfg(feature = "libp2p")]
-impl crate::engine::VerifyingKeyResolver for RegistryResolverTodo {
-    fn resolve(
-        &self,
-        _fingerprint: &creda_events::CertificateFingerprint,
-    ) -> Option<creda_events::VerifyingKey> {
-        None
-    }
-}
 
 #[cfg(test)]
 mod tests {

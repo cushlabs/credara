@@ -31,6 +31,7 @@
 pub mod config;
 pub mod engine;
 pub mod error;
+pub mod registry;
 pub mod replication;
 pub mod signer;
 
@@ -40,5 +41,6 @@ pub mod grpc;
 pub use config::{CredaConfig, PostureSetting};
 pub use engine::{CredaCore, Ingest, VerifyingKeyResolver};
 pub use error::{Error, Result};
+pub use registry::KeyRegistry;
 pub use replication::{IngestSummary, Replicator};
 pub use signer::{InMemorySigner, Signer};

@@ -49,6 +49,20 @@ impl std::fmt::Display for SignatureAlgorithm {
     }
 }
 
+impl SignatureAlgorithm {
+    /// Parse from the `Display` token (case-insensitive); the inverse of `to_string()`. Used by
+    /// the participant registry loader to read `<algorithm> <hex-key>` entries.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "ed25519" => Some(Self::Ed25519),
+            "ml-dsa-65" | "mldsa65" => Some(Self::MlDsa65),
+            "slh-dsa-256s" | "slhdsa256s" => Some(Self::SlhDsa256s),
+            "ed25519+ml-dsa-65" | "hybrid" => Some(Self::Ed25519MlDsa65),
+            _ => None,
+        }
+    }
+}
+
 /// A signature plus the metadata needed to identify the verifying key (§5.1.2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CryptoSignature {
@@ -226,6 +240,45 @@ impl VerifyingKey {
         blake3::hash(&self.public_key_bytes()).as_bytes().to_vec()
     }
 
+    /// Reconstruct a verifying key from its algorithm and raw public-key bytes — the inverse of
+    /// [`Self::public_key_bytes`]. Used by the participant registry to load admitted-peer keys
+    /// from disk. PQC variants require the `pqc` feature; without it they are unavailable.
+    pub fn from_public_key_bytes(algorithm: SignatureAlgorithm, bytes: &[u8]) -> Result<Self> {
+        match algorithm {
+            SignatureAlgorithm::Ed25519 => {
+                let arr: [u8; 32] = bytes.try_into().map_err(|_| {
+                    Error::MalformedKey(format!(
+                        "Ed25519 public key must be 32 bytes, got {}",
+                        bytes.len()
+                    ))
+                })?;
+                let vk = ed25519_dalek::VerifyingKey::from_bytes(&arr)
+                    .map_err(|e| Error::MalformedKey(format!("invalid Ed25519 public key: {e}")))?;
+                Ok(VerifyingKey::Ed25519(vk))
+            }
+            #[cfg(feature = "pqc")]
+            SignatureAlgorithm::MlDsa65 => Ok(VerifyingKey::MlDsa65(bytes.to_vec())),
+            #[cfg(feature = "pqc")]
+            SignatureAlgorithm::SlhDsa256s => Ok(VerifyingKey::SlhDsa256s(bytes.to_vec())),
+            #[cfg(feature = "pqc")]
+            SignatureAlgorithm::Ed25519MlDsa65 => {
+                if bytes.len() <= 32 {
+                    return Err(Error::MalformedKey(format!(
+                        "hybrid public key must be 32 (Ed25519) + ML-DSA bytes, got {}",
+                        bytes.len()
+                    )));
+                }
+                let ed_arr: [u8; 32] = bytes[..32].try_into().expect("checked length > 32");
+                let ed = ed25519_dalek::VerifyingKey::from_bytes(&ed_arr).map_err(|e| {
+                    Error::MalformedKey(format!("invalid hybrid Ed25519 component: {e}"))
+                })?;
+                Ok(VerifyingKey::Hybrid { ed, mldsa_public: bytes[32..].to_vec() })
+            }
+            #[cfg(not(feature = "pqc"))]
+            other => Err(Error::AlgorithmUnavailable(other.to_string())),
+        }
+    }
+
     /// Verify `signature` over `message`. Returns `Ok(())` only on a valid signature whose
     /// algorithm matches this key.
     pub fn verify(&self, message: &[u8], signature: &CryptoSignature) -> Result<()> {
@@ -280,6 +333,37 @@ mod tests {
         assert_eq!(sig.algorithm, SignatureAlgorithm::Ed25519);
         assert_eq!(sig.public_key_fingerprint, vk.fingerprint());
         vk.verify(msg, &sig).unwrap();
+    }
+
+    #[test]
+    fn ed25519_pubkey_round_trips_through_bytes() {
+        let sk = SigningKey::generate(SignatureAlgorithm::Ed25519).unwrap();
+        let vk = sk.verifying_key();
+        let restored =
+            VerifyingKey::from_public_key_bytes(SignatureAlgorithm::Ed25519, &vk.public_key_bytes())
+                .unwrap();
+        assert_eq!(restored.fingerprint(), vk.fingerprint());
+        // The reconstructed key verifies a real signature.
+        let sig = sk.sign(b"creda").unwrap();
+        restored.verify(b"creda", &sig).unwrap();
+    }
+
+    #[test]
+    fn algorithm_parse_round_trips() {
+        for a in [
+            SignatureAlgorithm::Ed25519,
+            SignatureAlgorithm::MlDsa65,
+            SignatureAlgorithm::SlhDsa256s,
+            SignatureAlgorithm::Ed25519MlDsa65,
+        ] {
+            assert_eq!(SignatureAlgorithm::parse(&a.to_string()), Some(a));
+        }
+        assert_eq!(SignatureAlgorithm::parse("nonsense"), None);
+    }
+
+    #[test]
+    fn from_bytes_rejects_wrong_length() {
+        assert!(VerifyingKey::from_public_key_bytes(SignatureAlgorithm::Ed25519, &[0u8; 16]).is_err());
     }
 
     #[test]
