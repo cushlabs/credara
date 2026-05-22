@@ -12,6 +12,11 @@
 //! synchronous, so each call is dispatched on `spawn_blocking` to keep the async runtime
 //! unblocked (§10.1.5). It compiles only with `--features grpc` (and `protoc` present at build).
 
+// `tonic::Status` is large (~176 bytes), and the generated gRPC service contract mandates
+// `Result<_, Status>` on every method — so the helper functions that feed those methods return it
+// too. Boxing it would fight the framework at every call site; allow the lint for this module.
+#![allow(clippy::result_large_err)]
+
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
