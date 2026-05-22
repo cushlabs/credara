@@ -240,7 +240,7 @@ fn decide(
 fn single_assert_projects_field() {
     let k = key();
     let a = assert_ev(&k, demo_dob("dob-1980"), VerificationMethod::GovernmentPhotoId, WALL);
-    let ei = project_from(&[a.clone()], &[a.id], secs(WALL));
+    let ei = project_from(std::slice::from_ref(&a), &[a.id], secs(WALL));
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(!e.disputed);
     assert_eq!(e.values.len(), 1);
@@ -274,7 +274,7 @@ fn conflicting_asserts_are_disputed() {
 fn independent_agreement_raises_confidence() {
     let dob = "dob-1980";
     let a = assert_ev(&key(), demo_dob(dob), VerificationMethod::GovernmentPhotoId, WALL);
-    let single = project_from(&[a.clone()], &[a.id], secs(WALL));
+    let single = project_from(std::slice::from_ref(&a), &[a.id], secs(WALL));
     let c_single = single.field(&FieldKey::DateOfBirth).unwrap().values[0].confidence;
 
     let b = assert_ev(&key(), demo_dob(dob), VerificationMethod::GovernmentPhotoId, WALL);
@@ -294,13 +294,13 @@ fn independent_agreement_raises_confidence() {
 #[test]
 fn government_id_beats_self_report() {
     let g = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
-    let cg = project_from(&[g.clone()], &[g.id], secs(WALL))
+    let cg = project_from(std::slice::from_ref(&g), &[g.id], secs(WALL))
         .field(&FieldKey::DateOfBirth)
         .unwrap()
         .values[0]
         .confidence;
     let sr = assert_ev(&key(), demo_dob("d"), VerificationMethod::SelfReport, WALL);
-    let csr = project_from(&[sr.clone()], &[sr.id], secs(WALL))
+    let csr = project_from(std::slice::from_ref(&sr), &[sr.id], secs(WALL))
         .field(&FieldKey::DateOfBirth)
         .unwrap()
         .values[0]
@@ -312,7 +312,7 @@ fn government_id_beats_self_report() {
 fn attestation_raises_confidence() {
     let k1 = key();
     let a = assert_ev(&k1, demo_dob("d"), VerificationMethod::SelfReport, WALL);
-    let baseline = project_from(&[a.clone()], &[a.id], secs(WALL))
+    let baseline = project_from(std::slice::from_ref(&a), &[a.id], secs(WALL))
         .field(&FieldKey::DateOfBirth)
         .unwrap()
         .values[0]
@@ -388,7 +388,7 @@ fn amend_by_wrong_institution_is_ignored() {
 fn projection_is_deterministic() {
     let k = key();
     let a = assert_ev(&k, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
-    let store = store_with(&[a.clone()]);
+    let store = store_with(std::slice::from_ref(&a));
     let sg = Subgraph::materialize(&store, &[a.id]).unwrap();
     let e1 = project(&sg, &[a.id], &ConfidenceConfig::default(), secs(WALL));
     let e2 = project(&sg, &[a.id], &ConfidenceConfig::default(), secs(WALL));
@@ -399,7 +399,7 @@ fn projection_is_deterministic() {
 fn fast_field_decays_with_age() {
     let now = secs(WALL);
     let fresh = assert_ev(&key(), demo_address("addr"), VerificationMethod::GovernmentPhotoId, WALL);
-    let cf = project_from(&[fresh.clone()], &[fresh.id], now)
+    let cf = project_from(std::slice::from_ref(&fresh), &[fresh.id], now)
         .field(&FieldKey::Address)
         .unwrap()
         .values[0]
@@ -410,7 +410,7 @@ fn fast_field_decays_with_age() {
         VerificationMethod::GovernmentPhotoId,
         "2010-01-01T00:00:00Z",
     );
-    let co = project_from(&[old.clone()], &[old.id], now)
+    let co = project_from(std::slice::from_ref(&old), &[old.id], now)
         .field(&FieldKey::Address)
         .unwrap()
         .values[0]
@@ -424,7 +424,7 @@ fn fast_field_decays_with_age() {
 fn deny_by_default_without_grant() {
     let a = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
     let q = query(fp_of(&key()), GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone()], &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
+    let d = decide(std::slice::from_ref(&a), &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
     assert!(!d.authorized);
 }
 
@@ -432,11 +432,11 @@ fn deny_by_default_without_grant() {
 fn treatment_presumed_authorizes_tpo_but_not_research() {
     let a = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
     let treat = query(fp_of(&key()), GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone()], &[a.id], &treat, DefaultPosture::TreatmentPresumed, &HashMap::new());
+    let d = decide(std::slice::from_ref(&a), &[a.id], &treat, DefaultPosture::TreatmentPresumed, &HashMap::new());
     assert!(d.authorized && d.covering_grants.is_empty());
 
     let research = query(fp_of(&key()), GrantPurpose::Research, UseMode::ReadOnly);
-    let d2 = decide(&[a.clone()], &[a.id], &research, DefaultPosture::TreatmentPresumed, &HashMap::new());
+    let d2 = decide(std::slice::from_ref(&a), &[a.id], &research, DefaultPosture::TreatmentPresumed, &HashMap::new());
     assert!(!d2.authorized, "research always needs an explicit grant");
 }
 

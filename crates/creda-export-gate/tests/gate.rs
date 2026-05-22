@@ -159,7 +159,7 @@ fn refuses_audience_mismatch_and_no_grant() {
     // No grant at all.
     let inst2 = key();
     let assert2 = mk_assert(&inst2);
-    let store2 = store_of(&[assert2.clone()]);
+    let store2 = store_of(std::slice::from_ref(&assert2));
     let gate2 = ExportGate::new(inst2);
     let req2 = ExportRequest { entry_points: vec![assert2.id], query: query(requester) };
     assert!(!gate2.authorize_export(&store2, &req2, NOW, 10).unwrap().is_permitted());
