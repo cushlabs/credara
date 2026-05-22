@@ -44,6 +44,7 @@ libp2p = { version = "0.54", optional = true, features = [
     "yamux",
     "identify",
     "request-response",
+    "cbor",
     "macros",
     "tokio",
 ] }

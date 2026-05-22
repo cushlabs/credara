@@ -28,7 +28,7 @@
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
-use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
+use libp2p::swarm::SwarmEvent;
 use libp2p::{gossipsub, identify, kad, request_response, Multiaddr, PeerId, Swarm};
 use tokio::sync::{mpsc, oneshot};
 
@@ -41,18 +41,31 @@ use crate::transport::NetworkTransport;
 
 /// The composed libp2p behaviour for a Creda peer (§6.2.1). Each field is a primitive Creda
 /// assembles rather than builds.
-#[derive(NetworkBehaviour)]
-pub struct CredaBehaviour {
-    /// Event propagation over bucketed topics (§6.2.4).
-    pub gossipsub: gossipsub::Behaviour,
-    /// Subgraph routing: which peers hold a patient's events (§6.1.5).
-    pub kademlia: kad::Behaviour<kad::store::MemoryStore>,
-    /// Targeted event fetch after a DHT lookup and during anti-entropy (§6.1.5, §6.1.8).
-    /// The protocol payload is a CBOR-encoded request/response of event ids ↔ events.
-    pub request_response: request_response::cbor::Behaviour<EventRequest, EventResponse>,
-    /// Peer metadata exchange.
-    pub identify: identify::Behaviour,
+///
+/// It lives in its own module so the `#[derive(NetworkBehaviour)]` macro's generated code (which
+/// uses a bare `Result<..>`) resolves to the std-prelude `Result`, not this crate's `Result`
+/// alias (which takes one type parameter and would otherwise break the generated `Debug` and
+/// connection-handler impls). TODO(libp2p-verify).
+mod behaviour {
+    use libp2p::swarm::NetworkBehaviour;
+    use libp2p::{gossipsub, identify, kad, request_response};
+
+    use super::{EventRequest, EventResponse};
+
+    #[derive(NetworkBehaviour)]
+    pub struct CredaBehaviour {
+        /// Event propagation over bucketed topics (§6.2.4).
+        pub gossipsub: gossipsub::Behaviour,
+        /// Subgraph routing: which peers hold a patient's events (§6.1.5).
+        pub kademlia: kad::Behaviour<kad::store::MemoryStore>,
+        /// Targeted event fetch after a DHT lookup and during anti-entropy (§6.1.5, §6.1.8).
+        /// The protocol payload is a CBOR-encoded request/response of event ids ↔ events.
+        pub request_response: request_response::cbor::Behaviour<EventRequest, EventResponse>,
+        /// Peer metadata exchange.
+        pub identify: identify::Behaviour,
+    }
 }
+pub use behaviour::{CredaBehaviour, CredaBehaviourEvent};
 
 /// A request for specific events by id (§6.1.5/§6.1.8 transfer step).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
