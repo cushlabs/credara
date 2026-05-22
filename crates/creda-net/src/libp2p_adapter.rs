@@ -128,7 +128,7 @@ impl Libp2pTransport {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| Error::Transport(format!("tcp/noise/yamux setup: {e}")))?
-            .with_behaviour(|key| build_behaviour(key))
+            .with_behaviour(build_behaviour)
             .map_err(|e| Error::Transport(format!("behaviour setup: {e}")))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
