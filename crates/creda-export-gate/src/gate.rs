@@ -18,7 +18,9 @@ pub struct ExportRequest {
 /// The Gate's decision. On `Permitted`, the caller persists and gossips the `ExportReceipt`
 /// (which records the release under a specific Grant, §4.3.3) and then performs the egress.
 pub enum ExportOutcome {
-    Permitted { receipt: IdentityEventNode },
+    // Boxed: an IdentityEventNode is large, and `Refused` is tiny — boxing keeps the enum small
+    // (clippy::large_enum_variant).
+    Permitted { receipt: Box<IdentityEventNode> },
     Refused { reason: String },
 }
 
@@ -30,7 +32,7 @@ impl ExportOutcome {
     /// The emitted receipt, if the export was permitted.
     pub fn receipt(&self) -> Option<&IdentityEventNode> {
         match self {
-            ExportOutcome::Permitted { receipt } => Some(receipt),
+            ExportOutcome::Permitted { receipt } => Some(receipt.as_ref()),
             ExportOutcome::Refused { .. } => None,
         }
     }
@@ -100,7 +102,7 @@ impl ExportGate {
             rfc3339(now_unix_secs)?,
             None,
         )?;
-        Ok(ExportOutcome::Permitted { receipt })
+        Ok(ExportOutcome::Permitted { receipt: Box::new(receipt) })
     }
 }
 
