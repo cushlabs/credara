@@ -11,8 +11,7 @@ use creda_graph::{AuthorizationQuery, RequesterContext};
 use creda_store::MemoryStore;
 
 fn core_with(posture: PostureSetting) -> CredaCore {
-    let mut config = CredaConfig::default();
-    config.default_posture = posture;
+    let config = CredaConfig { default_posture: posture, ..Default::default() };
     let store = Box::new(MemoryStore::new());
     let signer = Box::new(InMemorySigner::generate().unwrap());
     CredaCore::new(store, signer, config)

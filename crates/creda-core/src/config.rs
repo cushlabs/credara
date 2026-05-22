@@ -186,12 +186,10 @@ default_posture = "deny-by-default"
 
     #[test]
     fn validation_fails_loudly() {
-        let mut c = CredaConfig::default();
-        c.snapshot_interval_secs = 0;
+        let c = CredaConfig { snapshot_interval_secs: 0, ..Default::default() };
         assert!(c.validate().is_err());
 
-        let mut c2 = CredaConfig::default();
-        c2.subscribed_buckets = vec![1024]; // out of range
+        let c2 = CredaConfig { subscribed_buckets: vec![1024], ..Default::default() }; // out of range
         assert!(c2.validate().is_err());
     }
 
