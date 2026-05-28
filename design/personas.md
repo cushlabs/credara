@@ -44,7 +44,9 @@ authorization events are **enforced** (§4.8).
 - **Sees / doesn't see.** Sees the effective identity with per-field confidence and disagreement
   flags, and the provenance DAG. Never sees synthetic records or another institution's clinical
   payloads.
-- **Status.** Mockup built — [`clinician-review-mockup.html`](clinician-review-mockup.html).
+- **Status.** Mockups built — [`clinician-review-mockup.html`](clinician-review-mockup.html) for
+  identity review at point of care, and [`prior-auth-mockup.html`](prior-auth-mockup.html) for
+  Da Vinci-aligned prior authorization (CRD / DTR / PAS) with a signed `Attest` audit receipt.
 
 ### 2. Identity steward / operator
 
@@ -112,6 +114,7 @@ These gate what any persona's session may see. They are enforced below the UI.
 | File | Persona / context |
 |---|---|
 | [`clinician-review-mockup.html`](clinician-review-mockup.html) | Clinician · clinical view |
+| [`prior-auth-mockup.html`](prior-auth-mockup.html) | Clinician · Da Vinci prior auth (CRD/DTR/PAS) |
 | [`steward-console-mockup.html`](steward-console-mockup.html) | Identity steward · operator view |
 | [`patient-consent-mockup.html`](patient-consent-mockup.html) | Patient · consent client |
 | [`compliance-audit-mockup.html`](compliance-audit-mockup.html) | Compliance / audit reviewer · read-only |

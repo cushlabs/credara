@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creda · Prior Authorization (Da Vinci CRD / DTR / PAS · mockup)</title>
+<style>
+  :root {
+    --bg:#eef2f6; --surface:#fff; --surface-2:#f7f9fc;
+    --ink:#0f1b2d; --ink-2:#475569; --ink-3:#7c8aa0; --line:#dde4ee;
+    --primary:#0e6e8e;          /* clinical teal */
+    --payer:#1d4ed8;            /* payer / Da Vinci accent */
+    --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+    --info:#2563eb;
+    --shadow:0 1px 2px rgba(15,27,45,.06), 0 6px 20px rgba(15,27,45,.07);
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;}
+  button{font-family:inherit;cursor:pointer;}
+  .muted{color:var(--ink-3);}
+
+  .appbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:20;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;}
+  .brand .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#19b3d6,#0e6e8e);display:grid;place-items:center;font-size:14px;font-weight:800;}
+  .appbar .ctx{color:#aebfd4;font-size:12.5px;}
+  .appbar .spacer{flex:1;}
+  .appbar .who{font-size:12.5px;color:#cdd8e8;display:flex;align-items:center;gap:8px;}
+  .appbar .who .dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;}
+
+  .viewbanner{background:#e8f3f7;color:#0e6e8e;border-bottom:1px solid #c8e2ea;font-size:12.5px;padding:7px 20px;display:flex;align-items:center;gap:8px;}
+  .viewbanner b{font-weight:650;}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 20px 60px;}
+
+  /* ---- Header (patient + order + insurance) ---- */
+  .hdr{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+  @media (max-width:760px){.hdr{grid-template-columns:1fr;}}
+  .hdr .col{display:grid;gap:6px;}
+  .hdr .lab{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:650;}
+  .hdr .val{font-size:15px;font-weight:650;}
+  .hdr .sub{color:var(--ink-2);font-size:13px;}
+  .pickrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pickrow select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;}
+  .verifiedchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:650;padding:3px 9px;border-radius:999px;background:#e7f6ec;color:#15803d;}
+  .verifiedchip .d{width:7px;height:7px;border-radius:50%;background:#15803d;}
+
+  /* ---- Stepper ---- */
+  .stepper{display:flex;gap:8px;align-items:center;margin:18px 0 12px;flex-wrap:wrap;}
+  .step{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-3);}
+  .step.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .step.done{background:#e7f6ec;border-color:#bfe3c9;color:#15803d;}
+  .step.skipped{background:#f1f4f8;color:#64748b;}
+  .step .num{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.25);display:grid;place-items:center;font-weight:800;font-size:11px;}
+  .step.done .num{background:#bfe3c9;color:#15803d;}
+  .step:not(.active):not(.done):not(.skipped) .num{background:#eef2f6;color:var(--ink-3);}
+  .step .arrow{color:var(--ink-3);}
+
+  /* ---- Section card ---- */
+  .section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-top:16px;}
+  .section .hd{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .section .hd h2{margin:0;font-size:14.5px;}
+  .section .bd{padding:16px;}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .b-required{background:#fdeee5;color:#c2410c;border:1px solid #f3cdb3;}
+  .b-notreq{background:#e7f6ec;color:#15803d;border:1px solid #bfe3c9;}
+  .b-rt{background:#e7f1fb;color:#1d4ed8;}
+  .b-iv{background:#e3f2f6;color:#0e7490;}
+  .b-info{background:#e7f1fb;color:#2563eb;}
+  .b-warn{background:#fdf1e3;color:#b45309;}
+  .b-good{background:#e7f6ec;color:#15803d;}
+  .b-davinci{background:#eef0fb;color:#3730a3;border:1px dashed #c7cbf3;}
+
+  .lead{color:var(--ink-2);font-size:13.5px;}
+  .ruleref{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-top:10px;font-size:12.5px;color:var(--ink-2);}
+  .ruleref code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#fff;padding:1px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px;}
+
+  /* ---- DTR form ---- */
+  .field{padding:11px 0;border-bottom:1px solid var(--line);}
+  .field:last-child{border-bottom:0;}
+  .field .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .field .key{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:650;}
+  .field .req{font-size:10.5px;font-weight:800;color:var(--bad);}
+  .src{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 8px;border-radius:999px;background:#e3f2f6;color:#0e7490;border:1px solid #b6dfe8;}
+  .src .d{width:7px;height:7px;border-radius:50%;background:#0e7490;}
+  .src.gap{background:#fdf1e3;color:#b45309;border-color:#ecd6ab;}
+  .src.gap .d{background:#b45309;}
+  .pre{font-size:14px;margin-top:6px;}
+  .pre b{font-weight:650;}
+  .pre .meta{color:var(--ink-3);font-size:12px;}
+  .gapinput{margin-top:6px;display:flex;flex-direction:column;gap:6px;}
+  .gapinput input, .gapinput textarea, .gapinput select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;}
+  .gapinput textarea{min-height:64px;resize:vertical;}
+  .gapinput input:focus, .gapinput textarea:focus, .gapinput select:focus{outline:2px solid #bfe0ec;border-color:var(--primary);}
+
+  /* ---- Attest ---- */
+  .attest{margin-top:14px;display:flex;align-items:flex-start;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13px;}
+  .attest input{margin-top:3px;}
+
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 14px;border-radius:9px;font-size:13.5px;font-weight:650;}
+  .btn:hover{border-color:#b9c6d8;}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .btn.primary:disabled{background:#a8c8d5;border-color:#a8c8d5;cursor:not-allowed;}
+  .btn.ghost{background:transparent;}
+
+  /* ---- Submission timeline ---- */
+  .tl{display:grid;gap:10px;}
+  .tl .row{display:flex;gap:11px;align-items:flex-start;}
+  .tl .dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:12px;flex:none;}
+  .tl .dot.done{background:var(--good);}
+  .tl .dot.active{background:var(--primary); position:relative;}
+  .tl .dot.active::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--primary);opacity:.5;animation:pulse 1.4s ease-out infinite;}
+  @keyframes pulse{from{transform:scale(1);opacity:.5;}to{transform:scale(1.4);opacity:0;}}
+  .tl .dot.pending{background:#cbd5e1;}
+  .tl .t{font-size:13.5px;font-weight:650;}
+  .tl .w{color:var(--ink-3);font-size:12px;margin-top:1px;}
+
+  /* ---- Decision ---- */
+  .decision{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;}
+  .decision .seal{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:22px;flex:none;}
+  .decision .seal.approved{background:var(--good);}
+  .decision .seal.denied{background:var(--bad);}
+  .decision .seal.info{background:var(--warn);}
+  .decision h3{margin:0;font-size:17px;}
+  .conds{margin-top:9px;display:grid;gap:5px;font-size:13px;color:var(--ink-2);}
+  .conds li{list-style:none;padding-left:18px;position:relative;}
+  .conds li::before{content:"▸";color:var(--primary);position:absolute;left:0;}
+
+  /* ---- Provenance receipt ---- */
+  .receipt{background:linear-gradient(180deg,#f5f9ff,#fff);}
+  .codecard{background:#0f1b2d;color:#cfe3ee;border-radius:10px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;margin-top:10px;white-space:pre;overflow:auto;}
+  .codecard .kk{color:#7fd4ec;} .codecard .vv{color:#f5d49b;}
+  .reveal{display:none;}
+  .reveal.on{display:block;}
+  .linky{border:0;background:transparent;color:var(--primary);font-weight:650;font-size:12.5px;padding:6px 0;cursor:pointer;}
+
+  /* ---- Da Vinci footer ---- */
+  .davinci{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin-top:18px;padding:11px 13px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);}
+  .davinci b{color:var(--ink);font-weight:650;}
+
+  /* ---- Toast ---- */
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .2s;z-index:70;display:flex;align-items:center;gap:9px;}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Clinical Workflow · Prior Authorization</span></div>
+    <div class="spacer"></div>
+    <div class="who"><span class="dot"></span> Dr. A. Reyes · Mercy General</div>
+  </div>
+  <div class="viewbanner">
+    <span>⚕</span><b>In-workflow prior auth.</b><span>FHIR-based, real-time, pre-filled from the chart — following the Da&nbsp;Vinci CRD&nbsp;/&nbsp;DTR&nbsp;/&nbsp;PAS implementation guides. No separate payer portal.</span>
+  </div>
+
+  <div class="wrap" id="app"></div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   Creda · Prior Authorization mockup (Da Vinci CRD / DTR / PAS).
+   - CRD: real-time coverage check at order time → required / not required.
+   - DTR: payer Questionnaire pre-populated from the patient's EHR FHIR data
+     (Condition, Observation, MedicationStatement, ImagingStudy …), gaps the
+     clinician completes, explicit attestation.
+   - PAS: FHIR submission to the payer; status round-trip → decision.
+   Creda's value-add: the attestation is a signed Attest event in the patient's
+   identity DAG — tamper-evident, independently auditable (see the receipt).
+---------------------------------------------------------------------------- */
+
+const PATIENT = {
+  name: 'Maria Gonzalez',
+  dob: '1984-03-12',
+  sex: 'Female',
+  mrn: 'Mercy General · MRN 5582019',
+  coverage: { payer: 'BlueChoice PPO', memberId: 'BC-5582-019', plan: 'Choice Plus Network' },
+  confidence: 96,
+};
+
+const ORDERS = {
+  mri: {
+    id:'mri',
+    name:'MRI Lumbar Spine without contrast',
+    code:'CPT 72148',
+    needsAuth:true,
+    crd:{
+      rule:'BlueChoice medical-necessity policy MR-LS-101',
+      latencyMs:400,
+      note:'Prior authorization required. Documentation template available (DTR).',
+    },
+    dtr:{
+      title:'BlueChoice PPO — MRI Lumbar Spine documentation',
+      fields:[
+        {id:'dx', key:'Indicated diagnosis', preset:'M54.50 — Low back pain', src:{kind:'EHR · Condition since 2024-08-12'}, required:true},
+        {id:'dur', key:'Pain duration ≥ 6 weeks', preset:'Yes — symptom onset 2024-07-28', src:{kind:'EHR · Encounter note 2024-09-04'}, required:true},
+        {id:'tx', key:'Conservative therapy tried', preset:'Physical therapy × 8 weeks; ibuprofen 600 mg TID × 4 weeks', src:{kind:'EHR · MedicationStatement + Encounter notes'}, required:true},
+        {id:'imhx', key:'Lumbar imaging in last 12 months', preset:'None on file', src:{kind:'EHR · ImagingStudy (none in window)'}, required:true},
+        {id:'red', key:'Red-flag symptoms', placeholder:'Select one', kind:'select', options:['None','Sciatica without weakness','Sciatica with weakness','Saddle anesthesia / bowel-bladder dysfunction','Suspected malignancy / fracture / infection'], src:{kind:'Gap — clinician confirms'}, gap:true, required:true},
+        {id:'just', key:'Provider clinical justification', kind:'textarea', placeholder:'Briefly state why imaging is medically necessary now.', src:{kind:'Gap — free-text justification'}, gap:true, required:true},
+      ],
+    },
+    decision:{
+      kind:'approved',
+      title:'APPROVED',
+      sub:'BlueChoice PPO · auth #BC-PA-441089',
+      conditions:[
+        'Valid for 30 days from today',
+        'In-network facility only (BlueChoice radiology network)',
+        'Single study (no repeat without new authorization)',
+        'Notify within 24h if MR contrast becomes necessary',
+      ],
+      rationale:'Documentation establishes ≥ 6-week duration, prior conservative therapy, and clinical red-flag screening — meeting policy MR-LS-101.',
+    },
+  },
+  specialty: {
+    id:'specialty',
+    name:'Ustekinumab 90 mg SubQ injection',
+    code:'HCPCS J3357',
+    needsAuth:true,
+    crd:{
+      rule:'BlueChoice specialty drug policy SP-D-227',
+      latencyMs:520,
+      note:'Step-therapy / specialty drug — prior authorization required.',
+    },
+    dtr:{
+      title:'BlueChoice PPO — Specialty drug authorization (Ustekinumab)',
+      fields:[
+        {id:'dx', key:'Indicated diagnosis', preset:'L40.50 — Arthropathic psoriasis (Plaque psoriasis with PsA)', src:{kind:'EHR · Condition list'}, required:true},
+        {id:'step', key:'Step-therapy: methotrexate tried', preset:'Yes — methotrexate 15 mg/wk × 12 weeks, partial response', src:{kind:'EHR · MedicationStatement'}, required:true},
+        {id:'tnf', key:'TNF-α inhibitor tried', placeholder:'Yes / No', kind:'select', options:['No — clinical contraindication','Yes — failed adalimumab','Yes — failed etanercept'], src:{kind:'Gap — clinician confirms'}, gap:true, required:true},
+        {id:'tb', key:'Latent TB screening', preset:'Negative QuantiFERON 2024-11-02', src:{kind:'EHR · Observation'}, required:true},
+        {id:'just', key:'Provider justification', kind:'textarea', placeholder:'Briefly justify step-up therapy.', src:{kind:'Gap — free-text justification'}, gap:true, required:true},
+      ],
+    },
+    decision:{
+      kind:'approved',
+      title:'APPROVED — with quantity limit',
+      sub:'BlueChoice PPO · auth #BC-PA-441146',
+      conditions:[
+        'Authorized for 6 months',
+        'Quantity limit: 1 syringe per 8 weeks (after induction)',
+        'Specialty pharmacy dispensing only',
+      ],
+      rationale:'Step-therapy criteria met; safety screening complete. Approved under SP-D-227 §3.',
+    },
+  },
+  generic: {
+    id:'generic',
+    name:'Atorvastatin 40 mg tablets',
+    code:'RxNorm 617318',
+    needsAuth:false,
+    crd:{ rule:'Formulary tier 1 — no prior authorization required', latencyMs:240, note:'Covered under standard formulary.' },
+  },
+};
+
+const state = {
+  orderId:'mri',
+  step:'crd',        // 'crd' | 'dtr' | 'pas' | 'decision'
+  fields:{},         // gap-field values
+  attested:false,
+  submitTs:null,
+};
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+function order(){ return ORDERS[state.orderId]; }
+
+function render(){
+  const o = order();
+  // If not-required, the workflow short-circuits at CRD → "no auth needed".
+  app.innerHTML = `
+    ${hdrHTML(o)}
+    ${stepperHTML(o)}
+    ${o.needsAuth ? authflowHTML(o) : notRequiredHTML(o)}
+    ${davinciFooter()}
+  `;
+  bindGapInputs();
+}
+
+/* ---- Header ---- */
+function hdrHTML(o){
+  return `<div class="hdr">
+    <div class="col">
+      <div class="lab">Patient</div>
+      <div class="val">${PATIENT.name}</div>
+      <div class="sub">DOB ${PATIENT.dob} · ${PATIENT.sex} · ${PATIENT.mrn}</div>
+      <div style="margin-top:5px"><span class="verifiedchip"><span class="d"></span>Identity verified · ${PATIENT.confidence}% · via Creda</span></div>
+    </div>
+    <div class="col">
+      <div class="lab">Order</div>
+      <div class="pickrow">
+        <select id="orderPick" onchange="pickOrder(this.value)">
+          ${Object.values(ORDERS).map(x=>`<option value="${x.id}" ${x.id===state.orderId?'selected':''}>${x.name}</option>`).join('')}
+        </select>
+        <span class="badge b-iv">${o.code}</span>
+      </div>
+      <div class="lab" style="margin-top:9px">Insurance</div>
+      <div class="val" style="font-size:14px">${PATIENT.coverage.payer}</div>
+      <div class="sub">Member ${PATIENT.coverage.memberId} · ${PATIENT.coverage.plan}</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Stepper ---- */
+function stepperHTML(o){
+  if(!o.needsAuth){
+    return `<div class="stepper">
+      ${stepChip(1,'Coverage check',true,false,false)}
+      ${stepChip(2,'Documentation',false,false,true)}
+      ${stepChip(3,'Submission',false,false,true)}
+      ${stepChip(4,'Decision',false,false,true)}
+    </div>`;
+  }
+  const order = ['crd','dtr','pas','decision'];
+  const labels = ['Coverage check (CRD)','Documentation (DTR)','Submission (PAS)','Decision'];
+  const idx = order.indexOf(state.step);
+  return `<div class="stepper">${order.map((s,i)=>{
+    const done = i<idx;
+    const active = i===idx;
+    return stepChip(i+1, labels[i], done, active, false);
+  }).join('')}</div>`;
+}
+function stepChip(n,label,done,active,skipped){
+  const cls = active?'step active':done?'step done':skipped?'step skipped':'step';
+  return `<span class="${cls}"><span class="num">${done?'✓':n}</span>${label}</span>${n<4?'<span class="arrow">›</span>':''}`;
+}
+
+/* ---- Auth flow (required path) ---- */
+function authflowHTML(o){
+  return [
+    crdCardHTML(o),
+    state.step==='dtr' ? dtrCardHTML(o) : '',
+    (state.step==='pas' || state.step==='decision') ? pasCardHTML(o) : '',
+    state.step==='decision' ? decisionCardHTML(o) : '',
+    state.step==='decision' ? receiptCardHTML(o) : '',
+  ].join('');
+}
+
+/* ---- CRD result ---- */
+function crdCardHTML(o){
+  return `<div class="section">
+    <div class="hd">
+      <h2>Coverage requirements (CRD)</h2>
+      <span class="badge b-required" style="margin-left:auto">Prior authorization REQUIRED</span>
+      <span class="badge b-rt">real-time · ${o.crd.latencyMs} ms</span>
+      <span class="badge b-davinci">Da Vinci CRD</span>
+    </div>
+    <div class="bd">
+      <div class="lead">${o.crd.note}</div>
+      <div class="ruleref"><span>📜</span> Payer rule: <code>${o.crd.rule}</code></div>
+      ${state.step==='crd' ? `<div style="margin-top:14px;display:flex;gap:9px"><button class="btn primary" onclick="advance('dtr')">Start documentation →</button><button class="btn ghost" onclick="toast('In production, the EHR would auto-launch the DTR app.')">How is this auto-launched?</button></div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ---- DTR Questionnaire ---- */
+function dtrCardHTML(o){
+  const f = o.dtr.fields;
+  const gapsRemaining = f.filter(x => x.gap && !state.fields[x.id]).length;
+  return `<div class="section">
+    <div class="hd">
+      <h2>${o.dtr.title}</h2>
+      <span class="badge b-davinci" style="margin-left:auto">Da Vinci DTR</span>
+    </div>
+    <div class="bd">
+      <div class="lead">A FHIR Questionnaire from the payer — pre-populated from your patient's chart. Complete any gaps and attest.</div>
+      <div style="margin-top:12px">
+        ${f.map(fieldHTML).join('')}
+      </div>
+
+      <label class="attest">
+        <input type="checkbox" id="attestBox" ${state.attested?'checked':''} onchange="toggleAttest(this.checked)" />
+        <span>I attest that the documentation above accurately reflects the patient's clinical picture and supports medical necessity.</span>
+      </label>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap">
+        <div class="muted" style="font-size:12.5px">
+          ${gapsRemaining ? `${gapsRemaining} gap${gapsRemaining>1?'s':''} remain` : 'All gaps complete.'}
+        </div>
+        <button class="btn primary" id="submitBtn" ${(gapsRemaining || !state.attested) ? 'disabled' : ''} onclick="submitPAS()">Sign &amp; submit prior authorization</button>
+      </div>
+    </div>
+  </div>`;
+}
+function fieldHTML(f){
+  if(f.gap){
+    const v = state.fields[f.id] || '';
+    let input;
+    if(f.kind==='select'){
+      input = `<select data-fid="${f.id}"><option value="" ${v===''?'selected':''}>${f.placeholder||'Choose…'}</option>${f.options.map(o=>`<option ${v===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    } else if(f.kind==='textarea'){
+      input = `<textarea data-fid="${f.id}" placeholder="${f.placeholder||''}">${v}</textarea>`;
+    } else {
+      input = `<input data-fid="${f.id}" placeholder="${f.placeholder||''}" value="${v.replace(/"/g,'&quot;')}" />`;
+    }
+    return `<div class="field">
+      <div class="top"><span class="key">${f.key}</span> ${f.required?'<span class="req">REQUIRED</span>':''} <span class="src gap"><span class="d"></span>${f.src.kind}</span></div>
+      <div class="gapinput">${input}</div>
+    </div>`;
+  }
+  return `<div class="field">
+    <div class="top"><span class="key">${f.key}</span> ${f.required?'<span class="req">REQUIRED</span>':''} <span class="src"><span class="d"></span>${f.src.kind}</span></div>
+    <div class="pre"><b>${f.preset}</b></div>
+  </div>`;
+}
+function bindGapInputs(){
+  document.querySelectorAll('[data-fid]').forEach(el=>{
+    el.addEventListener('input', e=>{ state.fields[el.dataset.fid] = el.value; updateSubmitState(); });
+    el.addEventListener('change', e=>{ state.fields[el.dataset.fid] = el.value; updateSubmitState(); });
+  });
+}
+function toggleAttest(v){ state.attested = v; updateSubmitState(); }
+function updateSubmitState(){
+  const o = order();
+  if(!o.dtr) return;
+  const gapsRemaining = o.dtr.fields.filter(x => x.gap && !state.fields[x.id]).length;
+  const btn = $('submitBtn');
+  if(!btn) return;
+  btn.disabled = (gapsRemaining || !state.attested);
+  // gap counter
+  const counter = btn.parentElement.querySelector('.muted');
+  if(counter) counter.textContent = gapsRemaining ? `${gapsRemaining} gap${gapsRemaining>1?'s':''} remain` : 'All gaps complete.';
+}
+
+/* ---- PAS submission timeline ---- */
+function pasCardHTML(o){
+  const t = state.submitTs || Date.now();
+  const phase = state.step;
+  const decided = phase==='decision';
+  return `<div class="section">
+    <div class="hd">
+      <h2>Submission (PAS)</h2>
+      <span class="badge b-davinci" style="margin-left:auto">Da Vinci PAS</span>
+    </div>
+    <div class="bd">
+      <div class="tl">
+        ${tlRow('done','Bundle assembled', 'FHIR Claim + Patient + Coverage + QuestionnaireResponse + supporting Observations · signed by submitter')}
+        ${tlRow(decided?'done':'active','Sent to BlueChoice PPO', 'Routed via FHIR PAS endpoint; converted to X12 278 by the intermediary')}
+        ${tlRow(decided?'done':'pending','Payer reviewing', decided?'Decision received':'Typical response: 5–60 seconds for automated rules')}
+        ${tlRow(decided?'done':'pending','Decision', decided?'See below':'Pending')}
+      </div>
+    </div>
+  </div>`;
+}
+function tlRow(stateCls,title,when){
+  const dotChar = stateCls==='done'?'✓':stateCls==='active'?'•':'·';
+  return `<div class="row"><div class="dot ${stateCls}">${dotChar}</div><div><div class="t">${title}</div><div class="w">${when}</div></div></div>`;
+}
+
+/* ---- Decision ---- */
+function decisionCardHTML(o){
+  const d = o.decision;
+  const seal = {approved:'✓',denied:'×',info:'?'}[d.kind] || '✓';
+  return `<div class="section">
+    <div class="hd">
+      <h2>Decision</h2>
+      <span class="badge ${d.kind==='approved'?'b-good':d.kind==='denied'?'b-warn':'b-info'}" style="margin-left:auto">${d.title}</span>
+    </div>
+    <div class="bd">
+      <div class="decision">
+        <div class="seal ${d.kind}">${seal}</div>
+        <div>
+          <h3>${d.title}</h3>
+          <div class="muted" style="font-size:13px;margin-top:2px">${d.sub}</div>
+          <ul class="conds">${d.conditions.map(c=>`<li>${c}</li>`).join('')}</ul>
+          <div class="muted" style="font-size:12.5px;margin-top:9px"><b>Payer rationale.</b> ${d.rationale}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---- Provenance receipt (Creda's value-add) ---- */
+function receiptCardHTML(o){
+  return `<div class="section receipt">
+    <div class="hd">
+      <h2>Provenance receipt</h2>
+      <span class="badge b-good" style="margin-left:auto">Signed</span>
+    </div>
+    <div class="bd">
+      <div class="lead">This authorization request is recorded as a signed <b>Attest</b> event in the patient's identity DAG (§3.4.4). Compliance can audit it independently — see the <i>compliance &amp; audit</i> view.</div>
+      <button class="linky" onclick="toggleReveal()">View signed record ›</button>
+      <div class="reveal" id="rv">
+        <div class="codecard"><span class="kk">event_type</span>:&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">"Attest"</span>
+<span class="kk">attesting_party</span>: <span class="vv">"Mercy General · Dr. A. Reyes"</span>
+<span class="kk">purpose</span>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">"Prior authorization submission"</span>
+<span class="kk">references</span>:&nbsp;&nbsp;&nbsp; <span class="vv">[ patient-subgraph-head, ${order().id==='mri'?'\"CPT 72148\"':order().id==='specialty'?'\"HCPCS J3357\"':'\"RxNorm 617318\"'} ]</span>
+<span class="kk">payer_decision</span>: <span class="vv">"${order().decision?.title || ''}"</span>
+<span class="kk">signature</span>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="vv">ed25519:verified ✓</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleReveal(){ $('rv').classList.toggle('on'); }
+
+/* ---- Not-required happy path ---- */
+function notRequiredHTML(o){
+  return `<div class="section">
+    <div class="hd">
+      <h2>Coverage requirements (CRD)</h2>
+      <span class="badge b-notreq" style="margin-left:auto">No prior authorization required</span>
+      <span class="badge b-rt">real-time · ${o.crd.latencyMs} ms</span>
+      <span class="badge b-davinci">Da Vinci CRD</span>
+    </div>
+    <div class="bd">
+      <div class="lead">${o.crd.note}</div>
+      <div class="ruleref"><span>📜</span> Payer rule: <code>${o.crd.rule}</code></div>
+      <div class="muted" style="font-size:12.5px;margin-top:12px">The DTR / PAS steps are <i>skipped</i> when CRD returns "no auth required." The clinician can proceed with the order; no Questionnaire is fetched.</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Da Vinci footer ---- */
+function davinciFooter(){
+  return `<div class="davinci">
+    <b>Following the Da Vinci IGs:</b>
+    <span class="badge b-davinci">CRD · Coverage Requirements Discovery</span>
+    <span class="badge b-davinci">DTR · Documentation Templates &amp; Rules</span>
+    <span class="badge b-davinci">PAS · Prior Authorization Support</span>
+    <span style="margin-left:auto">FHIR R4 · CDS Hooks at order-sign</span>
+  </div>`;
+}
+
+/* ---- Actions ---- */
+function pickOrder(id){
+  state.orderId = id;
+  state.step = 'crd';
+  state.fields = {};
+  state.attested = false;
+  state.submitTs = null;
+  render();
+}
+function advance(s){ state.step = s; render(); }
+function submitPAS(){
+  state.step = 'pas';
+  state.submitTs = Date.now();
+  render();
+  toast('Bundle signed and submitted to BlueChoice PPO');
+  // Animate to decision after a short delay.
+  setTimeout(()=>{ state.step = 'decision'; render(); }, 2200);
+}
+
+let toastT=null;
+function toast(m){ const t=$('toast'); t.innerHTML=`<span>✓</span> ${m}`; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2400); }
+
+render();
+</script>
+</body>
+</html>
