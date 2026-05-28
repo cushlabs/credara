@@ -25,8 +25,8 @@ use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
 use creda_events::{
-    canonical, CertificateFingerprint, EventId, EventPayload, GrantPurpose, IdentityEventType,
-    UseMode,
+    canonical, CertificateFingerprint, EventId, EventPayload, GrantPurpose, IdentityEventNode,
+    IdentityEventType, UseMode,
 };
 use creda_graph::{AuthorizationQuery, RequesterContext};
 use creda_store::RocksdbStore;
@@ -47,9 +47,19 @@ use pb::{
     EventReply, GetEventReply, GetEventRequest, MatchReply, MatchRequest, Metrics,
 };
 
-/// The gRPC service, backed by a shared engine.
+/// Fire-and-forget hook the gRPC service invokes after a locally created event has been signed
+/// and stored — implementations enqueue the event onto the outbound replication path and **must
+/// not block**. The libp2p daemon wires this to the [`crate::replication::Replicator`] so that
+/// events created locally actually gossip outward; without a publisher the service is read/write
+/// to the engine only and replicates nothing outbound.
+pub trait EventPublisher: Send + Sync {
+    fn publish(&self, node: &IdentityEventNode);
+}
+
+/// The gRPC service, backed by a shared engine plus an optional outbound publisher.
 pub struct CredaService {
     core: Arc<CredaCore>,
+    publisher: Option<Arc<dyn EventPublisher>>,
 }
 
 fn ids_from_bytes(raw: &[Vec<u8>]) -> std::result::Result<Vec<EventId>, Status> {
@@ -130,6 +140,11 @@ impl Creda for CredaService {
         let parents = ids_from_bytes(&req.parent_ids)?;
         let core = self.core.clone();
         let node = blocking(move || core.create_event(payload, parents)).await?;
+        // Fire-and-forget outbound publish. The publisher must not block; if absent, this peer
+        // does not gossip its locally-created events (anti-entropy still backstops on testbed).
+        if let Some(publisher) = &self.publisher {
+            publisher.publish(&node);
+        }
         let event_cbor = canonical::to_vec(&node).map_err(|e| Status::internal(e.to_string()))?;
         Ok(Response::new(EventReply { event_cbor }))
     }
@@ -304,11 +319,16 @@ async fn shutdown_signal() {
 /// Serve the gRPC API for a prebuilt engine on `socket`, shutting down when `shutdown` resolves.
 /// Factored out of [`serve`] so tests can drive it with an in-memory engine and an explicit
 /// shutdown trigger.
-pub async fn serve_with_core<S>(core: Arc<CredaCore>, socket: &str, shutdown: S) -> Result<()>
+pub async fn serve_with_core<S>(
+    core: Arc<CredaCore>,
+    socket: &str,
+    shutdown: S,
+    publisher: Option<Arc<dyn EventPublisher>>,
+) -> Result<()>
 where
     S: std::future::Future<Output = ()> + Send + 'static,
 {
-    let service = CredaService { core };
+    let service = CredaService { core, publisher };
     let router = Server::builder().add_service(CredaServer::new(service));
 
     match parse_endpoint(socket) {
@@ -351,8 +371,13 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             config.grpc_socket
         );
 
+        // Outbound publisher (set under libp2p; absent otherwise — without it, locally created
+        // events are still signed and stored, just not gossiped).
+        let publisher: Option<Arc<dyn EventPublisher>>;
+
         // Start P2P replication when libp2p is built in: bring up the swarm, subscribe to the
-        // configured buckets, and pump received gossip batches into the engine's ingest gate.
+        // configured buckets, pump received gossip batches into the engine's ingest gate, and
+        // wire a publish-on-create channel that drains into Replicator::publish_event.
         #[cfg(feature = "libp2p")]
         {
             let (transport, mut inbound) =
@@ -390,18 +415,61 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                     }
                 }
             });
+            // Outbound publish-on-create: a bounded channel + drain task. The publisher hands
+            // freshly-created events to this channel (fire-and-forget); the drain calls the
+            // Replicator on them. If the channel is full or closed, we drop and log — gossip is
+            // best-effort and anti-entropy backstops the loss.
+            let (pub_tx, mut pub_rx) =
+                tokio::sync::mpsc::channel::<IdentityEventNode>(1024);
+            let repl_out = replicator.clone();
+            tokio::spawn(async move {
+                while let Some(node) = pub_rx.recv().await {
+                    match repl_out.publish_event(&node).await {
+                        Ok(Some(_bucket)) => {}
+                        Ok(None) => eprintln!(
+                            "creda serve: publish skipped — event has no routable bucket yet"
+                        ),
+                        Err(e) => eprintln!("creda serve: publish error: {e}"),
+                    }
+                }
+            });
+            publisher = Some(Arc::new(ChannelPublisher { tx: pub_tx }) as Arc<dyn EventPublisher>);
+
             eprintln!(
                 "creda serve: libp2p replication active (listen={}, buckets={})",
                 config.libp2p_listen,
                 config.subscribed_buckets.len()
             );
-            // NOTE: outbound publish-on-create (notifying this replicator of locally created
-            // events) and the anti-entropy peer-exchange loop are the remaining hooks — both
-            // land with the multi-peer test bed (DQ-3), which can drive real peers.
+            // NOTE: the anti-entropy peer-exchange loop + request_response/DHT QueryId correlation
+            // + inbound EventRequest answering are the remaining hooks — they land with the
+            // multi-peer test bed (DQ-3), which can drive real peers.
+        }
+        #[cfg(not(feature = "libp2p"))]
+        {
+            publisher = None;
         }
 
-        serve_with_core(core, &config.grpc_socket, shutdown_signal()).await
+        serve_with_core(core, &config.grpc_socket, shutdown_signal(), publisher).await
     })
+}
+
+/// Bounded outbound publisher: hands locally created events to the libp2p drain task without
+/// blocking. A full channel drops with a warning; the anti-entropy backstop heals gossip loss.
+#[cfg(feature = "libp2p")]
+struct ChannelPublisher {
+    tx: tokio::sync::mpsc::Sender<IdentityEventNode>,
+}
+
+#[cfg(feature = "libp2p")]
+impl EventPublisher for ChannelPublisher {
+    fn publish(&self, node: &IdentityEventNode) {
+        if self.tx.try_send(node.clone()).is_err() {
+            eprintln!(
+                "creda serve: outbound publish queue full or closed; event dropped \
+                 (anti-entropy will heal)"
+            );
+        }
+    }
 }
 
 
@@ -452,6 +520,41 @@ mod tests {
         assert!(parse_event_type("Nope").is_err());
     }
 
+    #[derive(Default)]
+    struct CountingPublisher {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+    impl EventPublisher for CountingPublisher {
+        fn publish(&self, _node: &IdentityEventNode) {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn publisher_is_called_on_create_event() {
+        let core = Arc::new(CredaCore::new(
+            Box::new(MemoryStore::new()),
+            Box::new(InMemorySigner::generate().unwrap()),
+            CredaConfig::default(),
+        ));
+        let counter: Arc<CountingPublisher> = Arc::new(CountingPublisher::default());
+        let publisher: Arc<dyn EventPublisher> = counter.clone();
+        let service = CredaService { core, publisher: Some(publisher) };
+
+        let payload = creda_events::EventPayload::Assert {
+            demographics: creda_events::Demographics::default(),
+            verification_method: creda_events::VerificationMethod::SelfReport,
+        };
+        let bytes = canonical::to_vec(&payload).unwrap();
+        let req = Request::new(pb::CreateEventRequest {
+            event_payload_cbor: bytes,
+            parent_ids: Vec::new(),
+        });
+        service.create_event(req).await.unwrap();
+
+        assert_eq!(counter.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
     #[tokio::test]
     async fn serves_and_cleans_up_a_unix_socket() {
         let dir = std::env::temp_dir().join(format!("creda-grpc-test-{}", std::process::id()));
@@ -466,9 +569,14 @@ mod tests {
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         let sock_str = sock.to_string_lossy().to_string();
         let handle = tokio::spawn(async move {
-            serve_with_core(core, &sock_str, async move {
-                let _ = rx.await;
-            })
+            serve_with_core(
+                core,
+                &sock_str,
+                async move {
+                    let _ = rx.await;
+                },
+                None,
+            )
             .await
         });
 
