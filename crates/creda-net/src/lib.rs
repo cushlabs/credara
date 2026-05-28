@@ -52,7 +52,7 @@ pub use bucketing::{bucket_of, topic_for_bucket, topic_for_key, DhtKey, BUCKET_C
 pub use error::{Error, Result};
 pub use gossip::{BatchConfig, GossipBatch, SeenSet};
 pub use snapshot::{Snapshot, SnapshotManifest};
-pub use transport::NetworkTransport;
+pub use transport::{EventSource, NetworkTransport};
 
 #[cfg(feature = "libp2p")]
 pub use libp2p_adapter::Libp2pTransport;

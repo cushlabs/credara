@@ -380,9 +380,18 @@ pub fn serve(config: CredaConfig) -> Result<()> {
         // wire a publish-on-create channel that drains into Replicator::publish_event.
         #[cfg(feature = "libp2p")]
         {
+            // The transport asks this back when a peer sends an EventRequest, so the swarm can
+            // answer from the local store (anti-entropy + targeted-fetch transfer step, §6.1.5,
+            // §6.1.8). Held as Arc<dyn EventSource>; called on spawn_blocking inside the adapter.
+            let event_source: Arc<dyn creda_net::EventSource> =
+                Arc::new(CoreEventSource { core: core.clone() });
             let (transport, mut inbound) =
-                creda_net::Libp2pTransport::generate_and_spawn(&config.libp2p_listen, Vec::new())
-                    .await?;
+                creda_net::Libp2pTransport::generate_and_spawn(
+                    &config.libp2p_listen,
+                    Vec::new(),
+                    event_source,
+                )
+                .await?;
             // Resolve event-author keys from the configured participant registry (§3.6). The
             // registry's *source* (UDAP/TEFCA sync, cert-chain validation, rotation) is an open
             // question (App C); an empty registry means no participants are admitted yet, so
@@ -451,6 +460,24 @@ pub fn serve(config: CredaConfig) -> Result<()> {
 
         serve_with_core(core, &config.grpc_socket, shutdown_signal(), publisher).await
     })
+}
+
+/// Backs the libp2p adapter's inbound EventRequest answering with the engine's local store: when
+/// a peer requests events by id, the swarm asks here (on `spawn_blocking`) and sends back what
+/// we have. Missing events are omitted (no "not found"), matching anti-entropy semantics.
+#[cfg(feature = "libp2p")]
+struct CoreEventSource {
+    core: Arc<CredaCore>,
+}
+
+#[cfg(feature = "libp2p")]
+impl creda_net::EventSource for CoreEventSource {
+    fn get_events(
+        &self,
+        ids: &[creda_events::EventId],
+    ) -> Vec<creda_events::IdentityEventNode> {
+        self.core.get_events(ids).unwrap_or_default()
+    }
 }
 
 /// Bounded outbound publisher: hands locally created events to the libp2p drain task without

@@ -62,3 +62,15 @@ pub trait NetworkTransport {
     /// This peer's own libp2p peer id, as bytes.
     fn local_peer_id(&self) -> Vec<u8>;
 }
+
+/// A read-only window into the local event store, used by the transport to answer **inbound**
+/// event requests from peers (§6.1.5 targeted fetch and §6.1.8 anti-entropy transfer). It is the
+/// symmetric counterpart to `Replicator::ingest_batch`: ingest is for events we *receive*, this
+/// is for events we *serve* when asked.
+///
+/// Implementations are sync and may touch storage; the libp2p adapter dispatches calls on
+/// `tokio::task::spawn_blocking` so the swarm event loop never blocks. Missing events are simply
+/// omitted from the result — there is no "not found" error.
+pub trait EventSource: Send + Sync + 'static {
+    fn get_events(&self, ids: &[EventId]) -> Vec<IdentityEventNode>;
+}

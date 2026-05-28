@@ -25,9 +25,12 @@
 //! the queried key to the peers on the lookup path. This adapter wires the DHT but does not
 //! solve query-privacy; do not represent it as solved.
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
+use libp2p::request_response::{Message, OutboundRequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{gossipsub, identify, kad, request_response, Multiaddr, PeerId, Swarm};
 use tokio::sync::{mpsc, oneshot};
@@ -37,7 +40,7 @@ use creda_events::{EventId, IdentityEventNode};
 use crate::bucketing::{topic_for_bucket, DhtKey};
 use crate::error::{Error, Result};
 use crate::gossip::GossipBatch;
-use crate::transport::NetworkTransport;
+use crate::transport::{EventSource, NetworkTransport};
 
 /// The composed libp2p behaviour for a Creda peer (§6.2.1). Each field is a primitive Creda
 /// assembles rather than builds.
@@ -89,6 +92,9 @@ enum Command {
     DhtProvide { key: DhtKey, reply: oneshot::Sender<Result<()>> },
     DhtFindProviders { key: DhtKey, reply: oneshot::Sender<Result<Vec<Vec<u8>>>> },
     RequestEvents { peer: Vec<u8>, ids: Vec<EventId>, reply: oneshot::Sender<Result<Vec<IdentityEventNode>>> },
+    /// Self-command emitted by the inbound-request task to send a response back through the
+    /// swarm (where `&mut Swarm` is available).
+    RespondEvents { channel: ResponseChannel<EventResponse>, events: Vec<IdentityEventNode> },
 }
 
 /// Handle to a running Creda libp2p peer. Cloneable; all clones drive the same Swarm task.
@@ -117,6 +123,7 @@ impl Libp2pTransport {
         keypair: libp2p::identity::Keypair,
         listen_on: Multiaddr,
         bootstrap: Vec<(PeerId, Multiaddr)>,
+        source: Arc<dyn EventSource>,
     ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let local_peer_id = PeerId::from(keypair.public());
 
@@ -140,9 +147,14 @@ impl Libp2pTransport {
             swarm.behaviour_mut().kademlia.add_address(&peer, addr);
         }
 
+        // Two command channels: `cmd_rx` carries external API calls (and closes when every
+        // Libp2pTransport handle is dropped, signalling shutdown); `self_rx` carries swarm-task
+        // self-commands (Command::RespondEvents from inbound-request fetch tasks). A single
+        // shared channel would never close on shutdown because the task holds a clone.
         let (cmd_tx, cmd_rx) = mpsc::channel(256);
+        let (self_tx, self_rx) = mpsc::channel(64);
         let (inbound_tx, inbound_rx) = mpsc::channel(1024);
-        tokio::spawn(run_swarm(swarm, cmd_rx, inbound_tx));
+        tokio::spawn(run_swarm(swarm, cmd_rx, self_tx, self_rx, inbound_tx, source));
 
         Ok((
             Self {
@@ -163,12 +175,13 @@ impl Libp2pTransport {
     pub async fn generate_and_spawn(
         listen: &str,
         _bootstrap: Vec<String>,
+        source: Arc<dyn EventSource>,
     ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let keypair = libp2p::identity::Keypair::generate_ed25519();
         let listen_on: Multiaddr = listen
             .parse()
             .map_err(|e| Error::Transport(format!("bad listen multiaddr {listen:?}: {e}")))?;
-        Self::spawn(keypair, listen_on, Vec::new()).await
+        Self::spawn(keypair, listen_on, Vec::new(), source).await
     }
 
     async fn send<T>(&self, make: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
@@ -254,26 +267,46 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
 
 /// The background event loop: service commands from handles and react to Swarm events.
 ///
-/// The gossipsub-message arm is wired: a received batch's bytes are forwarded on `inbound_tx`,
-/// which the daemon drains into `Replicator::ingest_batch` (signature verification happens there,
-/// §3.6). If the channel is full or closed the batch is dropped — gossip is best-effort and
-/// anti-entropy (§6.1.8) backfills any gap.
+/// Wiring:
+/// - Gossipsub messages are forwarded on `inbound_tx` for the engine's ingest gate (§3.6); a full
+///   or closed channel drops the batch (gossip is best-effort, anti-entropy heals — §6.1.8).
+/// - Outbound `request_events` calls are correlated by `OutboundRequestId` via `pending_outbound`,
+///   so the awaiting caller is woken when the matching response arrives (or fails).
+/// - Inbound `EventRequest`s are answered from the local store via [`EventSource`]: the lookup
+///   runs on `spawn_blocking` so the swarm loop never blocks, and the response is sent back
+///   through `self_tx` as `Command::RespondEvents` so `send_response` happens on the swarm task
+///   with `&mut Swarm` in hand. A separate `self_rx` is drained alongside `cmd_rx` (split into
+///   two channels so `cmd_rx` closes cleanly on external-handle shutdown).
 ///
-/// TODO(libp2p-verify): the `SwarmEvent`/`CredaBehaviourEvent` match arms are version-sensitive
-/// (the generated `CredaBehaviourEvent` variant names track the behaviour field names). The
-/// request_response and Kademlia arms still need correlation maps (keyed by `OutboundRequestId` /
-/// `QueryId`) to complete `request_events` / `dht_find_providers`, and an `EventSource` hook to
-/// answer inbound `EventRequest`s from the local store — both tracked for the test bed (DQ-3).
+/// TODO(libp2p-verify): the exact `SwarmEvent`/`request_response::Event` field names are tied to
+/// libp2p 0.54 (`Message::Request{request_id, request, channel}` / `Message::Response{request_id,
+/// response}` / `Event::OutboundFailure{request_id, error, ..}`). Kademlia query correlation
+/// (`QueryId` for get_providers) is still pending — see the kad arm.
 async fn run_swarm(
     mut swarm: Swarm<CredaBehaviour>,
     mut cmd_rx: mpsc::Receiver<Command>,
+    self_tx: mpsc::Sender<Command>,
+    mut self_rx: mpsc::Receiver<Command>,
     inbound_tx: mpsc::Sender<Vec<u8>>,
+    source: Arc<dyn EventSource>,
 ) {
+    // Outbound request_response correlation: completed when the matching response (or failure)
+    // arrives. Dropped on shutdown — pending callers see "swarm dropped the reply".
+    let mut pending_outbound: HashMap<
+        OutboundRequestId,
+        oneshot::Sender<Result<Vec<IdentityEventNode>>>,
+    > = HashMap::new();
+
     loop {
         tokio::select! {
             command = cmd_rx.recv() => {
-                let Some(command) = command else { break }; // all handles dropped
-                handle_command(&mut swarm, command);
+                let Some(command) = command else { break }; // all external handles dropped
+                handle_command(&mut swarm, &mut pending_outbound, command);
+            }
+            command = self_rx.recv() => {
+                if let Some(command) = command {
+                    handle_command(&mut swarm, &mut pending_outbound, command);
+                }
             }
             event = swarm.select_next_some() => {
                 match event {
@@ -283,12 +316,54 @@ async fn run_swarm(
                         // Deliver the received gossip batch to the engine's ingest path.
                         let _ = inbound_tx.try_send(message.data);
                     }
-                    // TODO(libp2p-verify): answer inbound EventRequests from the local store and
-                    // complete pending request_response responses (correlate by OutboundRequestId).
-                    SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(ev)) => {
-                        let _ = ev;
+
+                    // Inbound EventRequest from a peer: gather events from the local store and
+                    // send the response (via self_tx so the actual send_response runs on the
+                    // swarm task). spawn_blocking keeps the swarm event loop responsive.
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            message: Message::Request { request, channel, .. },
+                            ..
+                        },
+                    )) => {
+                        let source = source.clone();
+                        let self_tx = self_tx.clone();
+                        let ids = request.ids;
+                        tokio::spawn(async move {
+                            let events = tokio::task::spawn_blocking(move || source.get_events(&ids))
+                                .await
+                                .unwrap_or_default();
+                            let _ = self_tx
+                                .send(Command::RespondEvents { channel, events })
+                                .await;
+                        });
                     }
-                    // TODO(libp2p-verify): complete get_providers queries (correlate by QueryId).
+
+                    // Outbound EventRequest completed: deliver to the awaiting caller.
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            message: Message::Response { request_id, response },
+                            ..
+                        },
+                    )) => {
+                        if let Some(tx) = pending_outbound.remove(&request_id) {
+                            let _ = tx.send(Ok(response.events));
+                        }
+                    }
+
+                    // Outbound request failed (timeout, disconnect, …): error the awaiting caller.
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(
+                        request_response::Event::OutboundFailure { request_id, error, .. },
+                    )) => {
+                        if let Some(tx) = pending_outbound.remove(&request_id) {
+                            let _ = tx.send(Err(Error::Transport(format!(
+                                "request_response outbound failure: {error}"
+                            ))));
+                        }
+                    }
+
+                    // TODO(libp2p-verify): complete get_providers queries (correlate by QueryId)
+                    // and surface kad routing updates.
                     SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(ev)) => {
                         let _ = ev;
                     }
@@ -299,7 +374,11 @@ async fn run_swarm(
     }
 }
 
-fn handle_command(swarm: &mut Swarm<CredaBehaviour>, command: Command) {
+fn handle_command(
+    swarm: &mut Swarm<CredaBehaviour>,
+    pending_outbound: &mut HashMap<OutboundRequestId, oneshot::Sender<Result<Vec<IdentityEventNode>>>>,
+    command: Command,
+) {
     match command {
         Command::Subscribe { bucket, reply } => {
             let topic = gossipsub::IdentTopic::new(topic_for_bucket(bucket));
@@ -352,20 +431,29 @@ fn handle_command(swarm: &mut Swarm<CredaBehaviour>, command: Command) {
             let _ = reply.send(Ok(Vec::new()));
         }
         Command::RequestEvents { peer, ids, reply } => {
-            // TODO(libp2p-verify): like the DHT query, request_response is async — the response
-            // arrives as a later behaviour event. A production impl correlates by OutboundRequestId.
+            // send_request returns immediately with an OutboundRequestId; the reply Sender is
+            // parked in pending_outbound and completed when the matching response event arrives
+            // (or OutboundFailure errors it). This is the await-able half of anti-entropy.
             match peer_id_from_bytes(&peer) {
                 Ok(peer_id) => {
-                    swarm
+                    let request_id = swarm
                         .behaviour_mut()
                         .request_response
                         .send_request(&peer_id, EventRequest { ids });
-                    let _ = reply.send(Ok(Vec::new()));
+                    pending_outbound.insert(request_id, reply);
                 }
                 Err(e) => {
                     let _ = reply.send(Err(e));
                 }
             }
+        }
+        Command::RespondEvents { channel, events } => {
+            // send_response returns the response back if the channel is closed (peer gone); drop.
+            // TODO(libp2p-verify): consider surfacing this as a transport-level warn metric.
+            let _ = swarm
+                .behaviour_mut()
+                .request_response
+                .send_response(channel, EventResponse { events });
         }
     }
 }
