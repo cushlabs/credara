@@ -27,6 +27,17 @@ config:
   snapshotIntervalSecs: 21600            # 6h (§7.3.3)
   subscribedBuckets: []
 
+# Participant key registry: the trust-framework admission list used to authenticate received
+# events at ingest (§3.6). When `configMapName` is set, that ConfigMap is mounted read-only at
+# /etc/creda/participants and CREDA_PARTICIPANT_REGISTRY points the daemon at it. The ConfigMap
+# entries are participant files of the form `<algorithm> <hex-public-key>` (e.g. one per
+# institution). Leave empty for no admitted participants — inbound replication refuses everything
+# until the registry is populated. How the ConfigMap is *populated* (UDAP/TEFCA sync,
+# cert-chain validation, rotation, revocation) is an open question (App C); provide it out of
+# band, via an operator/sidecar, or by hand for the test bed.
+participantRegistry:
+  configMapName: ""
+
 # Secrets are referenced, never embedded (§10.6.5): create these k8s Secrets out-of-band.
 secrets:
   udapCertSecret: creda-udap-cert        # institutional UDAP certificate + key

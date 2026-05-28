@@ -53,6 +53,9 @@ spec:
             - { name: uds, mountPath: /var/run/creda }
             - { name: data, mountPath: {{ .Values.config.dataDir }} }
             - { name: tmp, mountPath: /tmp }
+            {{- if .Values.participantRegistry.configMapName }}
+            - { name: participants, mountPath: /etc/creda/participants, readOnly: true }
+            {{- end }}
         # ---- HAPI FHIR Bridge (Java) ----
         - name: hapi-bridge
           image: {{ include "creda.bridgeImage" . }}
@@ -78,6 +81,13 @@ spec:
         # readOnlyRootFilesystem (DQ-1) requires explicit writable scratch.
         - { name: tmp, emptyDir: {} }
         - { name: tmp-bridge, emptyDir: {} }
+        {{- if .Values.participantRegistry.configMapName }}
+        # Admitted-participant key files (provided out-of-band; App C open question).
+        - name: participants
+          configMap:
+            name: {{ .Values.participantRegistry.configMapName | quote }}
+            optional: false
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}

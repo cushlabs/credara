@@ -10,3 +10,6 @@ data:
   CREDA_LIBP2P_LISTEN: {{ .Values.config.libp2pListen | quote }}
   CREDA_DEFAULT_POSTURE: {{ .Values.config.defaultPosture | quote }}
   CREDA_SNAPSHOT_INTERVAL_SECS: {{ .Values.config.snapshotIntervalSecs | quote }}
+  {{- if .Values.participantRegistry.configMapName }}
+  CREDA_PARTICIPANT_REGISTRY: "/etc/creda/participants"
+  {{- end }}

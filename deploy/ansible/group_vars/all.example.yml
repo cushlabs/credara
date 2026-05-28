@@ -18,3 +18,12 @@ creda_values:
   persistence:
     size: 50Gi
     storageClass: ""   # "" = cluster default; set for cloud (e.g. gp3) or on-prem
+  # Participant key registry — admitted institutions' public keys for ingest authentication
+  # (§3.6). Provide the ConfigMap out-of-band, e.g.
+  #   kubectl create cm creda-participants -n creda \
+  #     --from-file=mercy.key=mercy.key --from-file=lakeside.key=lakeside.key
+  # Each file is "<algorithm> <hex-public-key>" (e.g. "ed25519 3b6a..."). How the ConfigMap is
+  # *populated* (UDAP/TEFCA sync + cert validation + rotation/revocation) is an open question
+  # (App C). Leave commented out to start with no participants admitted.
+  # participantRegistry:
+  #   configMapName: creda-participants
