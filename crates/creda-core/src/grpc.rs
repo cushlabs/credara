@@ -363,7 +363,27 @@ pub fn serve(config: CredaConfig) -> Result<()> {
 
     runtime.block_on(async move {
         let store = RocksdbStore::open(&config.data_dir)?;
-        let signer = InMemorySigner::generate()?; // TODO: source key from k8s Secret/HSM (§10.1.4)
+        // Load the institutional signing key (§10.1.4): from the configured Secret/file path if
+        // set, otherwise generate an ephemeral one. The ephemeral fallback is useful for one-off
+        // dev runs but fatal in production (institution_id would change per restart, breaking
+        // other peers' trust); we log loudly when it's hit.
+        let signer = match config.signing_key_path.as_deref() {
+            Some(path) => {
+                eprintln!("creda serve: loading Ed25519 signing key from {path}");
+                InMemorySigner::from_ed25519_secret_file(path).map_err(|e| {
+                    Error::Config(format!("loading signing key from {path}: {e}"))
+                })?
+            }
+            None => {
+                eprintln!(
+                    "creda serve: WARNING — no signing_key_path configured; generating an \
+                     ephemeral key. The institution_id will change on every restart. Set \
+                     CREDA_SIGNING_KEY_PATH (or [signing_key_path] in config) to a Secret-mounted \
+                     file in production."
+                );
+                InMemorySigner::generate()?
+            }
+        };
         let core = Arc::new(CredaCore::new(Box::new(store), Box::new(signer), config.clone()));
         eprintln!(
             "creda serve: engine ready (events={}); listening on {}",
@@ -380,6 +400,10 @@ pub fn serve(config: CredaConfig) -> Result<()> {
         // wire a publish-on-create channel that drains into Replicator::publish_event.
         #[cfg(feature = "libp2p")]
         {
+            // Bring the NetworkTransport trait into scope so the AE scheduler can call
+            // `connected_peers()` on the concrete Libp2pTransport behind the Replicator.
+            use creda_net::NetworkTransport;
+
             // The transport asks this back when a peer sends a PeerRequest (events fetch or
             // manifest), so the swarm can answer from the local store (anti-entropy +
             // targeted-fetch transfer step, §6.1.5, §6.1.8). Held as Arc<dyn EventSource>;
@@ -389,7 +413,7 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             let (transport, mut inbound) =
                 creda_net::Libp2pTransport::generate_and_spawn(
                     &config.libp2p_listen,
-                    Vec::new(),
+                    config.bootstrap_peers.clone(),
                     event_source,
                 )
                 .await?;

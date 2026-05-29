@@ -163,7 +163,14 @@ impl Libp2pTransport {
         swarm
             .listen_on(listen_on)
             .map_err(|e| Error::Transport(format!("listen: {e}")))?;
+
+        // Print the local peer id so operators (and the testbed peer-multiaddr.sh helper) can
+        // grab it without a separate API call. The format is stable: `local libp2p peer id:
+        // <peer-id>` followed by the peer id; the testbed greps for `12D3KooW...`.
+        eprintln!("creda-net: local libp2p peer id: {local_peer_id}");
+
         for (peer, addr) in bootstrap {
+            eprintln!("creda-net: adding bootstrap peer {peer} at {addr}");
             swarm.behaviour_mut().kademlia.add_address(&peer, addr);
         }
 
@@ -186,22 +193,27 @@ impl Libp2pTransport {
     }
 
     /// Convenience constructor that hides libp2p types from callers (Creda Core): generate a
-    /// fresh Ed25519 identity, parse the listen multiaddr, and spawn. Returns the handle and the
-    /// inbound gossip-batch channel.
+    /// fresh Ed25519 identity, parse the listen multiaddr, parse the bootstrap multiaddrs, and
+    /// spawn. Returns the handle and the inbound gossip-batch channel.
+    ///
+    /// `bootstrap` entries are multiaddrs of the form `/ip4/.../tcp/.../p2p/<peer-id>` (the
+    /// trailing `/p2p/<peer-id>` segment is required so the address can be installed into the
+    /// Kademlia routing table). Entries that fail to parse are logged and skipped rather than
+    /// aborting startup, so a stale bootstrap list can't keep the peer from coming up.
     ///
     /// TODO(libp2p-verify): derive the identity from the institution signing key / SPIFFE SVID
-    /// rather than generating a throwaway one (§6.2.3), and parse `bootstrap` entries of the form
-    /// `/ip4/.../tcp/.../p2p/<peer-id>` into `(PeerId, Multiaddr)` pairs (left empty for now).
+    /// rather than generating a throwaway one (§6.2.3).
     pub async fn generate_and_spawn(
         listen: &str,
-        _bootstrap: Vec<String>,
+        bootstrap: Vec<String>,
         source: Arc<dyn EventSource>,
     ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let keypair = libp2p::identity::Keypair::generate_ed25519();
         let listen_on: Multiaddr = listen
             .parse()
             .map_err(|e| Error::Transport(format!("bad listen multiaddr {listen:?}: {e}")))?;
-        Self::spawn(keypair, listen_on, Vec::new(), source).await
+        let bootstrap = parse_bootstrap(&bootstrap);
+        Self::spawn(keypair, listen_on, bootstrap, source).await
     }
 
     async fn send<T>(&self, make: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
@@ -571,4 +583,75 @@ fn handle_command(
 
 fn peer_id_from_bytes(bytes: &[u8]) -> Result<PeerId> {
     PeerId::from_bytes(bytes).map_err(|e| Error::Transport(format!("bad peer id: {e}")))
+}
+
+/// Parse bootstrap multiaddrs of the form `/ip4/.../tcp/.../p2p/<peer-id>` into the
+/// `(PeerId, Multiaddr)` pairs Kademlia's routing table needs. The `/p2p/<peer-id>` segment is
+/// required — without it we can't tell Kademlia which peer the address belongs to. Entries that
+/// fail to parse are logged to stderr and skipped (a stale bootstrap list shouldn't break peer
+/// startup; the peer can still come up and discover peers via gossip mesh push).
+fn parse_bootstrap(addrs: &[String]) -> Vec<(PeerId, Multiaddr)> {
+    let mut out = Vec::with_capacity(addrs.len());
+    for s in addrs {
+        match parse_one_bootstrap(s) {
+            Ok(pair) => out.push(pair),
+            Err(e) => eprintln!("creda-net: skipping bootstrap peer {s:?}: {e}"),
+        }
+    }
+    out
+}
+
+fn parse_one_bootstrap(s: &str) -> std::result::Result<(PeerId, Multiaddr), String> {
+    let addr: Multiaddr = s.parse().map_err(|e| format!("bad multiaddr: {e}"))?;
+    // Walk the components; the last /p2p/<peer-id> is what we need. Strip it from the dial address
+    // so Kademlia stores the network-level address and the peer id separately.
+    let mut peer_id: Option<PeerId> = None;
+    let mut dial = Multiaddr::empty();
+    for proto in addr.iter() {
+        if let libp2p::multiaddr::Protocol::P2p(pid) = &proto {
+            peer_id = Some(*pid);
+        } else {
+            dial.push(proto);
+        }
+    }
+    let peer_id = peer_id
+        .ok_or_else(|| "missing /p2p/<peer-id> suffix; expected e.g. /ip4/1.2.3.4/tcp/4001/p2p/12D3KooW...".to_string())?;
+    Ok((peer_id, dial))
+}
+
+#[cfg(test)]
+mod bootstrap_tests {
+    use super::*;
+
+    #[test]
+    fn parse_strips_p2p_segment_and_extracts_peer_id() {
+        // A real peer-id-shaped string from libp2p's docs.
+        let s = "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp";
+        let (pid, dial) = parse_one_bootstrap(s).unwrap();
+        assert_eq!(pid.to_string(), "12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp");
+        assert_eq!(dial.to_string(), "/ip4/127.0.0.1/tcp/4001");
+    }
+
+    #[test]
+    fn parse_rejects_missing_p2p_suffix() {
+        let s = "/ip4/127.0.0.1/tcp/4001";
+        let err = parse_one_bootstrap(s).unwrap_err();
+        assert!(err.contains("missing /p2p"));
+    }
+
+    #[test]
+    fn parse_rejects_bad_multiaddr() {
+        assert!(parse_one_bootstrap("not-a-multiaddr").is_err());
+    }
+
+    #[test]
+    fn parse_bootstrap_skips_bad_entries() {
+        let inputs = vec![
+            "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp".into(),
+            "not-a-multiaddr".into(),
+            "/ip4/10.0.0.5/tcp/4001".into(), // missing /p2p
+        ];
+        let parsed = parse_bootstrap(&inputs);
+        assert_eq!(parsed.len(), 1, "only the well-formed entry survives");
+    }
 }

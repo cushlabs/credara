@@ -9,6 +9,11 @@ spec:
   selector: {{- include "creda.selectorLabels" . | nindent 4 }}
   ports:
     - { name: http, port: {{ .Values.ports.http }}, targetPort: http }
+    {{- if hasPrefix "tcp://" .Values.config.grpcSocket }}
+    # Core gRPC TCP (testbed + ops tooling). Reachable in-cluster as
+    # `<peer-name>-0.<release>-headless.<ns>.svc.cluster.local:<grpcPort>`.
+    - { name: grpc, port: {{ .Values.ports.grpc }}, targetPort: grpc }
+    {{- end }}
 ---
 # FHIR HTTP API (Bridge) — in-cluster.
 apiVersion: v1

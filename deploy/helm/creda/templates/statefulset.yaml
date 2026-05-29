@@ -38,6 +38,9 @@ spec:
           ports:
             - { name: libp2p, containerPort: {{ .Values.ports.libp2p }} }
             - { name: health, containerPort: {{ .Values.ports.health }} }
+            {{- if hasPrefix "tcp://" .Values.config.grpcSocket }}
+            - { name: grpc, containerPort: {{ .Values.ports.grpc }} }
+            {{- end }}
           livenessProbe:
             httpGet: { path: /livez, port: health }
             initialDelaySeconds: 10
@@ -55,6 +58,9 @@ spec:
             - { name: tmp, mountPath: /tmp }
             {{- if .Values.participantRegistry.configMapName }}
             - { name: participants, mountPath: /etc/creda/participants, readOnly: true }
+            {{- end }}
+            {{- if .Values.signingKey.secretName }}
+            - { name: signing-key, mountPath: /etc/creda/signing-key, readOnly: true }
             {{- end }}
         # ---- HAPI FHIR Bridge (Java) ----
         - name: hapi-bridge
@@ -87,6 +93,18 @@ spec:
           configMap:
             name: {{ .Values.participantRegistry.configMapName | quote }}
             optional: false
+        {{- end }}
+        {{- if .Values.signingKey.secretName }}
+        # Institutional signing key (§10.1.4). The Secret holds the raw 32-byte Ed25519 secret
+        # under the key `signing.key`; the daemon reads CREDA_SIGNING_KEY_PATH pointing at the
+        # mounted file.
+        - name: signing-key
+          secret:
+            secretName: {{ .Values.signingKey.secretName | quote }}
+            items:
+              - key: {{ .Values.signingKey.secretKey | quote }}
+                path: signing.key
+                mode: 0400
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

@@ -26,6 +26,10 @@ config:
   defaultPosture: treatment-presumed     # or deny-by-default (§9.3.2)
   snapshotIntervalSecs: 21600            # 6h (§7.3.3)
   subscribedBuckets: []
+  # Bootstrap peers — multiaddrs of the form `/ip4/.../tcp/.../p2p/<peer-id>` (§6.1.3).
+  # Empty for a single-peer or seed deployment; populated when joining an existing network.
+  # Rendered into CREDA_BOOTSTRAP_PEERS (comma-separated) by the ConfigMap.
+  bootstrapPeers: []
 
 # Participant key registry: the trust-framework admission list used to authenticate received
 # events at ingest (§3.6). When `configMapName` is set, that ConfigMap is mounted read-only at
@@ -38,6 +42,18 @@ config:
 participantRegistry:
   configMapName: ""
 
+# Institutional signing key (§10.1.4). The Secret must hold the raw 32-byte Ed25519 secret under
+# `secretKey`. Leave `secretName` empty for one-off dev runs (the daemon generates an ephemeral
+# key per startup and logs a loud warning — institution_id changes on every restart, which
+# breaks other peers' trust). Required for production.
+#
+# Create one with:
+#   head -c 32 /dev/urandom > signing.key
+#   kubectl create secret generic creda-signing-key --from-file=signing.key
+signingKey:
+  secretName: ""
+  secretKey: "signing.key"
+
 # Secrets are referenced, never embedded (§10.6.5): create these k8s Secrets out-of-band.
 secrets:
   udapCertSecret: creda-udap-cert        # institutional UDAP certificate + key
@@ -48,6 +64,7 @@ ports:
   http: 8080      # HAPI FHIR (Bridge), ClusterIP
   libp2p: 4001    # peer-to-peer (NodePort/LoadBalancer)
   health: 9090    # /livez /readyz /metrics (§10.5.3)
+  grpc: 50051     # Core gRPC TCP (testbed + ops). Only exposed when grpcSocket is "tcp://..."
 libp2pService:
   type: NodePort  # or LoadBalancer for cloud
 

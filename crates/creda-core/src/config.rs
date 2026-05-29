@@ -56,6 +56,16 @@ pub struct CredaConfig {
     /// inbound replication is refused. Populating it from a UDAP/TEFCA registry is an open
     /// question (App C); see [`crate::registry`].
     pub participant_registry: Option<String>,
+    /// libp2p bootstrap peers (§6.1.3) as multiaddrs of the form
+    /// `/ip4/.../tcp/.../p2p/<peer-id>`. Empty means rely on Kademlia random-walk / gossip mesh
+    /// push (works once the peer has any inbound connection). Populated for the testbed and for
+    /// new institutional peers joining an established network.
+    pub bootstrap_peers: Vec<String>,
+    /// Path to the institutional Ed25519 signing key (raw 32 bytes, §10.1.4). When `None`, the
+    /// daemon generates an ephemeral key per startup — fine for unit tests and CLI commands,
+    /// fatal for a peer that needs to be recognized across restarts (its institution_id would
+    /// change each time). Production mounts a k8s Secret at this path.
+    pub signing_key_path: Option<String>,
 }
 
 impl Default for CredaConfig {
@@ -69,6 +79,8 @@ impl Default for CredaConfig {
             snapshot_interval_secs: 6 * 3600,
             subscribed_buckets: Vec::new(),
             participant_registry: None,
+            bootstrap_peers: Vec::new(),
+            signing_key_path: None,
         }
     }
 }
@@ -83,6 +95,8 @@ struct Overlay {
     snapshot_interval_secs: Option<u64>,
     subscribed_buckets: Option<Vec<u64>>,
     participant_registry: Option<String>,
+    bootstrap_peers: Option<Vec<String>>,
+    signing_key_path: Option<String>,
 }
 
 impl CredaConfig {
@@ -122,6 +136,12 @@ impl CredaConfig {
         if let Some(v) = overlay.participant_registry {
             self.participant_registry = Some(v);
         }
+        if let Some(v) = overlay.bootstrap_peers {
+            self.bootstrap_peers = v;
+        }
+        if let Some(v) = overlay.signing_key_path {
+            self.signing_key_path = Some(v);
+        }
         Ok(())
     }
 
@@ -146,6 +166,18 @@ impl CredaConfig {
         }
         if let Ok(v) = std::env::var("CREDA_PARTICIPANT_REGISTRY") {
             self.participant_registry = Some(v);
+        }
+        if let Ok(v) = std::env::var("CREDA_BOOTSTRAP_PEERS") {
+            // Comma-separated multiaddrs; whitespace tolerated; empty entries skipped.
+            self.bootstrap_peers = v
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+                .collect();
+        }
+        if let Ok(v) = std::env::var("CREDA_SIGNING_KEY_PATH") {
+            self.signing_key_path = Some(v);
         }
         Ok(())
     }
@@ -212,5 +244,14 @@ default_posture = "deny-by-default"
             PostureSetting::DenyByDefault.to_graph(),
             creda_graph::DefaultPosture::DenyByDefault
         );
+    }
+
+    #[test]
+    fn bootstrap_peers_from_toml() {
+        let mut c = CredaConfig::default();
+        c.apply_toml(r#"bootstrap_peers = ["/ip4/10.0.0.1/tcp/4001/p2p/12D3KooWAlice", "/ip4/10.0.0.2/tcp/4001/p2p/12D3KooWBob"]"#)
+            .unwrap();
+        assert_eq!(c.bootstrap_peers.len(), 2);
+        assert!(c.bootstrap_peers[0].ends_with("12D3KooWAlice"));
     }
 }

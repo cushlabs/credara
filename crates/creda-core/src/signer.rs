@@ -45,6 +45,24 @@ impl InMemorySigner {
         })
     }
 
+    /// Load an Ed25519 signer from a file containing the raw 32-byte secret. This is how the
+    /// daemon picks up its institutional signing key from a k8s Secret mounted as a file
+    /// (§10.1.4). The file is expected to be exactly 32 bytes — no PEM wrapper, no hex encoding.
+    /// For the testbed and for `kubectl create secret generic --from-file=...`.
+    pub fn from_ed25519_secret_file<P: AsRef<std::path::Path>>(
+        path: P,
+    ) -> creda_events::Result<Self> {
+        let bytes = std::fs::read(path.as_ref()).map_err(|e| {
+            creda_events::Error::MalformedKey(format!(
+                "reading signing key file {:?}: {e}",
+                path.as_ref()
+            ))
+        })?;
+        Ok(Self {
+            key: SigningKey::ed25519_from_secret_bytes(&bytes)?,
+        })
+    }
+
     /// This signer's public verifying key — what a peer needs to authenticate events this signer
     /// produced (the value a [`crate::engine::VerifyingKeyResolver`] would return for our
     /// fingerprint).

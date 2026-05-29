@@ -112,6 +112,32 @@ pub enum VerifyingKey {
 }
 
 impl SigningKey {
+    /// Load an Ed25519 signing key from raw 32-byte secret material. Used by the daemon to load
+    /// its institutional signing key from a k8s Secret / file (§10.1.4). PQC algorithms are not
+    /// supported here yet — they need a separate keyspec because their secret material is much
+    /// larger and not a single fixed-size byte slice.
+    pub fn ed25519_from_secret_bytes(secret: &[u8]) -> Result<Self> {
+        let arr: [u8; 32] = secret.try_into().map_err(|_| {
+            Error::MalformedKey(format!(
+                "Ed25519 secret must be 32 bytes, got {}",
+                secret.len()
+            ))
+        })?;
+        Ok(SigningKey::Ed25519(Box::new(
+            ed25519_dalek::SigningKey::from_bytes(&arr),
+        )))
+    }
+
+    /// Raw Ed25519 secret bytes (for serializing to a Secret). Only defined for Ed25519 keys;
+    /// returns `None` for other algorithms.
+    pub fn ed25519_secret_bytes(&self) -> Option<[u8; 32]> {
+        match self {
+            SigningKey::Ed25519(sk) => Some(sk.to_bytes()),
+            #[cfg(feature = "pqc")]
+            _ => None,
+        }
+    }
+
     /// Generate a fresh key for the given algorithm using the OS CSPRNG.
     pub fn generate(algorithm: SignatureAlgorithm) -> Result<Self> {
         match algorithm {
