@@ -2145,6 +2145,63 @@ Once Creda has more than ~20 production deployments, a dedicated Kubernetes Oper
 
 The Operator is deferred — the Helm chart is sufficient for early deployments. The trigger for building the Operator is operational evidence: when institutions repeatedly file the same operational toil tickets, those become Operator features.
 
+#### 10.6.7 Maintenance Windows and Rolling Upgrades
+
+Creda is designed to be upgraded without coordinated network downtime. Upgrades happen at two scopes — within an institution (replacing the binaries running a single institution's peers) and across the network (introducing a new protocol or IG version). Each scope has different mechanics and different risks.
+
+**Within an institution.** A Creda StatefulSet uses the default `RollingUpdate` strategy with `podManagementPolicy: OrderedReady`. Replicas are rolled one at a time, oldest-to-newest, waiting for `/readyz` to return 200 before proceeding to the next. The `PodDisruptionBudget` (Section 10.6.5, `minAvailable: 1` by default) prevents the Kubernetes scheduler from evicting more replicas than the institution can tolerate during voluntary disruption — node drains, cluster upgrades, autoscaler scale-downs.
+
+For a multi-replica institution, a rolling Helm upgrade produces no externally-visible service interruption: surviving replicas continue accepting FHIR queries on the Bridge ClusterIP service and continue gossiping on the libp2p mesh. The rolled-out replica re-joins the mesh via the bootstrap flow (Section 11.1.2), catches up missed events via anti-entropy (Section 6.1.8) and, if absent for longer than the institutional snapshot interval, via snapshot bootstrap (Section 6.2.5).
+
+For a single-replica institution, a Helm upgrade produces a brief unavailability window — typically 30-60 seconds for image pull + bootstrap + ready transition. The PDB is non-binding in this configuration (it cannot keep one replica available if there is only one replica). Single-replica institutions should plan upgrades during low-traffic windows or scale to 2 replicas before initiating the upgrade.
+
+**Across the network.** Cross-version interop — a v1.0 peer talking to a v1.1 peer — depends on protocol version negotiation and capability advertising, which are partially specified in Section 10.8 and fully covered by **open question 13.6.2**. Until that question closes:
+
+- Minor version upgrades are additive only (Section 10.4.2). A v1.1 peer can read v1.0 events; a v1.0 peer encountering an unknown event type preserves it and propagates it but ignores it during local traversal (Section 3.4).
+- Major version upgrades are not yet supported as rolling network-wide events. They will be when Section 10.8 lands a formal capability negotiation handshake.
+
+**Operational practice for institutions:**
+
+- Pin Helm chart versions per release. Don't track `latest`.
+- Test the new chart version in a non-production namespace before rolling production.
+- Watch `creda_replication_lag_p99` for at least 30 minutes after rolling each replica — the rolled replica's catch-up dominates this signal during convergence.
+- Coordinate with the legal coordinator if rolling a peer that holds the Participant Registry write key (Section 10.7.3).
+
+The §10.5 conformance test suite (Section 10.5.4) includes a rolling-upgrade scenario that exercises the within-institution path. Cross-version conformance is part of the §13.6.2 closure deliverable.
+
+#### 10.6.8 Storage Class Guidance for On-Prem Deployments
+
+The default Helm chart leaves `storageClass` empty so the cluster's default StorageClass is used. For cloud deployments this almost always produces a reasonable PV (AWS EBS gp3, GCP pd-balanced, Azure Premium SSD). For on-premises deployments, the default may be NFS or a thin-provisioned SAN, and the storage characteristics matter enough to RocksDB's correctness and performance that operators should choose explicitly rather than accept the cluster default.
+
+**RocksDB durability assumptions.** RocksDB writes to its Write-Ahead Log (WAL) and SST files via `write` + `fsync`/`fdatasync`. Correctness depends on the underlying storage actually flushing to durable media when fsync returns — not merely returning quickly. A storage class that buffers writes and acks fsync before durability is established can corrupt the store on power loss or node failure.
+
+**Recommended storage classes.**
+
+- **Cloud-managed block storage**: AWS EBS gp3 (provision IOPS for compaction headroom, not gp2 burst baseline), GCP pd-balanced or pd-ssd, Azure Premium SSD. All honor fsync correctly.
+- **On-prem CSI block**: Longhorn, OpenEBS LocalPV, OpenEBS Mayastor, Ceph RBD, Portworx. All honor fsync correctly when configured with their default replication and consistency settings.
+- **ZFS-backed PVs** (e.g., OpenEBS ZFS-LocalPV) with `sync=standard` or `sync=always`. ZFS provides correct fsync semantics.
+- **Local PVs on xfs or ext4**, backed by enterprise-grade NVMe with power-loss-protected write cache. Acceptable for single-replica institutions; loses durability on disk failure unless paired with above-RocksDB replication (multiple peers).
+
+**Storage classes to avoid.**
+
+- **NFSv3**: known fsync edge cases under load. The NFS client may ack writes before the server has flushed to disk. Do not use for RocksDB.
+- **NFSv4 with `async` export**: same risk as NFSv3.
+- **GlusterFS**: fsync behavior is inconsistent across versions and configurations. Not recommended for embedded databases.
+- **btrfs as the underlying filesystem**: CoW semantics fight RocksDB's own copy-on-write strategy, producing pathological write amplification. RocksDB upstream guidance is to avoid btrfs.
+- **Naive ramdisk / `emptyDir`**: data loss on pod restart. Acceptable only for ephemeral development.
+
+**NFSv4 with `sync` export** can be made to work but is fragile. Operators choosing NFS should verify fsync behavior under load (e.g., via the `diskchecker.pl` test) before committing to it.
+
+**IOPS profile.** RocksDB compaction is bursty — long quiet periods punctuated by sustained 200-2000 IOPS bursts lasting tens of seconds. Storage classes with low IOPS baselines and burst tokens (AWS gp2, some on-prem thin-provisioned SANs) will produce visible query latency spikes during compaction. Provision for the burst, not the average. The default 50 GiB peer is comfortable on gp3 at 3000 IOPS (the gp3 baseline). Larger peers (200+ GiB) should provision proportionally.
+
+**Volume snapshots vs. application snapshots.** RocksDB tolerates CSI block-level snapshots most of the time because of WAL replay on restart, but tolerance is not a guarantee. The Creda peer ships an explicit application-aware snapshot mechanism (`creda snapshot`, Section 7.5, scheduled by default every 6 hours in the Helm chart). Operators should prefer the application snapshot for backups; reserve CSI volume snapshots for full-disaster restore scenarios where the peer is already offline.
+
+**Access mode.** RocksDB requires exclusive access to its data directory; the Helm chart sets `accessMode: ReadWriteOnce` accordingly. Do not change this to `ReadWriteMany`. A peer running with the same data directory mounted into two pods will corrupt the store.
+
+**Multi-AZ replication via storage** is not a substitute for running multiple peers. A multi-AZ EBS-replicated volume protects against AZ failure but does not protect against Creda-level data loss (e.g., a corrupt event accepted by the peer and committed to disk). Running multiple StatefulSet replicas — each with its own PV — is the architectural answer to peer-level durability.
+
+**Tested storage class matrix** (to be expanded as pilots report data) is maintained in the Helm chart `values.yaml` comments. As of v1.0, the matrix lists AWS gp3, OpenEBS LocalPV, and Longhorn as confirmed-working under the conformance suite's storage scenarios.
+
 ### 10.7 Participant Registry Service (Network-Level)
 
 The Participant Registry is a Creda subgraph (per Section 6.1.3 — the meta-DAG of who is in the network), but the *operational service* maintaining it is a real deployed component, separate from any participating institution's peer. This service is operated by the network's **legal coordinator** — typically an HIE, a nonprofit, or a multi-institution consortium.
@@ -2191,6 +2248,74 @@ The coordinator role is not technically privileged within Creda — it is a desi
 3. The old coordinator's key is retired but historical events signed by it remain valid.
 
 This makes the coordinator role recoverable — if the current coordinator becomes unable or unwilling to perform the role, governance can transition to a new one without disrupting the network. The transition does require coordination among participating institutions (since they need to update their trust configuration to recognize the new coordinator's key), but the protocol supports it natively.
+
+### 10.8 Protocol Versioning and Capability Negotiation
+
+Creda is designed to outlive its founding cryptographic primitives, FHIR Implementation Guide versions, and protocol decisions. That commitment requires explicit mechanisms for peers running different versions to coexist, advertise what they support, and gracefully degrade when they encounter messages they don't understand. This section specifies the versioning surface and the negotiation handshake. **Note:** the design space is partially open per Section 13.6.2; this section captures the design direction so implementation can begin, with the closure deliverable refining the details.
+
+#### 10.8.1 Versioning Surfaces
+
+Creda has three independent versioning surfaces, each with its own evolution rate:
+
+- **Protocol version**: the wire format and behavioral contract of peer-to-peer messages (gossip batches, request-response payloads, DHT records). Bumped on breaking changes to the wire format. Expected to evolve slowly — months to years between bumps.
+- **Event schema version**: the canonical-CBOR schema of `IdentityEventNode` and the `EventPayload` enum. Bumped when adding new event types (additive, minor bump) or changing existing payload structure (breaking, major bump). The event-type enum is extensible by design (Section 3.4); new types are minor bumps.
+- **IG version**: the FHIR Implementation Guide version the peer implements. Tracks US Core baseline progression (R4 → R5 → R6 as the ecosystem moves, Section 13.6.1).
+
+Each surface uses semantic versioning. Bumps to one surface are independent of bumps to the others. A peer running Protocol v1.2 + Event Schema v1.1 + IG v1.0 is a valid configuration.
+
+#### 10.8.2 The CapabilityProfile
+
+A peer advertises its capability profile in three places:
+
+1. **libp2p identify protocol** — on every new connection, peers exchange identify payloads. Creda extends the standard identify with a CBOR-encoded `CredaCapabilityProfile`:
+
+```
+struct CredaCapabilityProfile {
+    protocol_versions: Vec<SemVer>,      // protocol versions this peer can speak
+    event_schema_version: SemVer,        // event schema version
+    supported_event_types: Vec<EventTypeTag>,  // includes any extension types
+    supported_signature_algorithms: Vec<SignatureAlgorithm>,
+    supported_hash_algorithms: Vec<HashAlgorithm>,
+    ig_version: SemVer,                  // FHIR IG version
+    peer_role: PeerRole,                 // Full, Light, Observer (Section 12.3.4)
+    feature_flags: Vec<FeatureFlag>,     // forward-compat for opt-in features
+}
+```
+
+2. **FHIR CapabilityStatement** — served at `/fhir/metadata` by the Bridge. The standard FHIR mechanism, extended with a `creda-capability-profile` extension that mirrors the libp2p profile.
+
+3. **Participant Registry event** — when an institution updates its capability profile materially (new event type support, new IG version, new signature algorithm), it publishes a `CapabilityAdvertisement` event. This propagates via normal gossip so other institutions know what to expect even before establishing a libp2p connection.
+
+#### 10.8.3 Negotiation Handshake
+
+When two peers connect:
+
+1. They exchange `CredaCapabilityProfile` via the extended identify protocol.
+2. Each peer computes the **intersection set** — the highest mutually-supported protocol version, the union of supported event types (each peer ignores unknown types per Section 3.4), and the union of supported signature algorithms (each peer verifies signatures with algorithms it admits; rejects events signed only with algorithms it does not admit).
+3. If the intersection is empty for the protocol version, the connection is terminated cleanly with a `version-mismatch` error. This should never happen in a healthy network — major version bumps are coordinated network events.
+4. If the intersection is non-empty, the peers proceed with the highest mutually-supported protocol version.
+
+The peer that initiated the connection logs a `creda_capability_mismatch_total` metric labeled by the mismatch category (event type, signature algorithm, IG version). Operators monitor this metric to detect peers that are running materially behind the network or materially ahead.
+
+#### 10.8.4 Forward and Backward Compatibility
+
+The protocol is designed so that adjacent minor versions are always interoperable:
+
+- **Unknown event types** are preserved and propagated; they are not rejected and they are not lost. A v1.0 peer that receives a v1.1 event type stores it, gossips it, and skips it during local subgraph traversal. When the peer is upgraded to v1.1, the event becomes interpretable.
+- **Unknown payload fields** are preserved in the CBOR encoding because canonical CBOR (RFC 8949) preserves map ordering and unknown keys are not dropped during round-trip. A v1.0 peer signing a v1.1-format event would lose the unknown fields; for this reason, a peer only authors events under its own schema version, never under a future version.
+- **Unknown signature algorithms** cause the receiving peer to log an `unverifiable-algorithm` warning and refuse to admit the event to the local store. The event still propagates to other peers (which may be able to verify it). The receiving peer's view is incomplete but not corrupt.
+- **Unknown feature flags** are ignored. Feature flags are opt-in and additive; a v1.0 peer that doesn't understand `feature:patient-portable-passkey` simply doesn't enable that feature.
+
+The hard floor is that breaking changes to the addressing primitive (UUIDv7 event ids), to the canonical CBOR encoding rules, or to the trust-anchor chain (Participant Registry signature chain back to the coordinator) require a coordinated major version bump and a transition window. The spec commits to providing at least a six-month transition window for any such bump, during which both versions are network-supported.
+
+#### 10.8.5 Code Surface
+
+Implementation lives in two crates:
+
+- `creda-events` exports `SchemaVersion` and `CapabilityProfile`. The existing `SignatureAlgorithm` and `HashAlgorithm` enums already support algorithm-agile signing and hashing; this section just formalizes their advertising surface.
+- `creda-net` extends the libp2p `identify` configuration to attach the CBOR-encoded profile and dispatches a `capability_mismatch` event to Core when the intersection is empty or materially narrow.
+
+This section partially closes the design surface of **open question 13.6.2**. The remaining open items — exact semver rules for the IG bumps, the transition-window mechanics for major version bumps, the coordinator's role in advertising network-wide deprecation events — are tracked in the §13.6.2 closure deliverable.
 
 ## 11. Operations
 
@@ -2547,6 +2672,77 @@ Key topics to cover in the full runbook:
 - **Incident response**: procedures for coordinator key compromise (Section 11.3.4), governance disputes, and other coordinator-specific incidents.
 
 The coordinator role is critical to network trust; the runbook should be developed before the network's first production deployment and reviewed annually by the governance body.
+
+### 11.6 Cryptographic Algorithm Migration
+
+Creda is designed to outlive its founding cryptographic primitives (Section 2.2, Section 5.1.2). This section specifies the operational workflow for rotating to a new signature algorithm or content-hash algorithm without disrupting the network and without invalidating historical events. The mechanism is mechanically supported by the algorithm-agile signature and hash types — this section is the operational runbook layered on top.
+
+#### 11.6.1 Why Algorithm Migration Is Not a Schema Migration
+
+A key architectural property earned in Section 5.1: events are addressed by `UUIDv7`, not by content hash. The `content_hash` field is a tamper-detection mechanism over the canonical payload at creation time; it is not the addressing primitive, and DAG parent edges reference `UUIDv7` not hash. Three consequences:
+
+- **Hash algorithm rotation does not invalidate event ids.** Re-hashing a historical event under a new algorithm changes its content hash but not its id. Parent references in downstream events remain valid.
+- **Signature algorithm rotation does not require re-signing existing events.** Old signatures remain valid under the algorithm that produced them. New events are signed under the new algorithm. Verifiers walk both.
+- **There is no schema migration step.** No event is rewritten in place. Algorithm rotation is purely additive: new events use the new algorithm, optionally accompanied by `Attest` events that add a new-algorithm signature layer over historical events.
+
+This is why Creda can commit to PQC readiness "from day one, not a future migration" (Section 5.1.2 line 383) — the migration is workflow, not schema surgery.
+
+#### 11.6.2 Hash Algorithm Rotation
+
+The `ContentHash` struct (`crates/creda-events/src/hash.rs`) carries `{ algorithm: HashAlgorithm, digest: Vec<u8> }`. New events publish under the institution's configured hash algorithm; receivers verify whichever algorithm is in the field as long as their verifier admits it.
+
+Operational sequence to introduce a new hash algorithm (e.g., Blake3 → SHA3-256 for a future quantum guidance update):
+
+1. **Coordinator advertises support.** The legal coordinator publishes a `CapabilityAdvertisement` event (Section 10.8.2) indicating that the network now admits the new algorithm. This propagates via normal gossip.
+2. **Institutions update verifiers.** Each peer's hash-verification policy is extended to admit the new algorithm. This is a Helm value (`config.admittedHashAlgorithms`) plus a rolling restart. Until all peers have been updated, only the original algorithm is universally verifiable.
+3. **Institutions opt into authoring with the new algorithm.** Once verifier rollout is confirmed via the `creda_hash_algorithm_admitted_total` metric, institutions individually switch their authoring algorithm by Helm value.
+4. **Monitoring.** The coordinator monitors `creda_capability_mismatch_total{category="hash-algorithm"}` to detect peers still on the old verifier policy.
+5. **Deprecation (years later).** Once adoption is universal, the coordinator publishes a `HashAlgorithmDeprecation` event with a cutoff date. After the cutoff, peers reject newly-authored events under the deprecated algorithm. Historical events under the deprecated algorithm remain valid forever — deprecation is forward-looking only.
+
+Steps 2 and 3 are deliberately decoupled. Verification capability is admitted first; authoring under the new algorithm follows only after verification is universal. This prevents a fast institution from authoring events that slow institutions cannot verify.
+
+#### 11.6.3 Signature Algorithm Rotation
+
+The same staged pattern applies to signature algorithms (`Ed25519` → `MlDsa65` → `Ed25519MlDsa65` hybrid → `SlhDsa256s`), with one additional consideration: signing keys are tied to participant identity in the Participant Registry (Section 3.6). Rotating signature algorithms requires rotating the registered public key.
+
+Operational sequence:
+
+1. **Coordinator advertises support.** As in §11.6.2 step 1, but for `SignatureAlgorithm`.
+2. **Institutions update verifiers.** Helm value `config.admittedSignatureAlgorithms` includes the new algorithm. Rolling restart.
+3. **Institutions generate new keypairs in the new algorithm.** HSM/KMS-backed where possible (Section 10.1.4). The new public key is registered in the Participant Registry via a `ParticipantKeyRotation` event signed by the old key. After this event propagates, both keys are admitted for the same participant.
+4. **Institutions switch authoring to the new key.** New events are signed with the new algorithm. Old events remain valid under the old key (which is still in the registry as a historical admitted key).
+5. **Old key retirement.** After a transition window (default: 90 days), the institution publishes a `ParticipantKeyRetirement` event for the old key. The old key is no longer accepted for newly-authored events but remains valid for verifying historical events.
+
+The `Ed25519MlDsa65` hybrid mode is the recommended interim state: events are signed with both algorithms, and verifiers require both to verify. This provides PQC protection while keeping classical verification working for tooling that hasn't yet been upgraded.
+
+#### 11.6.4 Bulk Attest-Resigning of Historical Chains
+
+The "harvest now, decrypt later" defense (Section 5.1.2 line 410) calls for institutions to optionally re-sign historical critical events under a PQC algorithm via `Attest` events that reference the original. This is a workflow, not a schema change. The events being attested are not rewritten — new `Attest` events are added to the DAG referencing them.
+
+Operational guidance:
+
+- **Scope selection.** Institutions choose which historical chains warrant retroactive PQC signatures. Recommended priority: high-confidence Link events, ExportReceipt chains for federal-program data, DeceasedDeclaration events. Not every Assert needs retroactive attestation.
+- **Throttle.** Bulk Attest publication respects the §6.2.4 rate limit (default 100 events/sec/peer). The Argo Workflow for bulk Attest mirrors the §11.3.5 tombstone workflow pattern: an Argo job iterates the scope, generates `Attest` events at the configured rate, and pauses for downstream processing.
+- **Coordinator coordination optional.** Unlike tombstone waves, bulk Attest does not affect other institutions' operational state (Attest events are additive, not destructive), so coordinator awareness is optional rather than required.
+- **Per-event throttle.** Each generated `Attest` carries `target_event_ids: Vec<UUIDv7>` (Section 5.1.3) and can attest up to several thousand events per Attest. Batching reduces gossip overhead but increases the blast radius if a single Attest is malformed.
+
+The reference Attest-resign tool is published alongside Creda Core as `creda attest --algorithm ml-dsa-65 --scope <selector>`. It is idempotent: re-running the tool over the same scope does not produce duplicate Attests if the events have already been attested under the target algorithm.
+
+#### 11.6.5 Metrics and Monitoring
+
+The following metrics surface algorithm-migration progress and risk:
+
+- `creda_events_authored_by_signature_algorithm_total{algorithm}` — counter of events authored by this peer per algorithm.
+- `creda_events_admitted_by_signature_algorithm_total{algorithm}` — counter of inbound events successfully verified per algorithm.
+- `creda_events_rejected_by_unverifiable_algorithm_total` — counter of inbound events refused because no admitted algorithm matched.
+- `creda_hash_algorithm_admitted_total{algorithm}` — gauge: is this algorithm in the local verifier admission set.
+- `creda_attest_resign_progress` — gauge: fraction of in-scope historical events that have a PQC Attest layer (if the institution is running an Attest-resign campaign).
+
+Sustained `creda_events_rejected_by_unverifiable_algorithm_total > 0` is an early warning that the network is heterogeneous in admitted algorithms — the institution is either ahead of the deprecation curve (still admitting only old algorithms) or behind it (peers have moved to a new algorithm that this one does not admit). Operators reconcile via the staged sequence above.
+
+#### 11.6.6 Relationship to Open Questions
+
+This section closes the *operational* portion of Section 5.1.2's PQC commitment. The remaining open items — exact NIST guidance timing for raising the quantum-security floor above 128-bit, the specific cutoff date for Ed25519-only deprecation, and the patient-side keypair migration story (Section 9.1.6) — depend on external standards bodies and pilot data, and are tracked separately. The mechanical foundation (algorithm-agile types, verifier policy, Attest-based retroactive signing) is complete in code and specified here in operations.
 
 ## 12. Migration and Adoption Path
 
@@ -3108,6 +3304,8 @@ Each question includes the relevant section, a description of what is unresolved
 **Why it's open:** We have not yet versioned the protocol or the IG. Versioning conventions, backward compatibility guarantees, and capability negotiation patterns need explicit design.
 
 **Closure condition:** Versioning and compatibility design document, published before v1.1. Cover: semantic versioning rules for the IG, the protocol, and the CapabilityStatement; backward compatibility commitments; deprecation policies; how peers advertise supported versions and how clients handle mixed-version networks.
+
+**Partial closure:** Section 10.8 (added post-initial-publication) specifies the three versioning surfaces (protocol, event schema, IG), the `CredaCapabilityProfile` advertised on libp2p identify and in the FHIR CapabilityStatement, and the negotiation handshake. Remaining open: exact semver rules per surface, transition-window mechanics for major version bumps, and the coordinator's role in advertising network-wide deprecation events.
 
 ### 13.7 Adoption and Operations
 
