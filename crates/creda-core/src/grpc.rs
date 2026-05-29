@@ -380,9 +380,10 @@ pub fn serve(config: CredaConfig) -> Result<()> {
         // wire a publish-on-create channel that drains into Replicator::publish_event.
         #[cfg(feature = "libp2p")]
         {
-            // The transport asks this back when a peer sends an EventRequest, so the swarm can
-            // answer from the local store (anti-entropy + targeted-fetch transfer step, §6.1.5,
-            // §6.1.8). Held as Arc<dyn EventSource>; called on spawn_blocking inside the adapter.
+            // The transport asks this back when a peer sends a PeerRequest (events fetch or
+            // manifest), so the swarm can answer from the local store (anti-entropy +
+            // targeted-fetch transfer step, §6.1.5, §6.1.8). Held as Arc<dyn EventSource>;
+            // called on spawn_blocking inside the adapter.
             let event_source: Arc<dyn creda_net::EventSource> =
                 Arc::new(CoreEventSource { core: core.clone() });
             let (transport, mut inbound) =
@@ -444,14 +445,47 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             });
             publisher = Some(Arc::new(ChannelPublisher { tx: pub_tx }) as Arc<dyn EventPublisher>);
 
+            // Anti-entropy peer-exchange scheduler (§6.1.8 backstop): every AE_INTERVAL_SECS,
+            // ask the transport for connected peers, pick a small sample, and drive a full
+            // round per peer (manifest -> reconcile -> request_events -> ingest). Gossip is
+            // best-effort; this is what guarantees eventual consistency under loss/partition.
+            const AE_INTERVAL_SECS: u64 = 30;
+            const AE_FANOUT: usize = 3;
+            let repl_ae = replicator.clone();
+            tokio::spawn(async move {
+                let mut tick = tokio::time::interval(std::time::Duration::from_secs(AE_INTERVAL_SECS));
+                // Skip the immediate first tick; let connections settle.
+                tick.tick().await;
+                loop {
+                    tick.tick().await;
+                    let peers = match repl_ae.transport().connected_peers().await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("creda serve: AE could not list connected peers: {e}");
+                            continue;
+                        }
+                    };
+                    for peer in peers.into_iter().take(AE_FANOUT) {
+                        match repl_ae.run_anti_entropy_round(&peer).await {
+                            Ok(s) => {
+                                if s.accepted > 0 || s.rejected > 0 {
+                                    eprintln!(
+                                        "creda serve: AE round accepted={} duplicates={} rejected={}",
+                                        s.accepted, s.duplicates, s.rejected
+                                    );
+                                }
+                            }
+                            Err(e) => eprintln!("creda serve: AE round error: {e}"),
+                        }
+                    }
+                }
+            });
+
             eprintln!(
-                "creda serve: libp2p replication active (listen={}, buckets={})",
+                "creda serve: libp2p replication active (listen={}, buckets={}, AE every {AE_INTERVAL_SECS}s)",
                 config.libp2p_listen,
                 config.subscribed_buckets.len()
             );
-            // NOTE: the anti-entropy peer-exchange loop + request_response/DHT QueryId correlation
-            // + inbound EventRequest answering are the remaining hooks — they land with the
-            // multi-peer test bed (DQ-3), which can drive real peers.
         }
         #[cfg(not(feature = "libp2p"))]
         {
@@ -462,9 +496,10 @@ pub fn serve(config: CredaConfig) -> Result<()> {
     })
 }
 
-/// Backs the libp2p adapter's inbound EventRequest answering with the engine's local store: when
-/// a peer requests events by id, the swarm asks here (on `spawn_blocking`) and sends back what
-/// we have. Missing events are omitted (no "not found"), matching anti-entropy semantics.
+/// Backs the libp2p adapter's inbound PeerRequest answering with the engine's local store: when
+/// a peer asks for events by id OR for our manifest (all event ids), the swarm asks here (on
+/// `spawn_blocking`) and sends back what we have. Missing events are omitted (no "not found"),
+/// matching anti-entropy semantics.
 #[cfg(feature = "libp2p")]
 struct CoreEventSource {
     core: Arc<CredaCore>,
@@ -477,6 +512,9 @@ impl creda_net::EventSource for CoreEventSource {
         ids: &[creda_events::EventId],
     ) -> Vec<creda_events::IdentityEventNode> {
         self.core.get_events(ids).unwrap_or_default()
+    }
+    fn all_event_ids(&self) -> Vec<creda_events::EventId> {
+        self.core.all_event_ids().unwrap_or_default()
     }
 }
 

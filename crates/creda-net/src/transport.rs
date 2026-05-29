@@ -59,6 +59,19 @@ pub trait NetworkTransport {
         ids: &[EventId],
     ) -> impl std::future::Future<Output = Result<Vec<IdentityEventNode>>> + Send;
 
+    /// Ask a peer for its local UUID set — the manifest exchange step of anti-entropy (§6.1.8).
+    /// Used by the daemon's periodic anti-entropy round to compute the reconciliation delta
+    /// before fetching the missing events with [`Self::request_events`].
+    fn request_manifest(
+        &self,
+        peer: &[u8],
+    ) -> impl std::future::Future<Output = Result<Vec<EventId>>> + Send;
+
+    /// The peer ids this peer is currently connected to (as bytes). Used by the daemon to pick
+    /// targets for the anti-entropy round. Empty if no connections.
+    fn connected_peers(&self)
+        -> impl std::future::Future<Output = Result<Vec<Vec<u8>>>> + Send;
+
     /// This peer's own libp2p peer id, as bytes.
     fn local_peer_id(&self) -> Vec<u8>;
 }
@@ -73,4 +86,6 @@ pub trait NetworkTransport {
 /// omitted from the result — there is no "not found" error.
 pub trait EventSource: Send + Sync + 'static {
     fn get_events(&self, ids: &[EventId]) -> Vec<IdentityEventNode>;
+    /// All event ids held locally — used to answer an anti-entropy manifest request (§6.1.8).
+    fn all_event_ids(&self) -> Vec<EventId>;
 }

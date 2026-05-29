@@ -141,10 +141,18 @@ impl<T: NetworkTransport> Replicator<T> {
         Ok(summary)
     }
 
+    /// End-to-end anti-entropy round against `peer` (§6.1.8): fetch the peer's manifest (its
+    /// UUID set), reconcile against our local store, fetch what we're missing, and ingest
+    /// through the signature gate. This is what the daemon's periodic AE scheduler calls.
+    pub async fn run_anti_entropy_round(&self, peer: &[u8]) -> Result<IngestSummary> {
+        let remote_ids = self.transport.request_manifest(peer).await?;
+        self.anti_entropy(peer, &remote_ids).await
+    }
+
     /// One anti-entropy round against `peer`, given the peer's set of event ids (§6.1.8). We
     /// fetch the events we are missing and ingest them through the same signature gate. Events
     /// the *peer* is missing are served when it runs its own round against us (or answers our
-    /// EventRequest), so this method only pulls.
+    /// `PeerRequest::Events`), so this method only pulls.
     pub async fn anti_entropy(&self, peer: &[u8], remote_ids: &[EventId]) -> Result<IngestSummary> {
         let local: BTreeSet<EventId> = self.core.all_event_ids()?.into_iter().collect();
         let remote: BTreeSet<EventId> = remote_ids.iter().copied().collect();
@@ -257,6 +265,13 @@ mod tests {
         ) -> creda_net::Result<Vec<IdentityEventNode>> {
             let canned = self.canned.lock().unwrap();
             Ok(canned.iter().filter(|n| ids.contains(&n.id)).cloned().collect())
+        }
+        async fn request_manifest(&self, _peer: &[u8]) -> creda_net::Result<Vec<EventId>> {
+            let canned = self.canned.lock().unwrap();
+            Ok(canned.iter().map(|n| n.id).collect())
+        }
+        async fn connected_peers(&self) -> creda_net::Result<Vec<Vec<u8>>> {
+            Ok(Vec::new())
         }
         fn local_peer_id(&self) -> Vec<u8> {
             self.peer_id.clone()
@@ -372,6 +387,31 @@ mod tests {
         let s2 = repl_c.ingest_batch(&good_batch.to_bytes().unwrap()).unwrap();
         assert_eq!(s2.rejected, 1);
         assert!(core_c.get_event(&node.id).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn run_anti_entropy_round_fetches_manifest_and_heals_gaps() {
+        let key_a = SigningKey::generate(SignatureAlgorithm::Ed25519).unwrap();
+        let vk_a = key_a.verifying_key();
+        let fp_a = CertificateFingerprint::new(vk_a.fingerprint());
+        let a = signed_assert(&key_a, "1980-01-01");
+        let b = signed_assert(&key_a, "1990-02-02");
+
+        // Peer B already holds `a`. The (mock) remote serves a manifest of [a, b] and serves the
+        // event nodes themselves on follow-up. run_anti_entropy_round drives the whole pull.
+        let core_b = core_with(InMemorySigner::generate().unwrap());
+        let tx = MockTransport::new(b"peerB");
+        tx.set_canned(vec![a.clone(), b.clone()]); // manifest = ids; request_events filters
+        let repl_b = Replicator::new(core_b.clone(), tx, resolver_for(&fp_a, &vk_a), 64);
+
+        // Seed peer B with `a` so the delta is exactly {b}.
+        repl_b
+            .ingest_batch(&GossipBatch::new(b"seed".to_vec(), 0, vec![a.clone()]).to_bytes().unwrap())
+            .unwrap();
+
+        let summary = repl_b.run_anti_entropy_round(b"peerA").await.unwrap();
+        assert_eq!(summary.accepted, 1, "AE round should fetch and accept the one missing event");
+        assert!(core_b.get_event(&b.id).unwrap().is_some());
     }
 
     #[tokio::test]

@@ -54,7 +54,7 @@ mod behaviour {
     use libp2p::swarm::NetworkBehaviour;
     use libp2p::{gossipsub, identify, kad, request_response};
 
-    use super::{EventRequest, EventResponse};
+    use super::{PeerRequest, PeerResponse};
 
     #[derive(NetworkBehaviour)]
     pub struct CredaBehaviour {
@@ -62,33 +62,40 @@ mod behaviour {
         pub gossipsub: gossipsub::Behaviour,
         /// Subgraph routing: which peers hold a patient's events (§6.1.5).
         pub kademlia: kad::Behaviour<kad::store::MemoryStore>,
-        /// Targeted event fetch after a DHT lookup and during anti-entropy (§6.1.5, §6.1.8).
-        /// The protocol payload is a CBOR-encoded request/response of event ids ↔ events.
-        pub request_response: request_response::cbor::Behaviour<EventRequest, EventResponse>,
+        /// Targeted event fetch (§6.1.5) and anti-entropy manifest exchange (§6.1.8) — both
+        /// carried as a CBOR-encoded `PeerRequest` ↔ `PeerResponse` pair on one codec.
+        pub request_response: request_response::cbor::Behaviour<PeerRequest, PeerResponse>,
         /// Peer metadata exchange.
         pub identify: identify::Behaviour,
     }
 }
 pub use behaviour::{CredaBehaviour, CredaBehaviourEvent};
 
-/// A request for specific events by id (§6.1.5/§6.1.8 transfer step).
+/// Peer-to-peer request carried over `/creda/events/1`. A single CBOR codec handles both the
+/// targeted event fetch (§6.1.5 + §6.1.8 transfer step) and the manifest exchange (§6.1.8
+/// reconciliation step) so we don't need a second request_response behaviour.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct EventRequest {
-    pub ids: Vec<EventId>,
+pub enum PeerRequest {
+    /// Send back the events with these ids (any not held locally are simply omitted).
+    Events { ids: Vec<EventId> },
+    /// Send back every event id held locally — the responder's UUID-set manifest, used by the
+    /// requester to compute the anti-entropy reconciliation delta.
+    Manifest,
 }
 
-/// The events returned for an [`EventRequest`].
+/// Response to a [`PeerRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct EventResponse {
-    pub events: Vec<IdentityEventNode>,
+pub enum PeerResponse {
+    Events { events: Vec<IdentityEventNode> },
+    Manifest { ids: Vec<EventId> },
 }
 
 // Aliases keep the run_swarm / handle_command signatures readable and clippy quiet on
-// type_complexity. The outbound map carries fetched events; the queries map carries DHT
-// get_providers results.
-type EventReply = oneshot::Sender<Result<Vec<IdentityEventNode>>>;
+// type_complexity. The outbound map carries fetched peer responses (the callers unwrap the
+// variant); the queries map carries DHT get_providers results.
+type PeerReply = oneshot::Sender<Result<PeerResponse>>;
 type ProviderReply = oneshot::Sender<Result<Vec<Vec<u8>>>>;
-type PendingOutbound = HashMap<OutboundRequestId, EventReply>;
+type PendingOutbound = HashMap<OutboundRequestId, PeerReply>;
 type PendingQueries = HashMap<QueryId, (ProviderReply, HashSet<PeerId>)>;
 
 /// Commands sent from [`Libp2pTransport`] handles to the background Swarm task. Keeping the
@@ -100,10 +107,14 @@ enum Command {
     Unsubscribe { bucket: u64, reply: oneshot::Sender<Result<()>> },
     DhtProvide { key: DhtKey, reply: oneshot::Sender<Result<()>> },
     DhtFindProviders { key: DhtKey, reply: oneshot::Sender<Result<Vec<Vec<u8>>>> },
-    RequestEvents { peer: Vec<u8>, ids: Vec<EventId>, reply: oneshot::Sender<Result<Vec<IdentityEventNode>>> },
+    RequestEvents { peer: Vec<u8>, ids: Vec<EventId>, reply: oneshot::Sender<Result<PeerResponse>> },
+    /// Anti-entropy manifest fetch (§6.1.8): "give me your UUID set so I can reconcile."
+    RequestManifest { peer: Vec<u8>, reply: oneshot::Sender<Result<PeerResponse>> },
     /// Self-command emitted by the inbound-request task to send a response back through the
     /// swarm (where `&mut Swarm` is available).
-    RespondEvents { channel: ResponseChannel<EventResponse>, events: Vec<IdentityEventNode> },
+    RespondPeer { channel: ResponseChannel<PeerResponse>, response: PeerResponse },
+    /// Snapshot of currently connected peer ids — for the daemon's anti-entropy round.
+    ConnectedPeers { reply: oneshot::Sender<Result<Vec<Vec<u8>>>> },
 }
 
 /// Handle to a running Creda libp2p peer. Cloneable; all clones drive the same Swarm task.
@@ -158,7 +169,7 @@ impl Libp2pTransport {
 
         // Two command channels: `cmd_rx` carries external API calls (and closes when every
         // Libp2pTransport handle is dropped, signalling shutdown); `self_rx` carries swarm-task
-        // self-commands (Command::RespondEvents from inbound-request fetch tasks). A single
+        // self-commands (Command::RespondPeer from inbound-request fetch tasks). A single
         // shared channel would never close on shutdown because the task holds a clone.
         let (cmd_tx, cmd_rx) = mpsc::channel(256);
         let (self_tx, self_rx) = mpsc::channel(64);
@@ -229,7 +240,26 @@ impl NetworkTransport for Libp2pTransport {
     async fn request_events(&self, peer: &[u8], ids: &[EventId]) -> Result<Vec<IdentityEventNode>> {
         let peer = peer.to_vec();
         let ids = ids.to_vec();
-        self.send(|reply| Command::RequestEvents { peer, ids, reply }).await
+        match self.send(|reply| Command::RequestEvents { peer, ids, reply }).await? {
+            PeerResponse::Events { events } => Ok(events),
+            PeerResponse::Manifest { .. } => Err(Error::Transport(
+                "peer returned a manifest in response to an events request".into(),
+            )),
+        }
+    }
+
+    async fn request_manifest(&self, peer: &[u8]) -> Result<Vec<EventId>> {
+        let peer = peer.to_vec();
+        match self.send(|reply| Command::RequestManifest { peer, reply }).await? {
+            PeerResponse::Manifest { ids } => Ok(ids),
+            PeerResponse::Events { .. } => Err(Error::Transport(
+                "peer returned events in response to a manifest request".into(),
+            )),
+        }
+    }
+
+    async fn connected_peers(&self) -> Result<Vec<Vec<u8>>> {
+        self.send(|reply| Command::ConnectedPeers { reply }).await
     }
 
     fn local_peer_id(&self) -> Vec<u8> {
@@ -281,11 +311,12 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
 ///   or closed channel drops the batch (gossip is best-effort, anti-entropy heals — §6.1.8).
 /// - Outbound `request_events` calls are correlated by `OutboundRequestId` via `pending_outbound`,
 ///   so the awaiting caller is woken when the matching response arrives (or fails).
-/// - Inbound `EventRequest`s are answered from the local store via [`EventSource`]: the lookup
-///   runs on `spawn_blocking` so the swarm loop never blocks, and the response is sent back
-///   through `self_tx` as `Command::RespondEvents` so `send_response` happens on the swarm task
-///   with `&mut Swarm` in hand. A separate `self_rx` is drained alongside `cmd_rx` (split into
-///   two channels so `cmd_rx` closes cleanly on external-handle shutdown).
+/// - Inbound `PeerRequest`s (events fetch or manifest) are answered from the local store via
+///   [`EventSource`]: the lookup runs on `spawn_blocking` so the swarm loop never blocks, and
+///   the response is sent back through `self_tx` as `Command::RespondPeer` so `send_response`
+///   happens on the swarm task with `&mut Swarm` in hand. A separate `self_rx` is drained
+///   alongside `cmd_rx` (split into two channels so `cmd_rx` closes cleanly on external-handle
+///   shutdown).
 ///
 /// - Outbound Kademlia `get_providers` calls are correlated by `QueryId` via `pending_queries`,
 ///   with a `HashSet<PeerId>` accumulator across multi-step progress events; the awaiting Sender
@@ -332,9 +363,9 @@ async fn run_swarm(
                         let _ = inbound_tx.try_send(message.data);
                     }
 
-                    // Inbound EventRequest from a peer: gather events from the local store and
-                    // send the response (via self_tx so the actual send_response runs on the
-                    // swarm task). spawn_blocking keeps the swarm event loop responsive.
+                    // Inbound PeerRequest from a peer: dispatch on the variant. Events and
+                    // Manifest both go through spawn_blocking + a self-command so the actual
+                    // send_response runs on the swarm task with &mut Swarm in hand.
                     SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             message: Message::Request { request, channel, .. },
@@ -343,18 +374,33 @@ async fn run_swarm(
                     )) => {
                         let source = source.clone();
                         let self_tx = self_tx.clone();
-                        let ids = request.ids;
                         tokio::spawn(async move {
-                            let events = tokio::task::spawn_blocking(move || source.get_events(&ids))
-                                .await
-                                .unwrap_or_default();
+                            let response = match request {
+                                PeerRequest::Events { ids } => {
+                                    let events = tokio::task::spawn_blocking(move || {
+                                        source.get_events(&ids)
+                                    })
+                                    .await
+                                    .unwrap_or_default();
+                                    PeerResponse::Events { events }
+                                }
+                                PeerRequest::Manifest => {
+                                    let ids = tokio::task::spawn_blocking(move || {
+                                        source.all_event_ids()
+                                    })
+                                    .await
+                                    .unwrap_or_default();
+                                    PeerResponse::Manifest { ids }
+                                }
+                            };
                             let _ = self_tx
-                                .send(Command::RespondEvents { channel, events })
+                                .send(Command::RespondPeer { channel, response })
                                 .await;
                         });
                     }
 
-                    // Outbound EventRequest completed: deliver to the awaiting caller.
+                    // Outbound request completed: deliver the PeerResponse to the awaiting
+                    // caller; the caller (request_events / request_manifest) unwraps the variant.
                     SwarmEvent::Behaviour(CredaBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             message: Message::Response { request_id, response },
@@ -362,7 +408,7 @@ async fn run_swarm(
                         },
                     )) => {
                         if let Some(tx) = pending_outbound.remove(&request_id) {
-                            let _ = tx.send(Ok(response.events));
+                            let _ = tx.send(Ok(response));
                         }
                     }
 
@@ -479,15 +525,12 @@ fn handle_command(
             pending_queries.insert(query_id, (reply, HashSet::new()));
         }
         Command::RequestEvents { peer, ids, reply } => {
-            // send_request returns immediately with an OutboundRequestId; the reply Sender is
-            // parked in pending_outbound and completed when the matching response event arrives
-            // (or OutboundFailure errors it). This is the await-able half of anti-entropy.
             match peer_id_from_bytes(&peer) {
                 Ok(peer_id) => {
                     let request_id = swarm
                         .behaviour_mut()
                         .request_response
-                        .send_request(&peer_id, EventRequest { ids });
+                        .send_request(&peer_id, PeerRequest::Events { ids });
                     pending_outbound.insert(request_id, reply);
                 }
                 Err(e) => {
@@ -495,13 +538,33 @@ fn handle_command(
                 }
             }
         }
-        Command::RespondEvents { channel, events } => {
+        Command::RequestManifest { peer, reply } => {
+            match peer_id_from_bytes(&peer) {
+                Ok(peer_id) => {
+                    let request_id = swarm
+                        .behaviour_mut()
+                        .request_response
+                        .send_request(&peer_id, PeerRequest::Manifest);
+                    pending_outbound.insert(request_id, reply);
+                }
+                Err(e) => {
+                    let _ = reply.send(Err(e));
+                }
+            }
+        }
+        Command::RespondPeer { channel, response } => {
             // send_response returns the response back if the channel is closed (peer gone); drop.
-            // TODO(libp2p-verify): consider surfacing this as a transport-level warn metric.
             let _ = swarm
                 .behaviour_mut()
                 .request_response
-                .send_response(channel, EventResponse { events });
+                .send_response(channel, response);
+        }
+        Command::ConnectedPeers { reply } => {
+            let peers: Vec<Vec<u8>> = swarm
+                .connected_peers()
+                .map(|p| p.to_bytes())
+                .collect();
+            let _ = reply.send(Ok(peers));
         }
     }
 }
