@@ -1,0 +1,36 @@
+# Testbed values for peer-b. Identical to peer-a except for `bootstrapPeers`, which the scenario
+# populates at runtime with peer-a's libp2p multiaddr after peer-a is Ready.
+#
+# When invoking helm install, the scenario passes peer-a's multiaddr via --set-string:
+#
+#   helm install peer-b ../../deploy/helm/creda \
+#     -f helm/values-peer-b.yaml \
+#     --set-string "config.bootstrapPeers[0]=$PEER_A_MULTIADDR"
+
+replicaCount: 1
+
+image:
+  core:
+    repository: creda-core
+    tag: testbed
+    pullPolicy: IfNotPresent
+  bridge:
+    repository: creda-bridge
+    tag: testbed
+    pullPolicy: IfNotPresent
+
+config:
+  dataDir: /var/lib/creda
+  grpcSocket: "tcp://0.0.0.0:50051"
+  libp2pListen: /ip4/0.0.0.0/tcp/4001
+  defaultPosture: treatment-presumed
+  snapshotIntervalSecs: 21600
+  subscribedBuckets: [0]
+  bootstrapPeers: []  # overridden at scenario runtime
+
+snapshotCronJob:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

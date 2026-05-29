@@ -1,0 +1,5 @@
+# Scenario run scratch — keypairs, port-forward PIDs, etc.
+.run/
+# Rust build output for the testbed tools.
+tools/peer-driver/target/
+tools/peer-driver/Cargo.lock

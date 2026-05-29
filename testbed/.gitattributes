@@ -1,0 +1,2 @@
+# Preserve executable bit on shell scripts when checked out across platforms.
+*.sh text eol=lf

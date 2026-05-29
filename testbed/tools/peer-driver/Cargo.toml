@@ -1,0 +1,27 @@
+[package]
+name = "peer-driver"
+version = "0.1.0"
+edition = "2021"
+description = "Testbed driver: inject + observe events against a Creda peer's gRPC TCP endpoint."
+publish = false
+
+# Standalone — not a member of the main workspace, so the main `anchor creda` build never has to
+# pull in tonic-client artifacts. Built explicitly via `make peer-driver` in the testbed Makefile.
+[workspace]
+
+[[bin]]
+name = "peer-driver"
+path = "src/main.rs"
+
+[dependencies]
+creda-events = { path = "../../../crates/creda-events" }
+
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+tonic = { version = "0.12" }
+prost = "0.13"
+serde_json = "1"
+anyhow = "1"
+
+[build-dependencies]
+tonic-build = "0.12"

@@ -1,0 +1,40 @@
+# Testbed values for peer-a — the seed peer.
+#
+# Differences from the production defaults:
+# - gRPC over TCP on :50051 (port-forwardable from the host).
+# - Both peers subscribe to bucket 0 so the smoke-test event lands in their shared mesh.
+# - No bootstrap peers — peer-a is the seed.
+# - Single replica; the testbed exercises gossip/AE between two PEERS, not within a StatefulSet.
+
+replicaCount: 1
+
+image:
+  core:
+    repository: creda-core
+    tag: testbed
+    pullPolicy: IfNotPresent
+  bridge:
+    repository: creda-bridge
+    tag: testbed
+    pullPolicy: IfNotPresent
+
+config:
+  dataDir: /var/lib/creda
+  # TCP so the testbed driver can reach it via kubectl port-forward.
+  grpcSocket: "tcp://0.0.0.0:50051"
+  libp2pListen: /ip4/0.0.0.0/tcp/4001
+  defaultPosture: treatment-presumed
+  snapshotIntervalSecs: 21600
+  subscribedBuckets: [0]
+  bootstrapPeers: []
+
+# The testbed disables the snapshot CronJob — scenarios don't need it and it just adds noise.
+snapshotCronJob:
+  enabled: false
+
+# PDB at minAvailable:1 is fine even for single-replica; documented in §10.6.7.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Resource baselines stay at chart defaults; small enough for a kind worker.

@@ -1,0 +1,30 @@
+# Exclude everything that doesn't belong in a docker build context. Without this, the Rust
+# `target/` dir alone can balloon a build context into tens of GB and OOM the overlay store.
+#
+# Build outputs
+target/
+**/target/
+bridge/build/
+bridge/.gradle/
+
+# Local caches (the in-repo cargo/gradle caches the host Makefile uses)
+.cargo-cache/
+.gradle-cache/
+
+# Testbed scratch (keypairs, port-forward PIDs, etc.)
+testbed/.run/
+testbed/tools/*/target/
+
+# Git metadata — Dockerfiles don't need it and it can be large
+.git/
+.gitignore
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+
+# Logs and tmp
+*.log
+*.tmp
+*.swp
