@@ -672,12 +672,16 @@ The DHT does not store patient data — it stores only the mapping from subgraph
 The DHT key for a patient subgraph is derived from a hash of core demographic tokens:
 
 ```
-dht_key = Blake3(
-    tokenize(name_family) ||
-    tokenize(date_of_birth) ||
+dht_key = SHA-512(
+    tokenize(name_family) || 0x1F ||
+    tokenize(date_of_birth) || 0x1F ||
     tokenize(sex)
 )
 ```
+
+The full 512-bit (64-byte) digest is used as the Kademlia routing key. Field separators (ASCII unit separator, `0x1F`) prevent boundary ambiguities between adjacent tokens.
+
+**Why SHA-512.** The DHT key is the only Creda hash with a network-wide coordination role — every peer must compute the same value for the same demographics, or the same patient lands in different buckets at different institutions and identity continuity silently breaks across the divergence line. That makes the DHT key the wrong place for a hash whose only FIPS path is a future migration. SHA-512 is FIPS 180-4 validated under the OpenSSL FIPS module that ships with UBI and the Hummingbird FIPS images, satisfying federal-program procurement (VA, IHS, DoD Health, federally-funded HIE work) without an algorithm-migration window. The 512-bit output also provides a 256-bit post-quantum security margin against Grover search — double the margin Blake3-256 or SHA-256 provides — which is appropriate for a primitive whose identity-continuity guarantees must survive decades of cryptanalytic progress. Per-event content hashes (§5.1.2) and Merkle roots (§6.1.8) remain on Blake3 because they're per-peer integrity primitives, not network-wide routing keys; they tolerate algorithm agility cleanly when future guidance demands a change.
 
 The tokenization scheme must produce the same output across all institutions for the same input demographics — this is defined in Section 9.2 and is critical for the DHT to function. The choice of fields (family name, DOB, sex) balances specificity (enough to narrow results) with availability (these three fields are almost always present at registration).
 

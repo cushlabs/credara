@@ -45,7 +45,7 @@ pub use demographics::{
 };
 pub use error::{Error, Result};
 pub use event::{IdentityEventNode, IdentityEventType, RedistributionPolicy, TestDataTag};
-pub use hash::{ContentHash, HashAlgorithm};
+pub use hash::{sha512_bytes, ContentHash, HashAlgorithm};
 pub use ids::{CertificateFingerprint, EventId};
 pub use payload::{
     AttestPurpose, AuthorizationScope, ContestReason, EventPayload, GrantAudience, GrantPurpose,
