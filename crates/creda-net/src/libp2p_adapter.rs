@@ -25,11 +25,12 @@
 //! the queried key to the peers on the lookup path. This adapter wires the DHT but does not
 //! solve query-privacy; do not represent it as solved.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
+use libp2p::kad::QueryId;
 use libp2p::request_response::{Message, OutboundRequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{gossipsub, identify, kad, request_response, Multiaddr, PeerId, Swarm};
@@ -278,10 +279,13 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
 ///   with `&mut Swarm` in hand. A separate `self_rx` is drained alongside `cmd_rx` (split into
 ///   two channels so `cmd_rx` closes cleanly on external-handle shutdown).
 ///
-/// TODO(libp2p-verify): the exact `SwarmEvent`/`request_response::Event` field names are tied to
-/// libp2p 0.54 (`Message::Request{request_id, request, channel}` / `Message::Response{request_id,
-/// response}` / `Event::OutboundFailure{request_id, error, ..}`). Kademlia query correlation
-/// (`QueryId` for get_providers) is still pending — see the kad arm.
+/// - Outbound Kademlia `get_providers` calls are correlated by `QueryId` via `pending_queries`,
+///   with a `HashSet<PeerId>` accumulator across multi-step progress events; the awaiting Sender
+///   is completed when the query terminates (`step.last`).
+///
+/// TODO(libp2p-verify): the exact field names of `SwarmEvent`/`request_response::Event`/
+/// `kad::Event::OutboundQueryProgressed`/`kad::QueryResult::GetProviders` are libp2p 0.54
+/// version-sensitive — adjust the match arms if the field/variant names drifted.
 async fn run_swarm(
     mut swarm: Swarm<CredaBehaviour>,
     mut cmd_rx: mpsc::Receiver<Command>,
@@ -297,15 +301,24 @@ async fn run_swarm(
         oneshot::Sender<Result<Vec<IdentityEventNode>>>,
     > = HashMap::new();
 
+    // Outbound Kademlia `get_providers` correlation. A single query may emit multiple
+    // `OutboundQueryProgressed` events (one per route segment that yields providers), so we keep
+    // an accumulating `HashSet<PeerId>` per QueryId and complete the awaiting Sender when the
+    // query terminates (`step.last`).
+    let mut pending_queries: HashMap<
+        QueryId,
+        (oneshot::Sender<Result<Vec<Vec<u8>>>>, HashSet<PeerId>),
+    > = HashMap::new();
+
     loop {
         tokio::select! {
             command = cmd_rx.recv() => {
                 let Some(command) = command else { break }; // all external handles dropped
-                handle_command(&mut swarm, &mut pending_outbound, command);
+                handle_command(&mut swarm, &mut pending_outbound, &mut pending_queries, command);
             }
             command = self_rx.recv() => {
                 if let Some(command) = command {
-                    handle_command(&mut swarm, &mut pending_outbound, command);
+                    handle_command(&mut swarm, &mut pending_outbound, &mut pending_queries, command);
                 }
             }
             event = swarm.select_next_some() => {
@@ -362,11 +375,40 @@ async fn run_swarm(
                         }
                     }
 
-                    // TODO(libp2p-verify): complete get_providers queries (correlate by QueryId)
-                    // and surface kad routing updates.
-                    SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(ev)) => {
-                        let _ = ev;
+                    // Kademlia query progress. We care specifically about `get_providers`
+                    // results — accumulate any providers reported in this step, and on the
+                    // terminating step (`step.last`) pop the pending entry and deliver the
+                    // accumulated peer-id bytes to the awaiting caller. Other kad events
+                    // (routing-table updates, other query kinds) we currently ignore.
+                    //
+                    // TODO(libp2p-verify): the exact `kad::Event::OutboundQueryProgressed` field
+                    // names and the `QueryResult::GetProviders` variant shape are libp2p 0.54
+                    // version-sensitive (`Result<GetProvidersOk, GetProvidersError>`). If 0.54
+                    // dropped the error half, adjust the match accordingly.
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(
+                        kad::Event::OutboundQueryProgressed { id, result, step, .. },
+                    )) => {
+                        if let kad::QueryResult::GetProviders(query_result) = result {
+                            if let Some((_, acc)) = pending_queries.get_mut(&id) {
+                                if let Ok(kad::GetProvidersOk::FoundProviders {
+                                    providers, ..
+                                }) = query_result
+                                {
+                                    for peer in providers {
+                                        acc.insert(peer);
+                                    }
+                                }
+                            }
+                            if step.last {
+                                if let Some((reply, acc)) = pending_queries.remove(&id) {
+                                    let peers: Vec<Vec<u8>> =
+                                        acc.into_iter().map(|p| p.to_bytes()).collect();
+                                    let _ = reply.send(Ok(peers));
+                                }
+                            }
+                        }
                     }
+                    SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(_)) => {}
                     _ => {}
                 }
             }
@@ -377,6 +419,7 @@ async fn run_swarm(
 fn handle_command(
     swarm: &mut Swarm<CredaBehaviour>,
     pending_outbound: &mut HashMap<OutboundRequestId, oneshot::Sender<Result<Vec<IdentityEventNode>>>>,
+    pending_queries: &mut HashMap<QueryId, (oneshot::Sender<Result<Vec<Vec<u8>>>>, HashSet<PeerId>)>,
     command: Command,
 ) {
     match command {
@@ -420,15 +463,15 @@ fn handle_command(
             let _ = reply.send(res);
         }
         Command::DhtFindProviders { key, reply } => {
-            // TODO(libp2p-verify): get_providers is asynchronous — the providers arrive via a
-            // later kad query-result event. A production impl registers `reply` keyed by the
-            // QueryId and completes it when the result event fires. This scaffold starts the
-            // query and returns an empty set immediately.
-            swarm
+            // `get_providers` returns synchronously with a `QueryId` and starts a Kademlia query;
+            // the actual providers arrive as one or more later `OutboundQueryProgressed` events.
+            // Park the reply Sender + an accumulator under the QueryId and complete it when the
+            // query terminates (see the kad arm in run_swarm).
+            let query_id = swarm
                 .behaviour_mut()
                 .kademlia
                 .get_providers(kad::RecordKey::new(&key));
-            let _ = reply.send(Ok(Vec::new()));
+            pending_queries.insert(query_id, (reply, HashSet::new()));
         }
         Command::RequestEvents { peer, ids, reply } => {
             // send_request returns immediately with an OutboundRequestId; the reply Sender is
