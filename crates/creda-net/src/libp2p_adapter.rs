@@ -83,6 +83,14 @@ pub struct EventResponse {
     pub events: Vec<IdentityEventNode>,
 }
 
+// Aliases keep the run_swarm / handle_command signatures readable and clippy quiet on
+// type_complexity. The outbound map carries fetched events; the queries map carries DHT
+// get_providers results.
+type EventReply = oneshot::Sender<Result<Vec<IdentityEventNode>>>;
+type ProviderReply = oneshot::Sender<Result<Vec<Vec<u8>>>>;
+type PendingOutbound = HashMap<OutboundRequestId, EventReply>;
+type PendingQueries = HashMap<QueryId, (ProviderReply, HashSet<PeerId>)>;
+
 /// Commands sent from [`Libp2pTransport`] handles to the background Swarm task. Keeping the
 /// Swarm in one task (it is `!Sync`) and talking to it over a channel is the idiomatic way to
 /// expose an ergonomic async API.
@@ -296,19 +304,13 @@ async fn run_swarm(
 ) {
     // Outbound request_response correlation: completed when the matching response (or failure)
     // arrives. Dropped on shutdown — pending callers see "swarm dropped the reply".
-    let mut pending_outbound: HashMap<
-        OutboundRequestId,
-        oneshot::Sender<Result<Vec<IdentityEventNode>>>,
-    > = HashMap::new();
+    let mut pending_outbound: PendingOutbound = HashMap::new();
 
     // Outbound Kademlia `get_providers` correlation. A single query may emit multiple
     // `OutboundQueryProgressed` events (one per route segment that yields providers), so we keep
     // an accumulating `HashSet<PeerId>` per QueryId and complete the awaiting Sender when the
     // query terminates (`step.last`).
-    let mut pending_queries: HashMap<
-        QueryId,
-        (oneshot::Sender<Result<Vec<Vec<u8>>>>, HashSet<PeerId>),
-    > = HashMap::new();
+    let mut pending_queries: PendingQueries = HashMap::new();
 
     loop {
         tokio::select! {
@@ -386,25 +388,28 @@ async fn run_swarm(
                     // version-sensitive (`Result<GetProvidersOk, GetProvidersError>`). If 0.54
                     // dropped the error half, adjust the match accordingly.
                     SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(
-                        kad::Event::OutboundQueryProgressed { id, result, step, .. },
+                        kad::Event::OutboundQueryProgressed {
+                            id,
+                            result: kad::QueryResult::GetProviders(query_result),
+                            step,
+                            ..
+                        },
                     )) => {
-                        if let kad::QueryResult::GetProviders(query_result) = result {
-                            if let Some((_, acc)) = pending_queries.get_mut(&id) {
-                                if let Ok(kad::GetProvidersOk::FoundProviders {
-                                    providers, ..
-                                }) = query_result
-                                {
-                                    for peer in providers {
-                                        acc.insert(peer);
-                                    }
+                        if let Some((_, acc)) = pending_queries.get_mut(&id) {
+                            if let Ok(kad::GetProvidersOk::FoundProviders {
+                                providers, ..
+                            }) = query_result
+                            {
+                                for peer in providers {
+                                    acc.insert(peer);
                                 }
                             }
-                            if step.last {
-                                if let Some((reply, acc)) = pending_queries.remove(&id) {
-                                    let peers: Vec<Vec<u8>> =
-                                        acc.into_iter().map(|p| p.to_bytes()).collect();
-                                    let _ = reply.send(Ok(peers));
-                                }
+                        }
+                        if step.last {
+                            if let Some((reply, acc)) = pending_queries.remove(&id) {
+                                let peers: Vec<Vec<u8>> =
+                                    acc.into_iter().map(|p| p.to_bytes()).collect();
+                                let _ = reply.send(Ok(peers));
                             }
                         }
                     }
@@ -418,8 +423,8 @@ async fn run_swarm(
 
 fn handle_command(
     swarm: &mut Swarm<CredaBehaviour>,
-    pending_outbound: &mut HashMap<OutboundRequestId, oneshot::Sender<Result<Vec<IdentityEventNode>>>>,
-    pending_queries: &mut HashMap<QueryId, (oneshot::Sender<Result<Vec<Vec<u8>>>>, HashSet<PeerId>)>,
+    pending_outbound: &mut PendingOutbound,
+    pending_queries: &mut PendingQueries,
     command: Command,
 ) {
     match command {
