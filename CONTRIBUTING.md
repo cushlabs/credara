@@ -32,6 +32,80 @@ guide before opening a pull request.
   defensible default, mark it `TODO(open-question-13.x)`, and **open a tracking issue**.
   Do not silently pick a permanent answer.
 
+## Branching and pull requests
+
+### Where to push
+
+- **External contributors** (most people): fork the repo, push to a branch on your fork,
+  and open a PR against `main` in this repo. You do not need write access — forks are
+  how we work with everyone outside the maintainer team.
+- **Maintainers**: push topic branches directly to this repo. Do not commit to `main`;
+  it is protected.
+
+### Branching model
+
+We use **trunk-based development**. `main` is the only long-lived branch and is always
+green (CI passing, releasable in principle). There is no `develop` branch.
+
+Topic branch naming:
+
+```
+m<milestone>/<short-kebab-description>     # e.g. m3/effective-identity-projection
+fix/<short-kebab-description>              # bug fixes not tied to a milestone
+docs/<short-kebab-description>             # docs-only changes
+```
+
+Keep branches short-lived. Rebase onto `main` rather than merging `main` into your
+branch — we require linear history.
+
+### Sizing a PR
+
+- **One milestone slice per PR.** If you cannot describe the change in one sentence,
+  it is probably two PRs.
+- **Soft cap: ~400 lines of diff** excluding generated files, lockfiles, and tests.
+  Larger PRs need a heads-up in an issue first so reviewers can plan.
+- **Draft PRs are welcome** for early feedback. Mark "Ready for review" only when CI is
+  green and the PR description is complete.
+
+### Commit hygiene
+
+- One logical change per commit. Use `git rebase -i` to clean up before review.
+- Reference the spec section in the commit subject (`M3: ... per §5.2.4`).
+- Sign off every commit for DCO (`git commit -s`). See below.
+- Sign commits with GPG or SSH if you can — required for release tags, recommended for
+  everything.
+
+### Review
+
+- At least **one approving review** from a code owner is required before merge. Changes
+  to the spec, the security model (UDAP/SPIFFE, signature verification, dual-control),
+  or cryptographic code require **two** approvals.
+- Code owners are defined in [`.github/CODEOWNERS`](.github/CODEOWNERS). GitHub will
+  request the right reviewers automatically.
+- Stale approvals are dismissed when you push new commits. Re-request review after
+  addressing feedback.
+- Resolve all review conversations before merge.
+
+### Merging
+
+- Maintainers merge. Use **Squash** for most PRs; use **Rebase** when each commit is
+  meaningful and you want them preserved. **Merge commits are disabled.**
+- Your branch must be **up to date with `main`** before merge. Use "Update branch" in
+  the PR UI (rebase) or rebase locally.
+- Delete the branch after merge (GitHub does this automatically for branches in this
+  repo; for forks, clean up on your end).
+
+### CI from forks
+
+PRs from forks run the standard CI workflows (`ci-rust`, `ci-java`, `ci-conformance`,
+`ci-docs`) but **do not have access to repository secrets**. Jobs that need secrets
+(e.g., signed release artifacts) only run after a maintainer pushes the change to a
+branch in this repo. If your PR appears to be missing a check, that is why — a
+maintainer will pick it up.
+
+First-time contributors' workflows require manual approval from a maintainer before
+they run. Subsequent PRs from the same contributor run automatically.
+
 ## Getting set up
 
 The only thing you install is **Docker**. The Rust toolchain, the C compiler, and all
@@ -58,6 +132,11 @@ creda-net → creda-core` chain (M1→M5) is a dependency spine and is not paral
 - [ ] Any deferred decision is marked `TODO(open-question-13.x)` with a linked issue.
 - [ ] No secrets, credentials, or real PHI are included — synthetic data only.
 - [ ] My commits are signed off (DCO — see below).
+- [ ] My branch is rebased on the latest `main` and has linear history.
+- [ ] PR is scoped to one milestone slice and within the ~400-line soft cap (or I opened
+      a tracking issue first).
+- [ ] PR description explains the *why*, links the relevant issue, and notes any
+      follow-ups left for later PRs.
 
 ## Developer Certificate of Origin (DCO)
 

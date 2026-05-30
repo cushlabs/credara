@@ -1,0 +1,60 @@
+name: Open question (spec §13)
+description: Track a deferred design decision from spec §13 (open questions)
+title: "[open-question-13.x] "
+labels: ["open-question-13.x", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when scaffolding around a deferred decision listed in
+        spec §13. The goal is that every `TODO(open-question-13.x)` in the codebase
+        has a tracking issue you can link to.
+
+  - type: input
+    id: number
+    attributes:
+      label: Open question number
+      description: e.g. `13.4`
+      placeholder: "13.x"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: Quote or paraphrase the open question from spec §13.
+    validations:
+      required: true
+
+  - type: textarea
+    id: interim
+    attributes:
+      label: Interim default
+      description: What is the "simplest defensible default" the code currently uses?
+        Include file paths.
+    validations:
+      required: true
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: What we need to resolve it
+      description: Information, decision, or external input required before a permanent
+        answer can be picked.
+
+  - type: textarea
+    id: candidates
+    attributes:
+      label: Candidate answers (optional)
+      description: Options under consideration, with pros / cons.
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene
+      options:
+        - label: The code is marked with `TODO(open-question-13.x)` referencing this issue.
+          required: true
+        - label: The interim default does not silently lock us into a permanent answer.
+          required: true

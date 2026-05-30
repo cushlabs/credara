@@ -1,0 +1,63 @@
+version: 2
+updates:
+  # Rust workspace (root Cargo.toml + crates/*)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "deps(cargo)"
+    groups:
+      patch-updates:
+        update-types: ["patch"]
+      minor-updates:
+        update-types: ["minor"]
+
+  # Java / Kotlin bridge (Gradle)
+  - package-ecosystem: "gradle"
+    directory: "/bridge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "java"
+    commit-message:
+      prefix: "deps(gradle)"
+    groups:
+      patch-updates:
+        update-types: ["patch"]
+      minor-updates:
+        update-types: ["minor"]
+
+  # GitHub Actions — pin to SHAs, but let Dependabot bump them.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
+
+  # Dev container image
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"

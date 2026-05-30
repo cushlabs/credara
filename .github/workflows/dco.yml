@@ -1,0 +1,20 @@
+name: DCO
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dco:
+    name: DCO
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check DCO sign-off
+        # Pin to a commit SHA — Dependabot will bump it.
+        uses: tim-actions/dco@2fd0504dc0d27b33f542867c300c60840c6dcb20
+        with:
+          commits: ${{ github.event.pull_request.commits }}

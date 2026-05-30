@@ -1,0 +1,55 @@
+name: Spec question or clarification
+description: Ask about the technical spec, or report an inconsistency between the spec and the code
+title: "[spec] "
+labels: ["spec", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The spec is the source of truth (`docs/creda-technical-spec.md`). Use this
+        template to ask about something ambiguous, propose a clarification, or flag
+        a place where the code drifts from the spec.
+
+  - type: input
+    id: section
+    attributes:
+      label: Spec section
+      description: Which section of the spec is this about? (e.g. `§5.2.4`)
+    validations:
+      required: true
+
+  - type: textarea
+    id: quote
+    attributes:
+      label: Relevant text
+      description: Quote the exact sentence(s) you have a question about.
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or proposed clarification
+      description: What is unclear, contradictory, or missing? If you are proposing a
+        change, state it precisely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Where this matters
+      description: Which component(s) or milestone(s) does this affect? Link any PR or
+        issue blocked by this.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Ambiguity in the spec
+        - Spec / code inconsistency
+        - Proposed clarification
+        - Proposed change (requires spec-owner review)
+    validations:
+      required: true

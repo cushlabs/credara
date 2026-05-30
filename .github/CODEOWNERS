@@ -1,0 +1,53 @@
+# Code owners for Creda.
+#
+# Order matters: later rules override earlier ones.
+# Replace @creda/<team> handles with real GitHub teams or usernames before
+# enabling "Require review from Code Owners" in branch protection.
+#
+# Docs: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner — catches anything not matched below.
+*                                       @creda/maintainers
+
+# ---- Dependency spine (M1 -> M5) ----
+/crates/creda-events/                   @creda/m1-events
+/crates/creda-store/                    @creda/m2-store
+/crates/creda-graph/                    @creda/m3-graph
+/crates/creda-net/                      @creda/m4-net
+/crates/creda-core/                     @creda/m5-core
+
+# ---- Adjacent components ----
+/crates/creda-export-gate/              @creda/export-gate
+/crates/creda-verifier/                 @creda/verifier
+/bridge/                                @creda/bridge
+/conformance/                           @creda/conformance
+/testbed/                               @creda/testbed
+/tools/                                 @creda/tooling
+/deploy/                                @creda/infra
+
+# ---- Build, CI, repo plumbing ----
+/Cargo.toml                             @creda/maintainers
+/Cargo.lock                             @creda/maintainers
+/Makefile                               @creda/maintainers
+/rust-toolchain.toml                    @creda/maintainers
+/.devcontainer/                         @creda/maintainers
+/.github/                               @creda/maintainers
+/.github/workflows/                     @creda/maintainers @creda/security
+
+# ---- Docs ----
+/docs/                                  @creda/docs
+/README.md                              @creda/docs @creda/maintainers
+/REPO_STRUCTURE.md                      @creda/docs @creda/maintainers
+/CONTRIBUTING.md                        @creda/maintainers
+/CODE_OF_CONDUCT.md                     @creda/maintainers
+
+# ---- Spec (require two approvals via branch protection rule) ----
+/docs/creda-technical-spec.md           @creda/spec-owners @creda/maintainers
+
+# ---- Security-critical paths (require two approvals via branch protection rule) ----
+/SECURITY.md                            @creda/security
+**/crypto/**                            @creda/security
+**/udap/**                              @creda/security
+**/spiffe/**                            @creda/security
+**/signature/**                         @creda/security
+**/auth/**                              @creda/security
