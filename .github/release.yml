@@ -1,0 +1,57 @@
+# Auto-generated release notes config.
+# Used by GitHub when you click "Generate release notes" on a tag, and by
+# any release workflow that calls the same API.
+#
+# Docs: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - dependencies     # Dependabot noise — grouped separately below.
+    authors:
+      - dependabot
+      - dependabot[bot]
+
+  categories:
+    - title: Breaking changes
+      labels:
+        - breaking-change
+
+    - title: Security
+      labels:
+        - security
+        - security-advisory
+
+    - title: Features
+      labels:
+        - enhancement
+
+    - title: Bug fixes
+      labels:
+        - bug
+        - regression
+
+    - title: Spec
+      labels:
+        - spec
+        - open-question-13.x
+
+    - title: Documentation
+      labels:
+        - docs
+
+    - title: Tests and conformance
+      labels:
+        - test
+
+    - title: Internal
+      labels:
+        - refactor
+        - ci
+        - docker
+
+    # Catch-all so nothing silently disappears from the notes.
+    - title: Other changes
+      labels:
+        - "*"
