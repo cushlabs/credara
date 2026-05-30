@@ -6,17 +6,24 @@
 # - No bootstrap peers — peer-a is the seed.
 # - Single replica; the testbed exercises gossip/AE between two PEERS, not within a StatefulSet.
 
+# Force the Helm fullname to "peer" (without the chart-name suffix). This keeps the StatefulSet,
+# pod, and Service names predictable — pod is `peer-0`, headless service is `peer-headless`.
+fullnameOverride: peer
+
 replicaCount: 1
 
 image:
   core:
     repository: creda-core
     tag: testbed
-    pullPolicy: IfNotPresent
+    # Never — the image is loaded into the kind nodes by `make images`; there is no remote
+    # registry for `creda-core:testbed`. Without this, kubelet falls back to pulling from
+    # docker.io/library/creda-core:testbed and fails with ImagePullBackOff.
+    pullPolicy: Never
   bridge:
     repository: creda-bridge
     tag: testbed
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
 
 config:
   dataDir: /var/lib/creda

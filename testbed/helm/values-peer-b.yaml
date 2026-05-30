@@ -7,17 +7,21 @@
 #     -f helm/values-peer-b.yaml \
 #     --set-string "config.bootstrapPeers[0]=$PEER_A_MULTIADDR"
 
+# Force the Helm fullname to "peer" — matches values-peer-a.yaml. See that file for why.
+fullnameOverride: peer
+
 replicaCount: 1
 
 image:
   core:
     repository: creda-core
     tag: testbed
-    pullPolicy: IfNotPresent
+    # See values-peer-a.yaml for why pullPolicy is Never.
+    pullPolicy: Never
   bridge:
     repository: creda-bridge
     tag: testbed
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
 
 config:
   dataDir: /var/lib/creda

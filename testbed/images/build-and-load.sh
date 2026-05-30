@@ -42,8 +42,21 @@ docker build \
   "$REPO_ROOT"
 
 echo "==> loading images into kind cluster '$CLUSTER'"
-kind load docker-image "$CORE_IMAGE" --name "$CLUSTER"
-kind load docker-image "$BRIDGE_IMAGE" --name "$CLUSTER"
-kind load docker-image "$DRIVER_IMAGE" --name "$CLUSTER"
+# Use `save | load image-archive` instead of `kind load docker-image` — the latter is unreliable
+# under Podman (it talks to Docker's daemon and Podman's local image store may not be visible).
+# Save+archive uses the OCI archive format which kind handles identically regardless of the
+# underlying engine. Works for both Docker and Podman without environment-specific branching.
+load_image_into_kind() {
+  local image="$1"
+  local tmp
+  tmp="$(mktemp -t kind-load.XXXXXX.tar)"
+  trap 'rm -f "$tmp"' RETURN
+  docker save "$image" -o "$tmp"
+  kind load image-archive "$tmp" --name "$CLUSTER"
+}
+
+load_image_into_kind "$CORE_IMAGE"
+load_image_into_kind "$BRIDGE_IMAGE"
+load_image_into_kind "$DRIVER_IMAGE"
 
 echo "==> images ready: $CORE_IMAGE, $BRIDGE_IMAGE, $DRIVER_IMAGE"
