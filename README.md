@@ -22,30 +22,37 @@ authority or vendor lock-in.
 
 ## Status
 
-> **Pre-launch — all milestones implemented; hardening in progress. Open for testers.**
-> The [technical specification](docs/creda-technical-spec.md) (Sections 1–13 + appendices,
-> ~81 pages) is complete and authoritative. All ten build milestones (M0–M9) are
-> implemented: the full Rust spine (event model → storage → graph reasoning → networking →
-> Core daemon), the dual-control Export Gate and Verifier, the HAPI FHIR Bridge, deployment
-> packaging, and the conformance suite with its synthetic-data generator. The default
-> workspace build and tests pass; the per-milestone table below records what is verified
-> versus what is feature-gated and still being reconciled.
+> **Pre-launch — all milestones implemented; multi-peer testbed green; hardening in progress.
+> Open for testers.** The [technical specification](docs/creda-technical-spec.md) (Sections
+> 1–13 + appendices, ~83 pages) is complete and authoritative. All ten build milestones
+> (M0–M9) are implemented and verified, the default workspace builds and tests green, the
+> opt-in libp2p adapter compiles and lints clean against the pinned version, and the
+> **multi-peer testbed under kind passes its gossip-convergence and anti-entropy-repair
+> scenarios end-to-end** — two real peers, real libp2p transport, real gossipsub mesh, real
+> manifest exchange, all running as Helm-installed StatefulSets in separate namespaces. The
+> first end-to-end gossip propagation measured at **2 ms** at peer-b after publication at
+> peer-a, well inside the §4.7 Bound 1 commitment (~1–2 s).
 >
-> This is **pre-launch software**: not yet deployed to a real network and not yet
+> This is still **pre-launch software**: not yet deployed to a real network and not yet
 > independently security-reviewed. Do not use it with real PHI.
 >
 > **New testers start here:** [`docs/HOW_TO_TEST.md`](docs/HOW_TO_TEST.md) walks through
 > prerequisites, the in-process conformance suite (`anchor creda`), the multi-peer testbed
-> (`testbed/ make smoke`), what success looks like, and how to file what you find. New-tester
-> friction is the bug we most want to hear about during hardening.
+> (`make -C testbed up && make -C testbed smoke`), what success looks like, and how to file
+> what you find. New-tester friction is the bug we most want to hear about during hardening.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
 
 Beyond the milestones, the in-daemon **gRPC serve socket** (Bridge ↔ Core over a Unix
-domain socket) and the **libp2p transport ↔ engine replication** path (signed-event ingest
-with mandatory signature verification, gossip publish, anti-entropy) are wired. The
-replication orchestration is transport-agnostic and unit-tested in the default build; the
-libp2p adapter itself remains an opt-in, separately-reconciled module (see *Verification*).
+domain socket or TCP), the **libp2p transport ↔ engine replication** path (signed-event
+ingest with mandatory signature verification, gossip publish, anti-entropy peer-exchange,
+DHT provider correlation), and the **HTTP health endpoint** (`/livez`, `/readyz`,
+`/metrics` on port 9090 for kubelet probes per §10.5.3) are all wired and exercised by the
+testbed. The link-chain authorization defense (§4.6 step 5.5 + §5.3.5 method ceilings) ships
+with three conformance scenarios pinning the boundary between rogue-Link attacks and
+legitimate first-encounter Links. The DHT key derivation switched to **SHA-512** so the
+routing-key primitive is FIPS-validated under OpenSSL's FIPS module without any future
+migration.
 
 ## Architectural thesis
 
@@ -181,21 +188,27 @@ The build proceeds in strict dependency order:
 | M0 | Repo init + CI | §12.2.2 | Done |
 | M1 | Event model (`creda-events`) | §3, §4, §5 | Implemented · tests green |
 | M2 | Storage (`creda-store`) | §5.2, §7.3, App. C | Implemented · tests green (incl. RocksDB) |
-| M3 | Graph / computation (`creda-graph`) | §5.2.4, §4.6, §5.3 | Implemented · tests green |
-| M4 | Networking (`creda-net`) | §6, §7 | Pure logic green; libp2p adapter opt-in (reconciling) |
+| M3 | Graph / computation (`creda-graph`) | §5.2.4, §4.6, §5.3, §4.6 step 5.5 | Implemented · tests green (incl. link-chain) |
+| M4 | Networking (`creda-net`) | §6, §7 | Pure logic green; libp2p adapter green under `make libp2p` |
 | M5 | Creda Core (`creda-core`) | §10.1 | Implemented · tests green |
 | M6 | Export Gate + Verifier | §4.5, §10.2, §10.3 | Implemented · tests green |
 | M7 | FHIR Bridge (`bridge/`) | §8, §10.4 | Builds green; FHIR↔CBOR mappers are stubs |
-| M8 | Deployment (`deploy/`) | §10.5, §10.6, §11 | Manifests authored; runtime verify on the test bed |
-| M9 | Conformance + synthetic data (`conformance/`) | §11.4 | Implemented · tests green |
+| M8 | Deployment (`deploy/`) | §10.5, §10.6, §11 | **Verified on kind** · gossip-convergence + AE-repair scenarios green |
+| M9 | Conformance + synthetic data (`conformance/`) | §11.4 | Implemented · tests green (incl. rogue-Link scenarios) |
+| DQ-3 | Multi-peer testbed | §11.4, §10.6 | Two scenarios green on kind; partition/revocation/upgrade/storage-class scenarios in progress |
 
 Verified by component: the default workspace (M1–M6, M9, plus the replication core) builds
 and tests green via `anchor creda` (or `make test`); the opt-in **gRPC** server via `make
 grpc`; the **FHIR Bridge** via `make bridge`. The shipped **libp2p** feature set
-(`make libp2p`) is the one quarantined surface still being reconciled against the pinned
-libp2p version, and is deliberately kept out of CI so its API churn never blocks the
-workspace. End-to-end multi-peer deployment (Helm on kind/k3d, gossip convergence,
-anti-entropy, revocation latency) is exercised in the test bed under `testbed/`.
+(`make libp2p`) builds and lints clean against the pinned libp2p version. End-to-end
+multi-peer deployment is exercised in the test bed under `testbed/`:
+`make -C testbed up && make -C testbed smoke` brings up two real peers in kind, injects an
+event at peer-a via a Kubernetes Job, and observes it at peer-b through real gossipsub —
+typically sub-10 ms convergence on a developer laptop. `make -C testbed ae-repair` proves
+the §6.1.8 anti-entropy backstop by joining peer-b after the events were already published
+at peer-a and watching the periodic manifest exchange heal the gap. Partition, revocation
+latency, rolling upgrade, storage class, and in-cluster rogue-Link scenarios use the same
+scaffold and land in subsequent passes.
 
 ## Building
 
@@ -204,18 +217,26 @@ one installs a Rust toolchain, protoc, or a JDK by hand (see
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
 
 ```sh
-anchor creda      # build + test the whole default workspace, one rolled-up summary (= make anchor)
-make grpc         # build + lint + test the opt-in gRPC server (feature `grpc`; needs protoc)
-make libp2p       # compile-check the shipped feature set (gRPC + libp2p) — libp2p reconciliation
-make bridge       # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
+anchor creda           # build + test the whole default workspace, one rolled-up summary (= make anchor)
+make grpc              # build + lint + test the opt-in gRPC server (feature `grpc`; needs protoc)
+make libp2p            # compile + lint the shipped feature set (gRPC + libp2p)
+make bridge            # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
+
+# Multi-peer testbed on kind (Docker + kind + kubectl + helm required; no host Rust):
+make -C testbed up        # create kind cluster + build & load all 3 testbed images
+make -C testbed smoke     # gossip-convergence scenario — typically <10 ms end-to-end
+make -C testbed ae-repair # anti-entropy-repair scenario — late-join healed via AE round
+make -C testbed down      # tear down the cluster
 ```
 
 The default build is intentionally free of the heavy, version-volatile dependencies
 (libp2p, tonic/protoc, the JVM bridge): those live behind features and separate targets so
 `anchor creda` stays fast and always green. With a local toolchain the workspace also builds
 the ordinary way (`cargo build --workspace` / `cargo test --workspace`). Local multi-peer
-development uses Docker Compose under `deploy/compose/`, and the multi-peer test bed lives
-under `testbed/`.
+development uses Docker Compose under `deploy/compose/`. The multi-peer test bed under
+`testbed/` runs entirely in-cluster — the peer-driver is a Rust binary packaged as an image
+and invoked as a Kubernetes Job — so no host Rust toolchain is needed even for the
+end-to-end scenarios.
 
 ## Security and data handling
 
