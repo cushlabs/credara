@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proto_dir = "../../../crates/creda-core/proto";
     tonic_build::configure()
         .build_server(false) // client only
-        .compile(&[proto], &[proto_dir])?;
+        .compile_protos(&[proto], &[proto_dir])?;
     println!("cargo:rerun-if-changed={}", proto);
     Ok(())
 }
