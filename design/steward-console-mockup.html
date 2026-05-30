@@ -56,6 +56,40 @@
   .b-stale{background:#eef2f6;color:#475569;}
   .b-good{background:#e7f6ec;color:#15803d;}
   .b-test{background:#fff3cd;color:#7c5800;border:1px dashed #d9b341;}
+  .b-blocked{background:#fde7e7;color:#b91c1c;}
+  .b-policy{background:#e7e9fb;color:#4338ca;}
+
+  /* link-policy panel */
+  .lp{display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12.5px;}
+  .lp .row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .lp .row:last-child{border-bottom:0;}
+  .lp .nm{flex:1;color:var(--ink-2);}
+  .lp .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);}
+  .lp .mini{height:5px;background:#e7edf4;border-radius:999px;overflow:hidden;width:120px;}
+  .lp .mini>span{display:block;height:100%;}
+  .lp .col h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:650;}
+  .floorbar{display:grid;grid-template-columns:60px 1fr 60px;gap:10px;align-items:center;margin:8px 0 4px;font-size:12px;color:var(--ink-2);}
+  .floorbar .track{position:relative;height:10px;background:#eef2f6;border-radius:999px;}
+  .floorbar .track .lane{position:absolute;top:0;bottom:0;border-radius:999px;}
+  .floorbar .track .lane.warn{background:repeating-linear-gradient(45deg,#fde7e7,#fde7e7 4px,#fce0e0 4px,#fce0e0 8px);left:0;width:60%;}
+  .floorbar .track .lane.ok{background:#e7f6ec;left:60%;right:0;}
+  .floorbar .track .marker{position:absolute;top:-3px;width:2px;height:16px;background:#0f1b2d;}
+  .floorbar .track .tag{position:absolute;top:18px;font-size:10.5px;color:var(--ink-3);transform:translateX(-50%);white-space:nowrap;}
+
+  /* link-chain step listing */
+  .chain{display:grid;gap:6px;}
+  .chain .step{display:grid;grid-template-columns:18px 1fr 64px 88px;gap:10px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);font-size:12.5px;}
+  .chain .step.fail{border-color:#f4cccc;background:#fdeeee;}
+  .chain .step.pass{border-color:#cae3d3;background:#eef9f1;}
+  .chain .step .dot{width:9px;height:9px;border-radius:50%;}
+  .chain .step.fail .dot{background:#b91c1c;}
+  .chain .step.pass .dot{background:#15803d;}
+  .chain .step .det .nm{font-weight:600;color:var(--ink);}
+  .chain .step .det .sub{color:var(--ink-3);font-size:11.5px;margin-top:1px;}
+  .chain .step .conf{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+  .chain .step .status{font-size:11px;font-weight:700;text-align:right;}
+  .chain .step.fail .status{color:#b91c1c;}
+  .chain .step.pass .status{color:#15803d;}
 
   .meter{width:78px;height:7px;border-radius:999px;background:#e7edf4;overflow:hidden;}
   .meter>span{display:block;height:100%;border-radius:999px;}
@@ -98,6 +132,9 @@
   .node .sub{font-size:9.5px;fill:rgba(255,255,255,.85);font-weight:500;}
   .edge{stroke:#b9c6d8;stroke-width:2;fill:none;}
   .edge.contest{stroke:var(--contest);stroke-dasharray:5 4;}
+  /* An edge flowing into a blocked Link: still drawn (the DAG topology is real) but visually
+     muted and dashed, so the diagram doesn't read as "the merge happened." */
+  .edge.blocked{stroke:#b91c1c;stroke-width:1.6;stroke-dasharray:4 4;opacity:.85;}
 
   /* evidence */
   .ev{display:grid;gap:7px;}
@@ -196,7 +233,39 @@ const KIND = {
   contest:{tag:'Open contest',cls:'b-contest'},
   synthetic:{tag:'Synthetic record',cls:'b-synthetic'},
   stale:{tag:'Stale verification',cls:'b-stale'},
+  blockedLink:{tag:'Link blocked by policy',cls:'b-blocked'},
 };
+
+/* ----------------------------------------------------------------------------
+   Link policy (§4.6 step 5.5, §5.3.5).
+   The responder's configurable per-LinkMethod ceilings on claimed confidence,
+   the min_link_confidence floor every Link in a merge chain must clear, and
+   whether the Link author needs prior standing in the responder's view.
+   These are responder-side overrides; institutions calibrate per posture.
+---------------------------------------------------------------------------- */
+const LINK_POLICY = {
+  posture: 'Deny-by-default',
+  min_link_confidence: 6000,
+  require_author_standing: false,
+  ceilings: {
+    InsuranceCrosswalk: 9500,
+    Referral:           9000,
+    Algorithmic:        7000,
+    Manual:             5000,
+    Other:              3000,
+  },
+};
+function effectiveConfidence(method, claimed){
+  const ceiling = LINK_POLICY.ceilings[method] ?? LINK_POLICY.ceilings.Other;
+  return Math.min(claimed, ceiling);
+}
+function parseClaim(c){
+  // "82%" -> 8200; "9000" -> 9000; numeric pass-through.
+  if (typeof c === 'number') return c;
+  if (typeof c !== 'string') return 0;
+  if (c.endsWith('%')) return Math.round(parseFloat(c)*100);
+  return parseInt(c,10) || 0;
+}
 function confColor(p){return p>=85?'var(--good)':p>=60?'var(--warn)':'var(--bad)';}
 function consentMeta(c){
   const M={
@@ -296,6 +365,46 @@ const CASES = [
     ],
   },
   {
+    id:'c5', kind:'blockedLink', conf:0, testData:false,
+    title:'Link from BluePeak Family Care — blocked by step 5.5',
+    summary:'A clinic Mercy has never interacted with published a Manual Link to an existing Mercy patient subgraph, claiming 9800/10000 confidence. The §4.6 step 5.5 check rejected it because Manual’s effective confidence caps at 5000 — below Mercy’s 6000 floor. No data was released; the Link still sits in the DAG as evidence for review.',
+    insts:['Mercy General','BluePeak Family Care'],
+    consent:{state:'presumed', note:'No consent restriction at play here. The Link itself did not extract data — step 5.5 stopped the request that depended on it. Reviewing the Link decides whether to Contest, leave it, or follow up out-of-band with BluePeak.'},
+    cmp:[
+      {key:'Name', a:'Anita Park', b:'Anita J Park', agree:'partial'},
+      {key:'Date of birth', a:'1986-04-09', b:'1986-04-09', agree:'match'},
+      {key:'Sex', a:'Female', b:'Female', agree:'match'},
+      {key:'Address', a:'Madison', b:'(absent)', agree:'partial'},
+    ],
+    evidence:[
+      {k:'Method', wt:'note', sign:'', desc:'BluePeak claimed Manual at 9800/10000 — capped to 5000 by responder ceiling'},
+      {k:'Floor',  wt:'−10', sign:'neg', desc:'effective 5000 < min_link_confidence (6000) → Link blocked from cross-institutional honor'},
+      {k:'Standing', wt:'note', sign:'', desc:'BluePeak has no prior Assert/Attest in Mercy’s view; strict-posture flag would also reject'},
+      {k:'Source', wt:'note', sign:'', desc:'no prior gossip or referral chain links Mercy and BluePeak'},
+    ],
+    /* The link-chain check runs at §4.6 step 5.5. Render every Link the responder traversed
+       toward an anchored event, with claimed vs. effective confidence and pass/fail status. */
+    linkChain: [
+      {linkId:'rl1', from:'BluePeak Assert', to:'Mercy Assert (anchor)', method:'Manual', claimed:9800, status:'fail',
+       reason:'effective 5000 < floor 6000'},
+    ],
+    events:[
+      {id:'a1',type:'Assert',inst:'Mercy General',when:'2022-05-15',vm:'Government photo ID',x:60,y:50,parents:[],summary:'Anita Park, Madison address — Mercy’s own record.'},
+      {id:'a2',type:'Assert',inst:'BluePeak Family Care',when:'2026-05-28',vm:'Self-report',x:60,y:200,parents:[],summary:'Anita J Park — new from BluePeak.'},
+      {id:'l1',type:'Link',inst:'BluePeak Family Care',when:'2026-05-28',conf:'98%',method:'Manual',x:300,y:125,parents:['a1','a2'],summary:'Self-issued Manual link at 9800/10000 — capped by responder method ceiling, blocked by floor.'},
+      // BluePeak followed the Link with a self-issued Grant that names themselves as audience.
+      // The Grant is in the DAG but cannot be honored against Mercy's data: §4.6 step 5.5
+      // blocks every chain that depends on the Manual Link, so the Grant is effectively inert
+      // at every responding peer that holds Mercy's subgraph for this patient.
+      {id:'g1',type:'Attest',inst:'BluePeak Family Care',when:'2026-05-28',x:540,y:55,parents:['l1'],summary:'Self-issued Grant naming BluePeak as audience. Inert at responding peers — every chain to a Mercy anchor crosses the blocked Link.'},
+    ],
+    actions:[
+      {label:'Contest the link', cls:'contest', ev:'Contest', note:'Records a signed Contest by Mercy on the BluePeak Link. Severs the merge in every responder’s projection and surfaces the dispute network-wide.'},
+      {label:'Leave standing for review', cls:'ghost', ev:null, note:'No event written. The Link stays in the DAG, blocked by step 5.5; if BluePeak follows up with a stronger method (Referral, InsuranceCrosswalk) or a prior Attest in Mercy’s view, it can be re-evaluated.'},
+      {label:'Reach BluePeak out-of-band', cls:'amend', ev:null, note:'No graph change. Triggers an operator workflow to contact BluePeak’s admin and ask for the basis of the claim. Often the right first step before contesting.'},
+    ],
+  },
+  {
     id:'c4', kind:'synthetic', conf:90, testData:true,
     title:'Synthetic patient surfaced in triage',
     summary:'A load-test record (test-data tagged) appears in the operator view. This is expected — synthetic events propagate and replicate like real ones, but are filtered from every clinical view (§11.4.1). Confirm it is test data and dismiss.',
@@ -337,10 +446,33 @@ function qitemHTML(c){
   const cm = consentMeta(c.consent);
   const flagged = c.consent && (c.consent.state==='revoked' || c.consent.state==='restricted');
   const consentFlag = flagged ? `<span class="badge" style="background:${cm.bg};color:${cm.fg}">${cm.label}</span>` : '';
-  const meter = c.kind==='contest' ? '' :
-    `<div class="meterrow"><span class="pct" style="color:${confColor(c.conf)}">${c.conf}%</span>
+  // If the case has at least one blocked Link, replace the match-confidence meter with an
+  // effective-vs-floor bar so the queue tells the steward at a glance why this case is here.
+  // Picks the most severe (lowest effective) Link in the case for the bar.
+  const blockedLink = c.events && c.events.filter(isLinkBlocked)
+    .map(e=>({e, eff: effectiveConfidence(e.method, parseClaim(e.conf))}))
+    .sort((a,b)=>a.eff-b.eff)[0];
+  let meter;
+  if (c.kind==='contest') {
+    meter = '';
+  } else if (blockedLink) {
+    const eff = blockedLink.eff;
+    const floor = LINK_POLICY.min_link_confidence;
+    const pct = Math.round((eff / 10000) * 100);
+    const floorPct = Math.round((floor / 10000) * 100);
+    meter = `<div class="meterrow">
+        <span class="pct" style="color:#b91c1c">${eff}</span>
+        <div class="meter" style="position:relative">
+          <span style="width:${pct}%;background:#b91c1c"></span>
+          <span style="position:absolute;top:-2px;bottom:-2px;left:${floorPct}%;width:2px;background:#0f1b2d"></span>
+        </div>
+        <span class="muted" style="font-size:11px">eff. confidence · floor ${floor}</span>
+      </div>`;
+  } else {
+    meter = `<div class="meterrow"><span class="pct" style="color:${confColor(c.conf)}">${c.conf}%</span>
       <div class="meter"><span style="width:${c.conf}%;background:${confColor(c.conf)}"></span></div>
       <span class="muted" style="font-size:11px">match confidence</span></div>`;
+  }
   return `<div class="qitem ${state.caseId===c.id?'sel':''} ${done?'resolved':''}" onclick="openCase('${c.id}')">
       <div class="top"><span class="badge ${k.cls}">${k.tag}</span>
         ${consentFlag}
@@ -385,7 +517,7 @@ function openCase(id){
 
     <div class="section">
       <div class="hd"><h2>Provenance graph</h2><span class="muted" style="font-size:12px;margin-left:auto">tap a node for detail</span></div>
-      ${dagLegend()}
+      ${dagLegend(c)}
       <div class="bd" style="padding:8px">${dagSVG(c)}</div>
     </div>
 
@@ -393,6 +525,10 @@ function openCase(id){
       <div class="hd"><h2>Match evidence</h2><span class="muted" style="font-size:12px;margin-left:auto">Fellegi–Sunter-style weighting · §5.3</span></div>
       <div class="bd"><div class="ev">${c.evidence.map(evHTML).join('')}</div></div>
     </div>
+
+    ${linkChainSection(c)}
+
+    ${linkPolicySection()}
 
     <div class="section">
       <div class="hd"><h2>Patient consent context</h2>
@@ -422,25 +558,249 @@ function evHTML(e){
   return `<div class="row"><span class="k">${e.k}</span><span class="wt ${wtcls}">${wt}</span><span class="desc">${e.desc}</span></div>`;
 }
 
-/* ---------------- DAG ---------------- */
-function dagLegend(){
-  const items=[['Assert','var(--assert)'],['Link','var(--link)'],['Contest','var(--contest)'],['Attest','var(--attest)'],['Amend','var(--amend)'],['Tombstone','var(--tomb)']];
-  return `<div class="legend">${items.map(([n,c])=>`<span class="it"><span class="sw" style="background:${c}"></span>${n}</span>`).join('')}</div>`;
+/* ---------------- Link policy panel ---------------- */
+/* Persistent in every case — surfaces the configured ceilings, floor, and standing flag the
+   responder is enforcing. The steward configures these per posture; pilots calibrate them
+   (§5.3.5 calibration is open §13.2.2). */
+function linkPolicySection(){
+  const ceilings = Object.entries(LINK_POLICY.ceilings);
+  const floor = LINK_POLICY.min_link_confidence;
+  const floorPct = floor / 100;
+  return `
+    <div class="section">
+      <div class="hd">
+        <h2>Link policy <span class="muted" style="font-weight:500;font-size:12px;margin-left:6px">§4.6 step 5.5 · §5.3.5</span></h2>
+        <span class="badge b-policy" style="margin-left:auto">${LINK_POLICY.posture}</span>
+      </div>
+      <div class="bd">
+        <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:10px">
+          Cross-institutional Grants reached through Link traversal must clear every Link's
+          floor after per-method ceilings are applied. The ceiling caps the signing institution's
+          claimed confidence; the floor is what the responder requires.
+        </div>
+        <div class="floorbar">
+          <div>0</div>
+          <div class="track">
+            <div class="lane warn"></div>
+            <div class="lane ok"></div>
+            <div class="marker" style="left:${floorPct}%"></div>
+            <div class="tag" style="left:${floorPct}%">floor ${floor}</div>
+          </div>
+          <div>10000</div>
+        </div>
+        <div class="lp" style="margin-top:24px">
+          <div class="col">
+            <h3>Per-method ceilings</h3>
+            ${ceilings.map(([m,v])=>`
+              <div class="row">
+                <span class="nm">${m}</span>
+                <span class="mini"><span style="width:${v/100}%;background:${v>=floor?'var(--good)':'var(--bad)'}"></span></span>
+                <span class="num">${v}</span>
+              </div>`).join('')}
+          </div>
+          <div class="col">
+            <h3>Other policy</h3>
+            <div class="row"><span class="nm">min_link_confidence (floor)</span><span class="num">${floor}</span></div>
+            <div class="row"><span class="nm">require_author_standing</span>
+              <span class="num">${LINK_POLICY.require_author_standing?'ON':'OFF'}</span></div>
+            <div class="row"><span class="nm">applies to</span>
+              <span class="num" style="font-weight:600;font-size:12px;color:var(--ink-2)">cross-institutional Grants only</span></div>
+            <div class="row" style="border-bottom:0;display:block;margin-top:8px">
+              <div class="muted" style="font-size:12px;line-height:1.5">
+                Manual ceiling (5000) is intentionally below the floor (6000) so a Manual Link
+                cannot clear cross-institutional honor on its own. A new institution with no
+                prior relationship can still be admitted via a stronger method (InsuranceCrosswalk,
+                Referral) or a patient-cosigned Link (§13.2.6, open).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
 }
+
+/* ---------------- Link chain (per case) ---------------- */
+/* Renders the §4.6 step 5.5 traversal results for this case. Each row is a Link in the path
+   from the Grant (or, for non-auth cases, from the cross-institution merge join) toward an
+   anchored event, with claimed vs. effective confidence and a pass/fail mark. */
+function linkChainSection(c){
+  if (!c.linkChain && !c.events.some(e=>e.type==='Link')) return '';
+  // If the case doesn't carry an explicit linkChain, derive a row per Link event so the
+  // steward sees the per-Link effective-confidence math even when nothing was blocked.
+  const rows = c.linkChain || c.events
+    .filter(e=>e.type==='Link')
+    .map(e=>{
+      const claim = parseClaim(e.conf);
+      const eff = effectiveConfidence(e.method, claim);
+      const pass = eff >= LINK_POLICY.min_link_confidence;
+      return {
+        linkId:e.id, from:e.inst, to:'responder anchor', method:e.method, claimed:claim,
+        status: pass ? 'pass' : 'fail',
+        reason: pass
+          ? `effective ${eff} ≥ floor ${LINK_POLICY.min_link_confidence}`
+          : `effective ${eff} < floor ${LINK_POLICY.min_link_confidence}`,
+      };
+    });
+  if (!rows.length) return '';
+  const anyFail = rows.some(r=>r.status==='fail');
+  return `
+    <div class="section">
+      <div class="hd">
+        <h2>Link-chain evaluation <span class="muted" style="font-weight:500;font-size:12px;margin-left:6px">§4.6 step 5.5</span></h2>
+        ${anyFail
+          ? `<span class="badge b-blocked" style="margin-left:auto">chain blocked</span>`
+          : `<span class="badge b-good" style="margin-left:auto">chain clears floor</span>`}
+      </div>
+      <div class="bd">
+        <div class="chain">
+          ${rows.map(r=>{
+            const eff = effectiveConfidence(r.method, r.claimed);
+            const ceiling = LINK_POLICY.ceilings[r.method] ?? LINK_POLICY.ceilings.Other;
+            return `
+              <div class="step ${r.status}">
+                <span class="dot"></span>
+                <div class="det">
+                  <div class="nm">${r.from} → ${r.to}</div>
+                  <div class="sub">${r.method} · claimed ${r.claimed}, ceiling ${ceiling} → effective <b>${eff}</b></div>
+                </div>
+                <div class="conf">${eff}</div>
+                <div class="status">${r.status === 'pass' ? 'PASS' : 'BLOCKED'}<div style="font-weight:500;font-size:10.5px;color:var(--ink-3);margin-top:2px">${r.reason}</div></div>
+              </div>`;
+          }).join('')}
+        </div>
+        ${anyFail ? `
+          <div class="muted" style="font-size:12px;margin-top:10px;line-height:1.5">
+            The Grant (or merge) that depended on this chain was denied. No data was released.
+            The Link still sits in the DAG as evidence and can be Contested if the steward
+            confirms it was sent in bad faith, or left in place if it was a good-faith claim
+            using an inadequate method (the linking institution can republish with a stronger
+            method).
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+/* ---------------- DAG ---------------- */
+function dagLegend(c){
+  const items=[['Assert','var(--assert)'],['Link','var(--link)'],['Contest','var(--contest)'],['Attest','var(--attest)'],['Amend','var(--amend)'],['Tombstone','var(--tomb)']];
+  const main = items.map(([n,c])=>`<span class="it"><span class="sw" style="background:${c}"></span>${n}</span>`).join('');
+  // The blocked-Link and inert-descendant chips only appear when the current case actually
+  // shows them, keeping the legend uncluttered on cases where everything passes.
+  const hasBlocked = c && c.events.some(isLinkBlocked);
+  const hasInert   = c && inertEventIds(c).size > 0;
+  const extras = [];
+  if (hasBlocked) {
+    extras.push(`<span class="it"><span class="sw" style="background:repeating-linear-gradient(45deg,#ffffff 0 4px,#7c3aed 4px 5px);border:1.5px dashed #7c3aed;border-radius:3px;width:14px;height:14px"></span>Blocked Link (in DAG, no merge)</span>`);
+  }
+  if (hasInert) {
+    extras.push(`<span class="it"><span class="sw" style="background:var(--ink-3);opacity:0.55;border:1.5px dashed var(--ink-2);border-radius:3px;width:14px;height:14px"></span>Inert (depends on a blocked Link)</span>`);
+  }
+  const tail = extras.length ? `<span style="flex:1"></span>${extras.join('')}` : '';
+  return `<div class="legend">${main}${tail}</div>`;
+}
+/* True when a Link event would be blocked by the responder's §4.6 step 5.5 check. The Link is
+   still in the DAG (it was published, gossiped, signed, stored); it just does not establish a
+   merge that any responder honors. The DAG must show this — solid edges and solid fill would
+   imply the merge took, which it didn't. */
+function isLinkBlocked(e){
+  if (e.type !== 'Link' || !e.method || !e.conf) return false;
+  return effectiveConfidence(e.method, parseClaim(e.conf)) < LINK_POLICY.min_link_confidence;
+}
+
+/* Walk forward from every blocked Link in the case and return the set of event ids whose only
+   path to a responder anchor crosses that blocked Link. Those events are *inert* — present in
+   the DAG, structurally valid, but no responder honors them. Simplification for the mockup: we
+   walk all descendants of blocked Links rather than computing a true reachability join, which
+   is fine for the cases we render here. The result is used to fade descendant nodes and dash
+   their edges so the diagram does not imply that a Grant or Attest under a blocked Link is
+   in force. */
+function inertEventIds(c){
+  const blocked = c.events.filter(isLinkBlocked).map(e=>e.id);
+  if (!blocked.length) return new Set();
+  const childMap = {};
+  c.events.forEach(e=>e.parents.forEach(p=>{
+    (childMap[p] = childMap[p] || []).push(e.id);
+  }));
+  const inert = new Set();
+  const queue = [...blocked];
+  while (queue.length) {
+    const id = queue.shift();
+    (childMap[id] || []).forEach(cid=>{
+      if (!inert.has(cid) && !blocked.includes(cid)) {
+        inert.add(cid);
+        queue.push(cid);
+      }
+    });
+  }
+  return inert;
+}
+
 function dagSVG(c){
   const nodeW=150,nodeH=52,margin=18;
   const byId=Object.fromEntries(c.events.map(e=>[e.id,e]));
+  const inert = inertEventIds(c);
   let edges='';
   c.events.forEach(e=>e.parents.forEach(pid=>{
     const a=byId[pid]; if(!a)return;
+    // An edge that flows into a blocked Link, or any edge whose endpoint is inert (downstream
+    // of a blocked Link), is rendered dashed. The DAG topology is accurate; the merge isn't.
+    const isInertEdge = isLinkBlocked(e) || inert.has(e.id) || isLinkBlocked(a) || inert.has(a.id);
+    const edgeCls = e.type==='Contest' ? 'contest' : (isInertEdge ? 'blocked' : '');
     const x1=a.x+nodeW,y1=a.y+nodeH/2,x2=e.x,y2=e.y+nodeH/2,mx=(x1+x2)/2;
-    edges+=`<path class="edge ${e.type==='Contest'?'contest':''}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+    edges+=`<path class="edge ${edgeCls}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
   }));
+  // Diagonal hatch pattern used as the fill for blocked Links — visually distinct from a solid
+  // colored "active" event without losing the Link color cue. Defined once per SVG.
+  const linkCol = 'var(--link)';
+  const defs = `<defs>
+    <pattern id="blockedHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#ffffff"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="${linkCol}" stroke-width="2" opacity="0.55"/>
+    </pattern>
+  </defs>`;
   const nodes=c.events.map(e=>{
     const col=TYPE_COLORS[e.type]||'var(--ink-2)';
     const sub=e.conf?('match '+e.conf):(e.method?e.method:(e.vm?e.vm:e.when));
+    const blocked = isLinkBlocked(e);
     // Just-recorded steward events get a dashed light border to mark them as new + pending replication.
     const mark=e._new?' stroke="#fff" stroke-dasharray="4 3" stroke-width="2"':'';
+    if (blocked) {
+      // Blocked Link: hatched fill, dashed Link-colored border, BLOCKED stamp top-right, and
+      // text re-coloured because the dark text-on-color trick no longer works against the
+      // hatch.
+      return `<g class="node" onclick="showEvent('${c.id}','${e.id}')">
+          <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11"
+                fill="url(#blockedHatch)" stroke="${linkCol}" stroke-width="2"
+                stroke-dasharray="6 4"/>
+          <text x="${e.x+12}" y="${e.y+21}" fill="${linkCol}">${e.type}</text>
+          <text class="sub" x="${e.x+12}" y="${e.y+38}" fill="${linkCol}" opacity="0.85">${trunc(e.inst,18)}</text>
+          <text class="sub" x="${e.x+nodeW-12}" y="${e.y+38}" text-anchor="end"
+                fill="${linkCol}" opacity="0.85">${trunc(sub,16)}</text>
+          <!-- BLOCKED stamp, top-right corner -->
+          <g transform="translate(${e.x+nodeW-50},${e.y-9})">
+            <rect width="56" height="18" rx="9" fill="#b91c1c"/>
+            <text x="28" y="13" text-anchor="middle" font-size="10" font-weight="700"
+                  fill="#ffffff" style="letter-spacing:.3px">BLOCKED</text>
+          </g>
+        </g>`;
+    }
+    if (inert.has(e.id)) {
+      // Inert downstream event: kept legible (still part of the DAG, still signed) but visually
+      // muted with reduced opacity and a dashed border. A small INERT pill in the corner makes
+      // the status legible without making the node disappear.
+      return `<g class="node" onclick="showEvent('${c.id}','${e.id}')" opacity="0.55">
+          <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${col}"
+                stroke="${col}" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text x="${e.x+12}" y="${e.y+21}">${e.type}</text>
+          <text class="sub" x="${e.x+12}" y="${e.y+38}">${trunc(e.inst,18)}</text>
+          <text class="sub" x="${e.x+nodeW-12}" y="${e.y+38}" text-anchor="end">${trunc(sub,16)}</text>
+          <g transform="translate(${e.x+nodeW-44},${e.y-9})">
+            <rect width="50" height="18" rx="9" fill="#b91c1c"/>
+            <text x="25" y="13" text-anchor="middle" font-size="10" font-weight="700"
+                  fill="#ffffff" style="letter-spacing:.3px">INERT</text>
+          </g>
+        </g>`;
+    }
     return `<g class="node" onclick="showEvent('${c.id}','${e.id}')">
         <rect x="${e.x}" y="${e.y}" width="${nodeW}" height="${nodeH}" rx="11" fill="${col}"${mark}/>
         <text x="${e.x+12}" y="${e.y+21}">${e.type}</text>
@@ -451,7 +811,7 @@ function dagSVG(c){
   // Size the canvas to its contents so appended nodes are never clipped.
   const W=Math.max(620, ...c.events.map(e=>e.x+nodeW))+margin;
   const H=Math.max(290, ...c.events.map(e=>e.y+nodeH))+margin;
-  return `<svg class="dag" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMin meet">${edges}${nodes}</svg>`;
+  return `<svg class="dag" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMin meet">${defs}${edges}${nodes}</svg>`;
 }
 function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+'…':s;}
 
@@ -459,6 +819,27 @@ function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+'…':s;}
 function showEvent(cid,eid){
   const c=CASES.find(x=>x.id===cid); const e=c.events.find(x=>x.id===eid);
   const col=TYPE_COLORS[e.type]||'var(--ink-2)';
+  // For Link events, expand the slide-over with the responder-side ceiling math so the steward
+  // can see at a glance whether this Link cleared the floor and why (§4.6 step 5.5, §5.3.5).
+  let linkPolicyDetail = '';
+  if (e.type === 'Link' && e.method) {
+    const claimed = parseClaim(e.conf);
+    const ceiling = LINK_POLICY.ceilings[e.method] ?? LINK_POLICY.ceilings.Other;
+    const eff = effectiveConfidence(e.method, claimed);
+    const pass = eff >= LINK_POLICY.min_link_confidence;
+    linkPolicyDetail = `
+      <div style="margin-top:14px;padding:10px 12px;border-radius:9px;background:${pass?'#eef9f1':'#fdeeee'};border:1px solid ${pass?'#cae3d3':'#f4cccc'}">
+        <div style="font-weight:700;font-size:12px;color:${pass?'#15803d':'#b91c1c'};margin-bottom:6px">
+          ${pass ? '✓ Link clears floor' : '✗ Link blocked by step 5.5'}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 60px;gap:4px 12px;font-size:12.5px">
+          <div class="muted">Claimed by signer</div><div style="text-align:right;font-weight:600">${claimed}</div>
+          <div class="muted">${e.method} ceiling</div><div style="text-align:right;font-weight:600">${ceiling}</div>
+          <div class="muted">Effective</div><div style="text-align:right;font-weight:700;color:${pass?'#15803d':'#b91c1c'}">${eff}</div>
+          <div class="muted">Responder floor</div><div style="text-align:right;font-weight:600">${LINK_POLICY.min_link_confidence}</div>
+        </div>
+      </div>`;
+  }
   $('sheetHd').innerHTML=`<span class="pill" style="background:${col}">${e.type}</span><button class="x" onclick="closeSheet()">×</button>`;
   $('sheetBd').innerHTML=`
     <div class="muted" style="font-size:13px;margin-bottom:10px">${TYPE_DESC[e.type]||''}</div>
@@ -471,6 +852,7 @@ function showEvent(cid,eid){
       <div class="k">Parents</div><div class="v">${e.parents.length?e.parents.join(', '):'root (none)'}</div>
     </div>
     <div style="margin-top:14px;font-size:13px">${e.summary||''}</div>
+    ${linkPolicyDetail}
     <div class="codecard"><span class="kk">event_type</span>: <span class="vv">"${e.type}"</span>
 <span class="kk">institution</span>: <span class="vv">"${e.inst}"</span>
 <span class="kk">signature</span>:&nbsp; <span class="vv">ed25519:verified ✓</span></div>`;

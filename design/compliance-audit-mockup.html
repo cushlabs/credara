@@ -69,6 +69,24 @@
   .b-grant{background:#e7f1fb;color:#1d4ed8;}
   .b-revoke{background:#fdeaea;color:#b91c1c;}
   .b-export{background:#e3f2f6;color:#0e7490;}
+  .b-linkdeny{background:#fdeaea;color:#b91c1c;}
+  .b-linkpass{background:#e7f6ec;color:#15803d;}
+
+  /* link-chain step list inside an audit decision */
+  .chainsteps{display:grid;gap:6px;margin-top:8px;}
+  .chainsteps .step{display:grid;grid-template-columns:18px 1fr 64px 80px;gap:10px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);font-size:12.5px;}
+  .chainsteps .step.fail{border-color:#f4cccc;background:#fdeeee;}
+  .chainsteps .step.pass{border-color:#cae3d3;background:#eef9f1;}
+  .chainsteps .step .dot{width:9px;height:9px;border-radius:50%;}
+  .chainsteps .step.fail .dot{background:#b91c1c;}
+  .chainsteps .step.pass .dot{background:#15803d;}
+  .chainsteps .step .det .nm{font-weight:600;}
+  .chainsteps .step .det .sub{color:var(--ink-3);font-size:11.5px;margin-top:1px;}
+  .chainsteps .step .conf{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+  .chainsteps .step .status{font-size:11px;font-weight:700;text-align:right;}
+  .chainsteps .step.fail .status{color:#b91c1c;}
+  .chainsteps .step.pass .status{color:#15803d;}
+  .policychip{display:inline-block;font-size:11px;font-weight:650;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:3px 9px;margin-right:6px;}
 
   .detail{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
   .detail .dh{padding:14px 16px;border-bottom:1px solid var(--line);}
@@ -86,7 +104,14 @@
   /* provenance chain pills */
   .chain{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
   .pill{font-size:11.5px;font-weight:650;color:#fff;padding:4px 10px;border-radius:8px;}
+  /* Blocked pill: hatched fill in the pill's color, dashed border, INERT-style appearance.
+     Used when the entry corresponds to a §4.6 step 5.5-blocked Link. */
+  .pill.blocked{background:repeating-linear-gradient(45deg,#ffffff 0 4px,currentColor 4px 5px) !important;color:#7c3aed;border:1.5px dashed currentColor;padding:2.5px 9px;}
+  /* Inert pill: pill is present (the event is in the DAG) but lower opacity + dashed border to
+     show it's downstream of a blocked step and therefore not in force. */
+  .pill.inert{opacity:0.55;border:1.5px dashed rgba(255,255,255,0.6);padding:2.5px 9px;}
   .arrow{color:var(--ink-3);font-weight:700;}
+  .arrow.blocked{color:#b91c1c;}
   .intact{margin-top:9px;font-size:12.5px;display:flex;align-items:center;gap:7px;}
 
   /* findings */
@@ -131,6 +156,7 @@
       <button data-f="grant">Grants</button>
       <button data-f="revoke">Revocations</button>
       <button data-f="export">Exports</button>
+      <button data-f="linkdecision">Link decisions</button>
       <button data-f="findings">Findings</button>
     </div>
     <div class="spacer"></div>
@@ -166,7 +192,28 @@ const EV = {
   grant:{label:'AuthorizationGrant', color:'var(--grant)', letter:'+', badge:'b-grant', tag:'Grant'},
   revoke:{label:'AuthorizationRevocation', color:'var(--revoke)', letter:'–', badge:'b-revoke', tag:'Revocation'},
   export:{label:'ExportReceipt', color:'var(--export)', letter:'↧', badge:'b-export', tag:'Export'},
+  // Authorization decisions taken at responding peers, when the §4.6 step 5.5 Link-chain check
+  // is the determining filter (block or admit). These don't carry their own DAG event — the
+  // ExportReceipt or denied-request log is what's signed — but they are first-class auditable
+  // moments and should appear in the ledger so reviewers can audit the §5.3.5 policy
+  // calibration as it actually runs in production.
+  linkdecision:{label:'Link-chain decision', color:'#6d28d9', letter:'⟂', badge:'b-grant', tag:'§4.6 step 5.5'},
 };
+
+/* ----------------------------------------------------------------------------
+   Link policy in effect for the deploying institution (mirrors steward console).
+   Calibration is policy (§5.3.5); the auditor sees what was running.
+---------------------------------------------------------------------------- */
+const LINK_POLICY = {
+  posture: 'Deny-by-default',
+  min_link_confidence: 6000,
+  require_author_standing: false,
+  ceilings: { InsuranceCrosswalk:9500, Referral:9000, Algorithmic:7000, Manual:5000, Other:3000 },
+};
+function effectiveConfidence(method, claimed){
+  const c = LINK_POLICY.ceilings[method] ?? LINK_POLICY.ceilings.Other;
+  return Math.min(claimed, c);
+}
 const F = {pass:{cls:'pass',badge:'b-pass',word:'PASS'}, warn:{cls:'warn',badge:'b-warn',word:'WARN'}, violation:{cls:'violation',badge:'b-violation',word:'VIOLATION'}};
 const PILL = {Assert:'var(--grant)', Link:'#7c3aed', Grant:'var(--grant)', Revocation:'var(--revoke)', Export:'var(--export)', Attest:'#15803d'};
 
@@ -209,14 +256,75 @@ const EVENTS = [
     chain:['Assert','Grant'], intact:true,
     finding:{level:'pass', title:'Class grant — membership verified', note:'Audience is an institution class; each responder verifies membership against the Participant Registry at evaluation time.', meta:'§4.6 step 3'}
   },
+  // ----- Link-chain decisions: the §4.6 step 5.5 events that determine whether a
+  // cross-institutional Grant is honored. Surfaced in the audit ledger so reviewers can
+  // confirm the policy ran as configured and spot calibration issues.
+  {
+    id:'ld1', type:'linkdecision', who:'BluePeak Family Care', patient:'tok:7f3a…c2', purpose:'Treatment',
+    when:'2025-01-13 17:08', requester:'BluePeak Family Care', grant:'g-bluepeak (self-issued)',
+    scope:'Identity + history',
+    chain:[
+      {type:'Assert', label:'Assert(BluePeak)'},
+      {type:'Link',   label:'Link(Manual)',   blocked:true},
+      {type:'Grant',  label:'Grant(self)',    inert:true},
+      {type:'Revocation', label:'Request blocked'},  // pill color + label do the work
+    ],
+    intact:true,
+    linkChain:[
+      {from:'BluePeak Assert', to:'Mercy Assert (anchor)', method:'Manual', claimed:9800, status:'fail',
+       reason:'effective 5000 < floor 6000'},
+    ],
+    decision:'denied',
+    finding:{level:'pass', title:'Step 5.5 blocked self-issued Grant via Manual link', note:'BluePeak (no prior relationship to Mercy or the patient) published a Manual Link at 9800/10000 confidence and a self-issued Grant. Effective confidence after method ceiling was 5000, below the 6000 floor. Authorization denied. No data was released.', meta:'§4.6 step 5.5 · Manual ceiling 5000 · floor 6000'},
+  },
+  {
+    id:'ld2', type:'linkdecision', who:'Lakeside Hospital', patient:'tok:5cc1…a9', purpose:'Treatment',
+    when:'2025-01-13 14:00', requester:'Lakeside Hospital', grant:'g-lakeside',
+    scope:'Identity only',
+    chain:[
+      {type:'Assert', label:'Assert(Lakeside)'},
+      {type:'Link',   label:'Link(InsuranceCrosswalk)'},
+      {type:'Grant',  label:'Grant'},
+      {type:'Export', label:'Access granted'},
+    ],
+    intact:true,
+    linkChain:[
+      {from:'Lakeside Assert', to:'Mercy Assert (anchor)', method:'InsuranceCrosswalk', claimed:9000, status:'pass',
+       reason:'effective 9000 ≥ floor 6000'},
+    ],
+    decision:'admitted',
+    finding:{level:'pass', title:'Step 5.5 admitted InsuranceCrosswalk link', note:'Lakeside used the InsuranceCrosswalk method, which caps at 9500. Effective confidence 9000 cleared the 6000 floor. Cross-institutional Grant honored under treatment purpose. Audit trail shows the merge join cleanly.', meta:'§4.6 step 5.5 · InsuranceCrosswalk ceiling 9500 · floor 6000'},
+  },
+  {
+    id:'ld3', type:'linkdecision', who:'Wellspring Pediatrics', patient:'tok:c4ed…11', purpose:'Treatment',
+    when:'2025-01-12 22:14', requester:'Wellspring Pediatrics', grant:'g-wellspring',
+    scope:'Identity + history',
+    chain:[
+      {type:'Assert', label:'Assert(Wellspring)'},
+      {type:'Link',   label:'Link(Algorithmic)'},
+      {type:'Link',   label:'Link(Referral)'},
+      {type:'Grant',  label:'Grant'},
+      {type:'Export', label:'Access granted'},
+    ],
+    intact:true,
+    linkChain:[
+      {from:'Wellspring Assert', to:'Referral hop',   method:'Algorithmic', claimed:7800, status:'pass',
+       reason:'effective 7000 ≥ floor 6000'},
+      {from:'Referral hop',     to:'Mercy anchor',   method:'Referral',    claimed:9200, status:'pass',
+       reason:'effective 9000 ≥ floor 6000'},
+    ],
+    decision:'admitted',
+    finding:{level:'pass', title:'Two-hop link-chain cleared floor at every step', note:'A two-hop chain reached Mercy via an Algorithmic link then a Referral. Both clear the floor after their respective ceilings (7000 and 9000). The chain is admitted in full because every step passed, not because the average was high.', meta:'§4.6 step 5.5 · Algorithmic ceiling 7000 · Referral ceiling 9000'},
+  },
 ];
 
 const state = {filter:'all', sel:null};
 const $ = id=>document.getElementById(id);
 
 function counts(){
+  const linkDenied = EVENTS.filter(e=>e.type==='linkdecision' && e.decision==='denied').length;
   return {
-    total:1284, exports:37, revocations:12,
+    total:1284, exports:37, revocations:12, linkDenied,
     findings: EVENTS.filter(e=>e.finding && e.finding.level!=='pass').length,
   };
 }
@@ -225,7 +333,7 @@ function renderKPIs(){
   $('kpis').innerHTML = `
     ${kpi(c.total.toLocaleString(),'events in window')}
     ${kpi(c.exports,'export receipts')}
-    ${kpi(c.revocations,'patient revocations')}
+    ${kpi(c.linkDenied,'§5.5 link-chain denials')}
     ${kpi(c.findings,'open findings',true)}`;
 }
 function kpi(v,l,flag){return `<div class="kpi ${flag?'flag':''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;}
@@ -257,15 +365,28 @@ function rowHTML(e){
 function consentOrigin(e){
   if(e.type==='grant')  return 'Patient-signed grant (§4.3)';
   if(e.type==='revoke') return 'Patient-signed revocation — patient withdrew consent';
+  if(e.type==='linkdecision') {
+    return e.decision==='denied'
+      ? 'Not reached — request denied at the link-chain check before consent was evaluated'
+      : 'Governed by a patient-signed grant; admitted via §5.5 link-chain check';
+  }
   return 'Governed by a patient-signed grant';
 }
 function openItem(id){
   state.sel=id; renderLedger();
   const e=EVENTS.find(x=>x.id===id); const m=EV[e.type];
   const f=e.finding;
+  // Link decisions get an extra header chip showing admit vs. deny outcome.
+  const decisionChip = e.type==='linkdecision'
+    ? `<span class="badge ${e.decision==='admitted'?'b-linkpass':'b-linkdeny'}">${e.decision==='admitted'?'admitted by §5.5':'denied by §5.5'}</span>`
+    : '';
   $('detail').innerHTML = `
     <div class="dh">
-      <div style="display:flex;align-items:center;gap:9px"><span class="badge ${m.badge}">${m.label}</span>${f?`<span class="badge ${F[f.level].badge}">${F[f.level].word}</span>`:''}</div>
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+        <span class="badge ${m.badge}">${m.label}</span>
+        ${decisionChip}
+        ${f?`<span class="badge ${F[f.level].badge}">${F[f.level].word}</span>`:''}
+      </div>
       <h2 style="margin-top:8px">${m.tag}: ${e.who}</h2>
     </div>
     <div class="db">
@@ -281,14 +402,52 @@ function openItem(id){
 
       <div class="sub">
         <h3>Provenance chain</h3>
-        <div class="chain">${e.chain.map((p,i)=>`${i?'<span class="arrow">→</span>':''}<span class="pill" style="background:${PILL[p]||'var(--ink-3)'}">${p}</span>`).join('')}</div>
+        <div class="chain">${renderChain(e)}</div>
         <div class="intact">${e.intact?'<span style="color:var(--pass)">✓</span> chain intact — every parent resolves, signatures verified':'<span style="color:var(--violation)">✕</span> chain broken — missing parents'}</div>
       </div>
+
+      ${linkChainSection(e)}
 
       <div class="sub">
         <h3>Compliance findings</h3>
         ${f?findingHTML(f):'<div class="muted" style="font-size:13px">No findings.</div>'}
       </div>
+    </div>`;
+}
+
+/* §4.6 step 5.5 link-chain evaluation as it actually ran. Surfaced for any event that carries
+   a linkChain array — both denied decisions (for audit trail) and admitted ones (for ongoing
+   policy calibration). */
+function linkChainSection(e){
+  if (!e.linkChain || !e.linkChain.length) return '';
+  const anyFail = e.linkChain.some(r=>r.status==='fail');
+  return `
+    <div class="sub">
+      <h3>Link-chain evaluation <span style="text-transform:none;letter-spacing:0;color:var(--ink-3);font-weight:500;margin-left:6px">§4.6 step 5.5</span></h3>
+      <div style="font-size:12.5px;margin-bottom:6px">
+        <span class="policychip">posture: ${LINK_POLICY.posture}</span>
+        <span class="policychip">floor: ${LINK_POLICY.min_link_confidence}</span>
+        <span class="policychip">standing required: ${LINK_POLICY.require_author_standing?'yes':'no'}</span>
+      </div>
+      <div class="chainsteps">
+        ${e.linkChain.map(r=>{
+          const eff = effectiveConfidence(r.method, r.claimed);
+          const ceiling = LINK_POLICY.ceilings[r.method] ?? LINK_POLICY.ceilings.Other;
+          return `<div class="step ${r.status}">
+              <span class="dot"></span>
+              <div class="det">
+                <div class="nm">${r.from} → ${r.to}</div>
+                <div class="sub" style="margin:0">${r.method} · claimed ${r.claimed}, ceiling ${ceiling} → effective <b>${eff}</b></div>
+              </div>
+              <div class="conf">${eff}</div>
+              <div class="status">${r.status==='pass'?'PASS':'BLOCKED'}<div style="font-weight:500;font-size:10.5px;color:var(--ink-3);margin-top:2px">${r.reason}</div></div>
+            </div>`;
+        }).join('')}
+      </div>
+      ${anyFail ? `<div class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">
+        Cross-institutional honor was denied. The Link still sits in the DAG as evidence; the
+        steward console queues it for review per the same configured posture (§4.6 step 5.5).
+      </div>` : ''}
     </div>`;
 }
 function findingHTML(f){
@@ -297,6 +456,25 @@ function findingHTML(f){
       <div class="fn">${f.note}</div>
       <div class="fmeta mono">${f.meta}</div>
     </div>`;
+}
+
+/* Render the provenance chain row. Each entry can be a bare string (legacy: "Assert" / "Grant"
+   etc., always rendered as a normal pill) or a richer object {type, label?, blocked?, inert?}.
+   Blocked entries get a hatched/dashed treatment matching the steward console DAG. Inert
+   entries are faded with a dashed border. Arrows leading to a blocked entry turn red so the
+   visual flow makes the break obvious. */
+function renderChain(e){
+  const entries = (e.chain || []).map(p => typeof p === 'string'
+    ? {type:p, label:p, blocked:false, inert:false}
+    : {type:p.type, label:p.label||p.type, blocked:!!p.blocked, inert:!!p.inert});
+  return entries.map((p,i)=>{
+    const col = PILL[p.type] || 'var(--ink-3)';
+    const cls = p.blocked ? 'pill blocked' : (p.inert ? 'pill inert' : 'pill');
+    const bgStyle = p.blocked ? `color:${col}` : `background:${col}`;
+    const arrowCls = (i>0 && (p.blocked || entries[i-1].blocked)) ? 'arrow blocked' : 'arrow';
+    const arrow = i ? `<span class="${arrowCls}">${p.blocked || entries[i-1].blocked ? '⇢' : '→'}</span>` : '';
+    return `${arrow}<span class="${cls}" style="${bgStyle}">${p.label}</span>`;
+  }).join('');
 }
 
 /* ---------- report ---------- */
