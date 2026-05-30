@@ -12,6 +12,14 @@ fullnameOverride: peer
 
 replicaCount: 1
 
+# The testbed exercises the protocol layer (Core gRPC + libp2p) directly via the peer-driver Jobs.
+# The Bridge has a known M7 stub bug (PatientResourceProvider.create returns Void) that prevents
+# it from coming Ready, and we don't need it for these scenarios. Disable it to skip the
+# container entirely — the StatefulSet then ships only the Core container, /readyz is what
+# determines pod Readiness, and we save ~3GB Java heap per peer.
+bridge:
+  enabled: false
+
 image:
   core:
     repository: creda-core

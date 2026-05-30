@@ -54,6 +54,12 @@ signingKey:
   secretName: ""
   secretKey: "signing.key"
 
+# HAPI FHIR Bridge container. Default on for production — the Bridge is the FHIR-facing surface
+# institutions integrate against (§10.6.1). Disabled in testbed deployments that only exercise
+# the peer-to-peer protocol layer via gRPC directly.
+bridge:
+  enabled: true
+
 # Secrets are referenced, never embedded (§10.6.5): create these k8s Secrets out-of-band.
 secrets:
   udapCertSecret: creda-udap-cert        # institutional UDAP certificate + key

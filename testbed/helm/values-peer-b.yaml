@@ -12,6 +12,10 @@ fullnameOverride: peer
 
 replicaCount: 1
 
+# Bridge disabled — see values-peer-a.yaml for why.
+bridge:
+  enabled: false
+
 image:
   core:
     repository: creda-core

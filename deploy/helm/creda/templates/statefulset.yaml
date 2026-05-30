@@ -62,6 +62,7 @@ spec:
             {{- if .Values.signingKey.secretName }}
             - { name: signing-key, mountPath: /etc/creda/signing-key, readOnly: true }
             {{- end }}
+        {{- if .Values.bridge.enabled }}
         # ---- HAPI FHIR Bridge (Java) ----
         - name: hapi-bridge
           image: {{ include "creda.bridgeImage" . }}
@@ -81,6 +82,7 @@ spec:
           volumeMounts:
             - { name: uds, mountPath: /var/run/creda }
             - { name: tmp-bridge, mountPath: /tmp }
+        {{- end }}
       volumes:
         # Shared Unix domain socket between Core and Bridge (§10.5.1).
         - { name: uds, emptyDir: {} }
