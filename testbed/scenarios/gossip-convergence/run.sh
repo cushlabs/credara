@@ -32,8 +32,31 @@ if ! docker image inspect "$DRIVER_IMAGE" >/dev/null 2>&1; then
   exit 2
 fi
 
+dump_diagnostics() {
+  for NS in "$NS_A" "$NS_B"; do
+    echo "------ $NS pods ------" >&2
+    $kc -n "$NS" get pods 2>/dev/null || true
+    for POD in $($kc -n "$NS" get pods -o name 2>/dev/null); do
+      echo "------ describe $NS/$POD ------" >&2
+      $kc -n "$NS" describe "$POD" 2>/dev/null | tail -40 || true
+      echo "------ logs $NS/$POD creda-core ------" >&2
+      $kc -n "$NS" logs "$POD" -c creda-core --tail=80 2>/dev/null || true
+      echo "------ logs $NS/$POD hapi-bridge ------" >&2
+      $kc -n "$NS" logs "$POD" -c hapi-bridge --tail=40 2>/dev/null || true
+    done
+  done
+}
+
 cleanup() {
   local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "==> failure detected (rc=$rc); dumping diagnostics" >&2
+    dump_diagnostics
+  fi
+  if [[ "${KEEP_NAMESPACES:-0}" = "1" ]]; then
+    echo "==> KEEP_NAMESPACES=1; leaving $NS_A and $NS_B in place for manual inspection"
+    exit "$rc"
+  fi
   echo "==> cleanup"
   $hm uninstall -n "$NS_A" peer 2>/dev/null || true
   $hm uninstall -n "$NS_B" peer 2>/dev/null || true
@@ -120,7 +143,7 @@ spec:
       containers:
         - name: driver
           image: $DRIVER_IMAGE
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           args:
             - "--peer"
             - "http://$PEER_DNS"
@@ -150,7 +173,7 @@ spec:
       containers:
         - name: driver
           image: $DRIVER_IMAGE
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           args:
             - "--peer"
             - "http://$PEER_DNS"
