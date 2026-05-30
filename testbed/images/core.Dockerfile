@@ -32,6 +32,10 @@ RUN cargo build --release -p creda-core --features "${FEATURES}"
 FROM ${RUNTIME}
 COPY --from=builder /src/target/release/creda /usr/local/bin/creda
 EXPOSE 4001 9090
+# Declare non-root UID at the image level so the image is self-describing (PodSecurity-restricted
+# friendly) and we don't depend on the chart's runtime override to do the right thing. Matches
+# the chart's containerSecurityContext.runAsUser default of 65532 (DQ-1).
+USER 65532:65532
 # Entrypoint is just the binary; the Helm chart provides the subcommand via container args
 # (default `["serve"]`). Avoids double-`serve` when the chart adds its own args.
 ENTRYPOINT ["/usr/local/bin/creda"]

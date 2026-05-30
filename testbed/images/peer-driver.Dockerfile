@@ -19,4 +19,8 @@ RUN cargo build --release --manifest-path testbed/tools/peer-driver/Cargo.toml
 
 FROM ${RUNTIME}
 COPY --from=builder /src/testbed/tools/peer-driver/target/release/peer-driver /usr/local/bin/peer-driver
+# Non-root UID at the image level so the image satisfies PodSecurity-restricted on its own.
+# The peer-driver only opens an outbound TCP connection and writes to stdout — it needs no
+# special privileges. Matches the chart's runAsUser default (DQ-1).
+USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/peer-driver"]

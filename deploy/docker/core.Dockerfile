@@ -31,6 +31,10 @@ RUN cargo build --release -p creda-core --features "${FEATURES}"
 FROM ${RUNTIME}
 # Distroless: no shell, no package manager (§10.6.1). Non-root by base-image default (DQ-1).
 COPY --from=builder /src/target/release/creda /usr/local/bin/creda
+# Make the non-root UID explicit at the image level — Hummingbird non-root bases default to
+# UID 65532 but declaring it removes the "runs as root" image warning and keeps the chart's
+# runtime override (runAsUser: 65532) redundant rather than load-bearing.
+USER 65532:65532
 # Bridge HTTP is exposed by the bridge container; here: libp2p (4001), metrics/health (9090).
 EXPOSE 4001 9090
 # Entrypoint is just the binary; subcommand and flags come from the Helm chart's `args` field

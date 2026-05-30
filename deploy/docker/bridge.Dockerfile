@@ -21,6 +21,8 @@ RUN gradle --no-daemon clean bootJar
 FROM ${RUNTIME}
 # Distroless Java: just the JRE + the app jar. Non-root by base-image default (DQ-1).
 COPY --from=builder /src/bridge/build/libs/*.jar /app/creda-bridge.jar
+# Explicit non-root UID at the image level — see core.Dockerfile for rationale.
+USER 65532:65532
 EXPOSE 8080
 # Hummingbird OpenJDK base provides the JRE; entrypoint runs the Spring Boot fat jar.
 ENTRYPOINT ["java", "-jar", "/app/creda-bridge.jar"]

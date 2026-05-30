@@ -20,4 +20,6 @@ RUN gradle --no-daemon clean bootJar
 FROM ${RUNTIME}
 COPY --from=builder /src/bridge/build/libs/*.jar /app/creda-bridge.jar
 EXPOSE 8080
+# Non-root UID at the image level — matches the chart's runAsUser default (DQ-1).
+USER 65532:65532
 ENTRYPOINT ["java", "-jar", "/app/creda-bridge.jar"]
