@@ -140,10 +140,24 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # The testbed namespaces are labeled with the restricted Pod Security Standard (DQ-1
+      # parity with production). Every pod, including the peer-driver Job, must conform.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: driver
           image: $DRIVER_IMAGE
           imagePullPolicy: Never
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
           args:
             - "--peer"
             - "http://$PEER_DNS"
@@ -170,10 +184,24 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # The testbed namespaces are labeled with the restricted Pod Security Standard (DQ-1
+      # parity with production). Every pod, including the peer-driver Job, must conform.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: driver
           image: $DRIVER_IMAGE
           imagePullPolicy: Never
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
           args:
             - "--peer"
             - "http://$PEER_DNS"
