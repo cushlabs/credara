@@ -458,7 +458,15 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                 resolver,
                 100_000,
             ));
-            replicator.subscribe_buckets(&config.subscribed_buckets).await?;
+            // If `subscribe_all_buckets` is set (testbed convenience), expand to the full bucket
+            // space so synthetic events landing in any bucket reach this peer. Otherwise honor
+            // the explicit list in config.
+            let bucket_list: Vec<u64> = if config.subscribe_all_buckets {
+                (0..creda_net::BUCKET_COUNT).collect()
+            } else {
+                config.subscribed_buckets.clone()
+            };
+            replicator.subscribe_buckets(&bucket_list).await?;
             let repl = replicator.clone();
             tokio::spawn(async move {
                 while let Some(bytes) = inbound.recv().await {
@@ -526,7 +534,7 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             eprintln!(
                 "creda serve: libp2p replication active (listen={}, buckets={}, AE every {AE_INTERVAL_SECS}s)",
                 config.libp2p_listen,
-                config.subscribed_buckets.len()
+                bucket_list.len()
             );
         }
         #[cfg(not(feature = "libp2p"))]

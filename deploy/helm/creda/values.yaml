@@ -26,6 +26,11 @@ config:
   defaultPosture: treatment-presumed     # or deny-by-default (§9.3.2)
   snapshotIntervalSecs: 21600            # 6h (§7.3.3)
   subscribedBuckets: []
+  # Testbed convenience: subscribe to every bucket (0..1024). Heavy for production but trivial
+  # for two-peer kind setups where the synthetic data can land in any bucket. Leave false in
+  # production deployments and use `subscribedBuckets` to enumerate the buckets the institution
+  # covers.
+  subscribeAllBuckets: false
   # Bootstrap peers — multiaddrs of the form `/ip4/.../tcp/.../p2p/<peer-id>` (§6.1.3).
   # Empty for a single-peer or seed deployment; populated when joining an existing network.
   # Rendered into CREDA_BOOTSTRAP_PEERS (comma-separated) by the ConfigMap.

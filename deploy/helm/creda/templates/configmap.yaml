@@ -10,6 +10,18 @@ data:
   CREDA_LIBP2P_LISTEN: {{ .Values.config.libp2pListen | quote }}
   CREDA_DEFAULT_POSTURE: {{ .Values.config.defaultPosture | quote }}
   CREDA_SNAPSHOT_INTERVAL_SECS: {{ .Values.config.snapshotIntervalSecs | quote }}
+  {{- if .Values.config.subscribedBuckets }}
+  # Comma-separated u64 list. The daemon subscribes to each bucket's gossipsub topic so
+  # events that hash there (Replicator::publish_event derives the bucket from the event's
+  # demographics) reach this peer. Empty/missing = no buckets (peer receives nothing).
+  CREDA_SUBSCRIBED_BUCKETS: {{ join "," .Values.config.subscribedBuckets | quote }}
+  {{- end }}
+  {{- if .Values.config.subscribeAllBuckets }}
+  # Testbed convenience: subscribe to every bucket (0..1024). Overrides subscribedBuckets in
+  # the daemon. Heavy for production but trivial for two-peer kind setups where the synthetic
+  # data can land in any bucket.
+  CREDA_SUBSCRIBE_ALL_BUCKETS: "true"
+  {{- end }}
   {{- if .Values.participantRegistry.configMapName }}
   CREDA_PARTICIPANT_REGISTRY: "/etc/creda/participants"
   {{- end }}

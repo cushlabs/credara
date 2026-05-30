@@ -70,6 +70,11 @@ pub struct CredaConfig {
     /// Bound by the daemon. Kubelet calls these for liveness and readiness probes; without it
     /// bound the chart's StatefulSet pod will never reach Ready.
     pub health_listen: String,
+    /// Testbed convenience: when `true`, the daemon subscribes to every bucket (0..BUCKET_COUNT)
+    /// regardless of `subscribed_buckets`. Heavy in production (1024 gossipsub topics per
+    /// peer); fine for kind/k3d test beds where the synthetic data could land anywhere in the
+    /// bucket space and the gossip volume is negligible.
+    pub subscribe_all_buckets: bool,
 }
 
 impl Default for CredaConfig {
@@ -88,6 +93,7 @@ impl Default for CredaConfig {
             // Matches the chart's `ports.health` default (9090). Override per pod with
             // CREDA_HEALTH_LISTEN if you bind a different port.
             health_listen: "0.0.0.0:9090".into(),
+            subscribe_all_buckets: false,
         }
     }
 }
@@ -105,6 +111,7 @@ struct Overlay {
     bootstrap_peers: Option<Vec<String>>,
     signing_key_path: Option<String>,
     health_listen: Option<String>,
+    subscribe_all_buckets: Option<bool>,
 }
 
 impl CredaConfig {
@@ -153,6 +160,9 @@ impl CredaConfig {
         if let Some(v) = overlay.health_listen {
             self.health_listen = v;
         }
+        if let Some(v) = overlay.subscribe_all_buckets {
+            self.subscribe_all_buckets = v;
+        }
         Ok(())
     }
 
@@ -192,6 +202,19 @@ impl CredaConfig {
         }
         if let Ok(v) = std::env::var("CREDA_HEALTH_LISTEN") {
             self.health_listen = v;
+        }
+        // Comma-separated u64 list; whitespace tolerated; empty entries skipped.
+        if let Ok(v) = std::env::var("CREDA_SUBSCRIBED_BUCKETS") {
+            self.subscribed_buckets = v
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| s.parse::<u64>().ok())
+                .collect();
+        }
+        if let Ok(v) = std::env::var("CREDA_SUBSCRIBE_ALL_BUCKETS") {
+            let lower = v.trim().to_ascii_lowercase();
+            self.subscribe_all_buckets = matches!(lower.as_str(), "1" | "true" | "yes" | "on");
         }
         Ok(())
     }

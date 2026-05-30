@@ -34,6 +34,8 @@ config:
   defaultPosture: treatment-presumed
   snapshotIntervalSecs: 21600
   subscribedBuckets: [0]
+  # See values-peer-a.yaml for why.
+  subscribeAllBuckets: true
   bootstrapPeers: []  # overridden at scenario runtime
 
 snapshotCronJob:

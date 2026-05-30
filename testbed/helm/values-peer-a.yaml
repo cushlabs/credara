@@ -41,6 +41,10 @@ config:
   defaultPosture: treatment-presumed
   snapshotIntervalSecs: 21600
   subscribedBuckets: [0]
+  # The peer-driver synthesizes Asserts whose demographics hash to any of 1024 buckets, so the
+  # testbed peers subscribe to all of them. Gossip then propagates regardless of which bucket
+  # the synthetic data lands in.
+  subscribeAllBuckets: true
   bootstrapPeers: []
 
 # The testbed disables the snapshot CronJob — scenarios don't need it and it just adds noise.
