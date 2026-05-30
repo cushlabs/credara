@@ -1,0 +1,38 @@
+name: gitleaks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly full-history scan to catch anything that slipped in via merge.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # Pin to a commit SHA — Dependabot will bump it.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Fetch full history so the scan covers the whole repo, not just the
+          # PR diff. gitleaks-action falls back to a PR-only scan when run on
+          # pull_request events; this gives it the data it needs for push/cron.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE: required only for orgs >25 users (currently free for us).
+          # GITLEAKS_NOTIFY_USER_LIST: '@cushlabs/security'
+          GITLEAKS_ENABLE_COMMENTS: "true"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"

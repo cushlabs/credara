@@ -1,0 +1,48 @@
+# gitleaks configuration for Creda.
+#
+# Starts from the upstream default ruleset and layers project-specific
+# allowlist entries to suppress known false positives. Run locally with:
+#   gitleaks detect --config .gitleaks.toml --verbose
+#
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project allowlist — do not add real secrets here."
+paths = [
+  # Lockfiles regularly contain registry index hashes that pattern-match
+  # like high-entropy tokens but are not secrets.
+  '''^Cargo\.lock$''',
+
+  # The synthetic data generator (M9) produces fake credentials that the
+  # default ruleset would flag. Real data must never live here.
+  '''^conformance/(fixtures|synthetic)/''',
+
+  # Docs and the spec contain example tokens / keys for illustration.
+  '''^docs/.*\.md$''',
+  '''^design/.*''',
+
+  # The example Ansible vars file uses placeholders, not real values.
+  '''^deploy/ansible/group_vars/all\.example\.ya?ml$''',
+]
+
+# Regexes for strings that look like secrets but are not.
+regexes = [
+  # Example public keys in the participant key registry docstring:
+  #   "ed25519 3b6a..."
+  '''ed25519 [0-9a-fA-F]{8,}''',
+]
+
+# Stop-words: if a matched string also contains any of these substrings,
+# treat the finding as a false positive.
+stopwords = [
+  "EXAMPLE",
+  "PLACEHOLDER",
+  "TODO",
+  "FIXME",
+  "synthetic",
+  "sample",
+  "fixture",
+]

@@ -1,0 +1,32 @@
+# Pre-commit hooks for Creda contributors.
+#
+# Install once:
+#   pipx install pre-commit       # or: brew install pre-commit
+#   pre-commit install
+#
+# Run on demand:
+#   pre-commit run --all-files
+#
+# CI re-runs the same hooks (gitleaks, at minimum) so a missed local install
+# is caught at PR time, but running locally keeps the feedback loop short.
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+        exclude: ^deploy/helm/.*/templates/  # Helm templates aren't valid YAML
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: \.md$  # Markdown trailing whitespace is sometimes intentional
+      - id: mixed-line-ending
+        args: ["--fix=lf"]

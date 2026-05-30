@@ -150,11 +150,38 @@ git commit -s -m "M1: add Assert event payload validation per §3.4"
 
 This adds a `Signed-off-by: Your Name <you@example.com>` trailer. CI checks for it.
 
+## Pre-commit hooks
+
+Install the project's pre-commit hooks once per clone — they catch the things CI checks
+anyway (secrets, large files, merge markers, mixed line endings) before a commit is
+even created.
+
+```sh
+# One-time install of the framework
+pipx install pre-commit          # or: brew install pre-commit / pip install pre-commit
+
+# Install the hooks for this repo
+pre-commit install
+
+# Run against everything once (recommended after install)
+pre-commit run --all-files
+```
+
+The hooks are pinned in [`.pre-commit-config.yaml`](.pre-commit-config.yaml). The most
+important one is **gitleaks**, which scans the diff for credentials, API keys, and
+private-key material before commit. Its allowlist lives in
+[`.gitleaks.toml`](.gitleaks.toml).
+
+If gitleaks blocks a commit and the finding is a false positive, **do not bypass the
+hook**. Either rewrite the example to avoid the pattern, or extend the allowlist in a
+PR and explain why the pattern is safe. `--no-verify` is reserved for genuine
+emergencies — and CI will catch it anyway.
+
 ## Security and data handling
 
 - **Never commit secrets, credentials, or real PHI.** Use the synthetic data generator
-  (M9) only. The `.gitignore` and (eventually) pre-commit hooks help guard against
-  accidental secret commits, but the responsibility is yours.
+  (M9) only. The `.gitignore` and the pre-commit hooks (gitleaks — see above) help guard
+  against accidental secret commits, but the responsibility is yours.
 - **Do not weaken the security model.** UDAP + SPIFFE dual credentials, mandatory
   signature verification on replication, authorization enforcement at the responding
   peer, and dual-control are load-bearing (spec §9). Changes that touch them need extra
