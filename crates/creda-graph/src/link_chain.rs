@@ -32,11 +32,55 @@
 //! Defaults aim at "deny the obvious attack, permit the obvious legitimate case." Concrete
 //! calibration is institution policy.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 
-use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventNode, LinkMethod};
+use creda_events::{EventId, EventPayload, IdentityEventNode, LinkMethod};
 
 use crate::subgraph::Subgraph;
+
+/// Per-`LinkMethod` ceilings on the signing institution's claimed `confidence_score`. A struct
+/// rather than a map because the methods are a small fixed set, and we want infallible lookups
+/// for any `LinkMethod` variant without hash/order requirements on the enum (which is bit-stable
+/// across the wire). Adjust fields directly to recalibrate.
+#[derive(Clone, Debug)]
+pub struct MethodCeilings {
+    pub insurance_crosswalk: u16,
+    pub referral: u16,
+    pub algorithmic: u16,
+    pub manual: u16,
+    pub other: u16,
+}
+
+impl MethodCeilings {
+    /// Default ceilings reflect each method's intrinsic verification strength (§5.3.5). These
+    /// are starting points, not protocol invariants; institutions calibrate.
+    pub fn defaults() -> Self {
+        Self {
+            insurance_crosswalk: 9500,
+            referral: 9000,
+            algorithmic: 7000,
+            manual: 5000,
+            other: 3000,
+        }
+    }
+
+    /// Ceiling for a specific method.
+    pub fn for_method(&self, method: LinkMethod) -> u16 {
+        match method {
+            LinkMethod::InsuranceCrosswalk => self.insurance_crosswalk,
+            LinkMethod::Referral => self.referral,
+            LinkMethod::Algorithmic => self.algorithmic,
+            LinkMethod::Manual => self.manual,
+            LinkMethod::Other => self.other,
+        }
+    }
+}
+
+impl Default for MethodCeilings {
+    fn default() -> Self {
+        Self::defaults()
+    }
+}
 
 /// Configuration for the Link-chain check. Held per responding peer. Construct via
 /// [`LinkChainConfig::default`] and adjust.
@@ -51,32 +95,13 @@ pub struct LinkChainConfig {
     pub require_author_standing: bool,
     /// Per-`LinkMethod` ceiling on the signing institution's claimed `confidence_score`. The
     /// effective confidence used in the floor check is `min(claimed, ceiling)`.
-    pub method_ceilings: BTreeMap<LinkMethod, u16>,
+    pub method_ceilings: MethodCeilings,
 }
 
 impl LinkChainConfig {
-    /// Default ceilings reflect each method's intrinsic verification strength. Tweakable per
-    /// deployment — these are starting points, not protocol invariants (§5.3.2).
-    pub fn default_method_ceilings() -> BTreeMap<LinkMethod, u16> {
-        let mut m = BTreeMap::new();
-        m.insert(LinkMethod::InsuranceCrosswalk, 9500);
-        m.insert(LinkMethod::Referral, 9000);
-        m.insert(LinkMethod::Algorithmic, 7000);
-        m.insert(LinkMethod::Manual, 5000);
-        m.insert(LinkMethod::Other, 3000);
-        m
-    }
-
-    /// Effective confidence for a Link, given the ceiling. Unknown methods are treated as
-    /// `Other`'s ceiling, conservatively.
+    /// Effective confidence for a Link, given the ceiling.
     pub fn effective_confidence(&self, claimed: u16, method: LinkMethod) -> u16 {
-        let ceiling = self
-            .method_ceilings
-            .get(&method)
-            .copied()
-            .or_else(|| self.method_ceilings.get(&LinkMethod::Other).copied())
-            .unwrap_or(0);
-        claimed.min(ceiling)
+        claimed.min(self.method_ceilings.for_method(method))
     }
 }
 
@@ -89,7 +114,7 @@ impl Default for LinkChainConfig {
             // Off by default to preserve the legitimate first-encounter case. Federal /
             // deny-by-default deployments flip this on.
             require_author_standing: false,
-            method_ceilings: Self::default_method_ceilings(),
+            method_ceilings: MethodCeilings::defaults(),
         }
     }
 }
@@ -360,7 +385,10 @@ mod tests {
 
     #[test]
     fn default_ceilings_cover_all_known_methods() {
-        let ceilings = LinkChainConfig::default_method_ceilings();
+        let ceilings = MethodCeilings::defaults();
+        // The struct shape guarantees every variant is covered at compile time. This test exists
+        // to catch regressions: if someone adds a new LinkMethod variant they must also extend
+        // MethodCeilings (the match in for_method would otherwise fail to compile).
         for method in [
             LinkMethod::Manual,
             LinkMethod::Algorithmic,
@@ -368,10 +396,9 @@ mod tests {
             LinkMethod::InsuranceCrosswalk,
             LinkMethod::Other,
         ] {
-            assert!(
-                ceilings.contains_key(&method),
-                "default ceiling missing for {method:?} — would surprise operators"
-            );
+            let c = ceilings.for_method(method);
+            assert!(c > 0, "default ceiling for {method:?} is zero — would silently deny everything");
+            assert!(c <= 10_000, "ceiling exceeds confidence range for {method:?}");
         }
     }
 
