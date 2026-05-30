@@ -1,0 +1,10 @@
+apiVersion: v2
+name: creda-clients
+description: |
+  Persona-specific Creda front-end clients (clinician / prior-auth / steward / patient / audit).
+  Single nginx pod serving a SPA built by clients/Dockerfile; one Service exposes :8080.
+  Used by the testbed ui-smoke scenario; the production chart will rebase this into the main
+  creda chart once the clients move out of mock mode.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

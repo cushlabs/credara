@@ -1,0 +1,19 @@
+# Defaults for the testbed clients chart. Override per scenario as needed.
+
+image:
+  repository: creda-clients
+  tag: testbed
+  pullPolicy: Never   # see testbed/helm/values-peer-a.yaml for why
+
+# When set, points the SPA at a real bridge (`http://creda-bridge:8080/fhir`); empty falls
+# back to the build-time default (mock). For ui-smoke we deliberately leave it empty so the
+# spec runs deterministically against fixtures.
+fhirBase: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits:   { cpu: 250m, memory: 192Mi }

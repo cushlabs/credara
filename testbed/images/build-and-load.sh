@@ -13,6 +13,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CORE_IMAGE="creda-core:testbed"
 BRIDGE_IMAGE="creda-bridge:testbed"
 DRIVER_IMAGE="peer-driver:testbed"
+CLIENTS_IMAGE="creda-clients:testbed"
+E2E_IMAGE="creda-clients-e2e:testbed"
 
 # The Core build needs the dev image present locally (it's the builder stage). The user runs
 # `make libp2p` (or any `make` target) before `make up`, which builds creda-dev:local; if missing,
@@ -39,6 +41,22 @@ echo "==> building $DRIVER_IMAGE"
 docker build \
   -f "$REPO_ROOT/testbed/images/peer-driver.Dockerfile" \
   -t "$DRIVER_IMAGE" \
+  "$REPO_ROOT"
+
+# Clients + e2e runner — used by scenarios/ui-smoke. Built unconditionally so `make up`
+# leaves a fully-loaded cluster regardless of which scenario the user runs next. Both
+# Dockerfiles live under clients/ rather than testbed/images/ because the same Dockerfiles
+# build the production image (clients/Dockerfile) and the dev e2e runner.
+echo "==> building $CLIENTS_IMAGE"
+docker build \
+  -f "$REPO_ROOT/clients/Dockerfile" \
+  -t "$CLIENTS_IMAGE" \
+  "$REPO_ROOT"
+
+echo "==> building $E2E_IMAGE"
+docker build \
+  -f "$REPO_ROOT/clients/e2e.Dockerfile" \
+  -t "$E2E_IMAGE" \
   "$REPO_ROOT"
 
 echo "==> loading images into kind cluster '$CLUSTER'"
@@ -76,5 +94,7 @@ load_image_into_kind() {
 load_image_into_kind "$CORE_IMAGE"
 load_image_into_kind "$BRIDGE_IMAGE"
 load_image_into_kind "$DRIVER_IMAGE"
+load_image_into_kind "$CLIENTS_IMAGE"
+load_image_into_kind "$E2E_IMAGE"
 
-echo "==> images ready: $CORE_IMAGE, $BRIDGE_IMAGE, $DRIVER_IMAGE"
+echo "==> images ready: $CORE_IMAGE, $BRIDGE_IMAGE, $DRIVER_IMAGE, $CLIENTS_IMAGE, $E2E_IMAGE"

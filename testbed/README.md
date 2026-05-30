@@ -73,6 +73,45 @@ make down      # tear down the cluster
 `make smoke` is non-destructive — it brings up two peers in their own namespaces, runs the
 scenario, and tears down the peers but leaves the cluster running for the next run.
 
+### User-acceptance testing the front-end clients
+
+To drive the persona UIs in a browser (clinician / prior-auth / steward / patient / audit),
+run these one per terminal (or one at a time — each block is paste-safe in both bash and
+zsh):
+
+```sh
+cd testbed
+make up
+```
+
+Once, if the cluster + images aren't already built. Then bring the clients up — mock-mode
+FHIR fixtures, persistent namespace `creda-ui`:
+
+```sh
+cd testbed
+make ui-up
+```
+
+In a second terminal, port-forward the in-cluster Service to your laptop. This is
+blocking; Ctrl-C kills the forwarder only and the UI keeps running:
+
+```sh
+cd testbed
+make ui-forward
+```
+
+Tear the UAT namespace down when you're done:
+
+```sh
+cd testbed
+make ui-down
+```
+
+`make ui-up` is idempotent — re-running it upgrades the chart in place rather than
+reinstalling. The UAT install lives in its own `creda-ui` namespace and is **not** affected by
+`make ui-smoke`, which uses the ephemeral `creda-ui-smoke` namespace and cleans up after
+itself. UAT and ui-smoke can run side-by-side without interference.
+
 ## Why this exists
 
 The unit and integration tests live in `crates/` and `conformance/` and run against
@@ -107,6 +146,10 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
   (~2s normal). `make smoke`.
 - `anti-entropy-repair/` — peer-a publishes events before peer-b exists; peer-b joins later;
   events arrive at peer-b only via the periodic anti-entropy round (§6.1.8). `make ae-repair`.
+- `ui-smoke/` — deploys the persona front-end clients (`clients/`) into the cluster and runs
+  Playwright e2e specs as an in-cluster Job. Asserts each persona's primary flow against a
+  mock FHIR bridge; rebases onto a real bridge once the M7 `TODO(bridge-verify)` stubs land.
+  `make ui-smoke`.
 
 Planned (not yet implemented):
 

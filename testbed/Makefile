@@ -19,7 +19,7 @@ BASH         ?= bash
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean images smoke ae-repair
+.PHONY: up down clean images smoke ae-repair ui-smoke ui-up ui-forward ui-down
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -52,3 +52,24 @@ smoke:
 # is 30s today and the first useful round is at ~t=30s after the joining peer's daemon starts.
 ae-repair:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/anti-entropy-repair/run.sh "$(CLUSTER_NAME)"
+
+# UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
+# Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the
+# M7 bridge stubs land the same scenario will run against a real bridge.
+ui-smoke:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/ui-smoke/run.sh "$(CLUSTER_NAME)"
+
+## --- UI for user-acceptance testing ---
+##
+## ui-up brings the persona clients up in their own persistent namespace ('creda-ui') so a
+## reviewer can drive the UI in a browser. It is intentionally separate from ui-smoke (which
+## tears its namespace down at the end) — a test run never disturbs an in-progress UAT
+## session. ui-forward is the blocking port-forward; ui-down tears the UAT namespace down.
+ui-up:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-up.sh "$(CLUSTER_NAME)"
+
+ui-forward:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-forward.sh "$(CLUSTER_NAME)"
+
+ui-down:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-down.sh "$(CLUSTER_NAME)"
