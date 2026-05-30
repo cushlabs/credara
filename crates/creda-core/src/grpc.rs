@@ -391,6 +391,24 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             config.grpc_socket
         );
 
+        // Health endpoint (§10.5.3). Spawned before the libp2p block so /livez goes green
+        // immediately and Kubernetes won't restart the pod during a slow libp2p init. /readyz
+        // stays 503 until the `ready` flag is flipped at the bottom of startup.
+        let ready = crate::health::ReadyFlag::new();
+        {
+            let ready_for_health = ready.clone();
+            let core_for_health = core.clone();
+            let health_listen = config.health_listen.clone();
+            tokio::spawn(async move {
+                if let Err(e) =
+                    crate::health::serve_health(&health_listen, ready_for_health, core_for_health)
+                        .await
+                {
+                    eprintln!("creda serve: health endpoint exited: {e}");
+                }
+            });
+        }
+
         // Outbound publisher (set under libp2p; absent otherwise — without it, locally created
         // events are still signed and stored, just not gossiped).
         let publisher: Option<Arc<dyn EventPublisher>>;
@@ -515,6 +533,11 @@ pub fn serve(config: CredaConfig) -> Result<()> {
         {
             publisher = None;
         }
+
+        // Startup sequence finished — flip /readyz to 200. From this point Kubernetes will
+        // route traffic to this pod (rolling upgrade waits on this; §10.6.7).
+        ready.set_ready();
+        eprintln!("creda serve: /readyz now reports ready");
 
         serve_with_core(core, &config.grpc_socket, shutdown_signal(), publisher).await
     })

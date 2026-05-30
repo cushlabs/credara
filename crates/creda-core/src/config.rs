@@ -66,6 +66,10 @@ pub struct CredaConfig {
     /// fatal for a peer that needs to be recognized across restarts (its institution_id would
     /// change each time). Production mounts a k8s Secret at this path.
     pub signing_key_path: Option<String>,
+    /// `host:port` for the HTTP health endpoint (§10.5.3 — `/livez`, `/readyz`, `/metrics`).
+    /// Bound by the daemon. Kubelet calls these for liveness and readiness probes; without it
+    /// bound the chart's StatefulSet pod will never reach Ready.
+    pub health_listen: String,
 }
 
 impl Default for CredaConfig {
@@ -81,6 +85,9 @@ impl Default for CredaConfig {
             participant_registry: None,
             bootstrap_peers: Vec::new(),
             signing_key_path: None,
+            // Matches the chart's `ports.health` default (9090). Override per pod with
+            // CREDA_HEALTH_LISTEN if you bind a different port.
+            health_listen: "0.0.0.0:9090".into(),
         }
     }
 }
@@ -97,6 +104,7 @@ struct Overlay {
     participant_registry: Option<String>,
     bootstrap_peers: Option<Vec<String>>,
     signing_key_path: Option<String>,
+    health_listen: Option<String>,
 }
 
 impl CredaConfig {
@@ -142,6 +150,9 @@ impl CredaConfig {
         if let Some(v) = overlay.signing_key_path {
             self.signing_key_path = Some(v);
         }
+        if let Some(v) = overlay.health_listen {
+            self.health_listen = v;
+        }
         Ok(())
     }
 
@@ -178,6 +189,9 @@ impl CredaConfig {
         }
         if let Ok(v) = std::env::var("CREDA_SIGNING_KEY_PATH") {
             self.signing_key_path = Some(v);
+        }
+        if let Ok(v) = std::env::var("CREDA_HEALTH_LISTEN") {
+            self.health_listen = v;
         }
         Ok(())
     }

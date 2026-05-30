@@ -38,6 +38,9 @@ pub mod signer;
 #[cfg(feature = "grpc")]
 pub mod grpc;
 
+#[cfg(feature = "grpc")]
+pub mod health;
+
 pub use config::{CredaConfig, PostureSetting};
 pub use engine::{CredaCore, Ingest, VerifyingKeyResolver};
 pub use error::{Error, Result};
