@@ -107,8 +107,8 @@ $hm install -n "$NS_A" peer "$CHART" \
   --set participantRegistry.configMapName=creda-participants \
   --wait --timeout 180s >/dev/null
 
-"$TESTBED/scripts/wait-ready.sh" "$NS_A" peer 180
-PEER_A_MULTIADDR="$("$TESTBED/scripts/peer-multiaddr.sh" "$NS_A" peer-0)"
+bash "$TESTBED/scripts/wait-ready.sh" "$NS_A" peer 180
+PEER_A_MULTIADDR="$(bash "$TESTBED/scripts/peer-multiaddr.sh" "$NS_A" peer-0)"
 echo "==> peer-a multiaddr: $PEER_A_MULTIADDR"
 
 # ---- install peer-b (bootstrap → peer-a) -----------------------------------------------------
@@ -120,7 +120,7 @@ $hm install -n "$NS_B" peer "$CHART" \
   --set-string "config.bootstrapPeers[0]=$PEER_A_MULTIADDR" \
   --wait --timeout 180s >/dev/null
 
-"$TESTBED/scripts/wait-ready.sh" "$NS_B" peer 180
+bash "$TESTBED/scripts/wait-ready.sh" "$NS_B" peer 180
 
 echo "==> giving the mesh a moment to form (3s)"
 sleep 3
