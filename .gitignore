@@ -60,3 +60,15 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+
+# ---- Vite / Playwright / sandbox temp ----
+# Vite writes timestamped temp configs next to vite.config.ts during HMR.
+**/vite.config.ts.timestamp-*.mjs
+# Playwright per-run output (already in clients/.gitignore, restated here so
+# git status is clean if Playwright is run outside clients/ too).
+**/playwright-report/
+**/test-results/
+# Sandbox-side scratch artifacts (Claude's Read/Write tooling occasionally
+# leaves 0-byte _tmp_* files in the mount that can't be unlinked from inside).
+_tmp_*
+**/_tmp_*
