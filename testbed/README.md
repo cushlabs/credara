@@ -47,6 +47,20 @@ No host Rust, JDK, or Gradle — every build runs inside `creda-dev:local`, and 
 runs as a Kubernetes Job inside the kind cluster (matching the eventual operator deployment
 model).
 
+## Scripts and the executable bit
+
+Every script invocation goes through `bash <path>` rather than executing the script directly
+(both in the Makefile and inside scenario scripts that call helper scripts). This means a fresh
+clone of the repo can run `make smoke` without any `chmod +x` step — git only preserves the
+executable bit for files that had it set in the commit that introduced them, and we don't want
+new testers to hit a permission-denied error before the scenario starts. If you add a new
+script, follow the same pattern: `$(BASH) $(REPO_ROOT)/path/to/script.sh` in the Makefile and
+`bash "$TESTBED/path/to/script.sh"` inside scenario scripts.
+
+If you want direct `./script.sh` invocation to work too (handy for ad-hoc debugging), set the
+bit in git with `git update-index --chmod=+x <path>` once and commit. The Makefile path doesn't
+require it.
+
 ## Quickstart
 
 ```
