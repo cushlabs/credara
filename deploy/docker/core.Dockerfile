@@ -18,6 +18,10 @@ ARG RUNTIME=registry.fedoraproject.org/hummingbird/minimal-nonroot:fips
 ARG FEATURES=grpc,libp2p
 
 FROM ${RUST_BUILDER} AS builder
+# ARGs declared before the first FROM are NOT in scope inside build stages — they have to be
+# re-declared after FROM to be visible. Without this, ${FEATURES} below resolves to empty and
+# cargo builds with default features only (no grpc, no libp2p).
+ARG FEATURES
 WORKDIR /src
 COPY . .
 # The Hummingbird Rust builder is expected to carry the C/C++ toolchain + libclang (for
@@ -29,4 +33,7 @@ FROM ${RUNTIME}
 COPY --from=builder /src/target/release/creda /usr/local/bin/creda
 # Bridge HTTP is exposed by the bridge container; here: libp2p (4001), metrics/health (9090).
 EXPOSE 4001 9090
-ENTRYPOINT ["/usr/local/bin/creda", "serve"]
+# Entrypoint is just the binary; subcommand and flags come from the Helm chart's `args` field
+# (default `["serve"]`). This lets the same image run other subcommands (`init`, `snapshot`,
+# `inspect`) by changing chart args, and avoids duplicate `serve` when the chart sets args.
+ENTRYPOINT ["/usr/local/bin/creda"]

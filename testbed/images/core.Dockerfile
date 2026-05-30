@@ -17,6 +17,11 @@ ARG RUNTIME=registry.fedoraproject.org/fedora-minimal:41
 ARG FEATURES=grpc,libp2p
 
 FROM ${RUST_BUILDER} AS builder
+# ARGs declared before the first FROM are NOT in scope inside build stages — they have to be
+# re-declared after FROM to be visible. Without this, ${FEATURES} below resolves to empty and
+# cargo builds with default features only (no grpc, no libp2p) — and `creda serve` errors out
+# at runtime saying gRPC is missing.
+ARG FEATURES
 WORKDIR /src
 COPY . .
 # CARGO_HOME / target live inside the layer so the build artifacts go into the image. We set
@@ -27,4 +32,6 @@ RUN cargo build --release -p creda-core --features "${FEATURES}"
 FROM ${RUNTIME}
 COPY --from=builder /src/target/release/creda /usr/local/bin/creda
 EXPOSE 4001 9090
-ENTRYPOINT ["/usr/local/bin/creda", "serve"]
+# Entrypoint is just the binary; the Helm chart provides the subcommand via container args
+# (default `["serve"]`). Avoids double-`serve` when the chart adds its own args.
+ENTRYPOINT ["/usr/local/bin/creda"]
