@@ -1,0 +1,137 @@
+# Canonical label set for cushlabs/creda.
+#
+# Synced to GitHub by .github/workflows/labels.yml on push to main.
+# Edit here, not in the GitHub UI — UI edits will be reverted on the next sync.
+#
+# Color palette is loosely organized:
+#   reds      = bugs, regressions, blockers
+#   oranges   = security
+#   yellows   = needs-triage, waiting
+#   greens    = enhancements, good-first-issue
+#   blues     = docs, infrastructure
+#   purples   = milestones
+#   greys     = process / meta
+
+# ---- Type ----
+- name: bug
+  color: "d73a4a"
+  description: Something is not working as specified.
+- name: regression
+  color: "b60205"
+  description: Worked before, broken now.
+- name: enhancement
+  color: "0e8a16"
+  description: New feature or improvement to an existing one.
+- name: docs
+  color: "0075ca"
+  description: Documentation changes only.
+- name: refactor
+  color: "5319e7"
+  description: Internal change with no observable behaviour change.
+- name: test
+  color: "1d76db"
+  description: Test-only change (including conformance).
+- name: dependencies
+  color: "0366d6"
+  description: Dependency bump (Dependabot).
+
+# ---- Areas ----
+- name: rust
+  color: "dea584"
+  description: Touches the Rust workspace.
+- name: java
+  color: "b07219"
+  description: Touches the Java/Kotlin bridge.
+- name: ci
+  color: "ededed"
+  description: CI configuration, workflows, or release tooling.
+- name: docker
+  color: "0db7ed"
+  description: Dev container or deploy images.
+
+# ---- Security ----
+- name: security
+  color: "ee0701"
+  description: Security-impacting change. Requires second review.
+- name: security-advisory
+  color: "b60205"
+  description: Linked to a private security advisory.
+
+# ---- Workflow / triage ----
+- name: needs-triage
+  color: "fbca04"
+  description: New issue, not yet reviewed by a maintainer.
+- name: needs-info
+  color: "fef2c0"
+  description: Waiting on reporter for more information.
+- name: blocked
+  color: "b60205"
+  description: Blocked on an external decision, dependency, or another issue.
+- name: wontfix
+  color: "ffffff"
+  description: This will not be worked on.
+- name: duplicate
+  color: "cfd3d7"
+  description: Already tracked elsewhere — link the original.
+- name: invalid
+  color: "e4e669"
+  description: Not actionable as filed.
+
+# ---- Community ----
+- name: good-first-issue
+  color: "7057ff"
+  description: Suited to a new contributor.
+- name: help-wanted
+  color: "008672"
+  description: Maintainers would welcome a PR.
+- name: discussion
+  color: "d4c5f9"
+  description: Needs design discussion before implementation.
+
+# ---- Spec / process ----
+- name: spec
+  color: "5319e7"
+  description: Question, clarification, or change to the technical spec.
+- name: open-question-13.x
+  color: "fbca04"
+  description: Tracks a deferred decision from spec §13.
+
+# ---- Milestones (spec build order) ----
+- name: M0
+  color: "c5def5"
+  description: M0 — foundations.
+- name: M1
+  color: "bfd4f2"
+  description: M1 — creda-events.
+- name: M2
+  color: "bfd4f2"
+  description: M2 — creda-store.
+- name: M3
+  color: "bfd4f2"
+  description: M3 — creda-graph.
+- name: M4
+  color: "bfd4f2"
+  description: M4 — creda-net.
+- name: M5
+  color: "bfd4f2"
+  description: M5 — creda-core.
+- name: M6
+  color: "bfd4f2"
+  description: M6 — export-gate / verifier.
+- name: M7
+  color: "bfd4f2"
+  description: M7 — bridge.
+- name: M8
+  color: "bfd4f2"
+  description: M8 — deployment.
+- name: M9
+  color: "bfd4f2"
+  description: M9 — conformance + synthetic data.
+
+# ---- Release notes grouping ----
+- name: breaking-change
+  color: "b60205"
+  description: Backwards-incompatible change. Calls for a major/minor bump.
+- name: skip-changelog
+  color: "ededed"
+  description: Exclude from auto-generated release notes.

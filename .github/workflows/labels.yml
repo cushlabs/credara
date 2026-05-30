@@ -1,0 +1,30 @@
+name: Sync labels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.yml"
+      - ".github/workflows/labels.yml"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    name: Sync labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Apply labels from .github/labels.yml
+        # Pin to a commit SHA — Dependabot will bump it.
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+        with:
+          config-file: .github/labels.yml
+          # delete-other-labels removes labels not in the config so the file
+          # stays the single source of truth. Turn off briefly during migration
+          # if you have existing labels you want to preserve.
+          delete-other-labels: true
