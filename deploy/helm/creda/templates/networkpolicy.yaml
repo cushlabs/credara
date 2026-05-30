@@ -16,6 +16,12 @@ spec:
     - ports:
         - { protocol: TCP, port: {{ .Values.ports.http }} }    # FHIR clients
         - { protocol: TCP, port: {{ .Values.ports.libp2p }} }  # peers
+        {{- if hasPrefix "tcp://" .Values.config.grpcSocket }}
+        # Core gRPC TCP (testbed + ops tooling). Only rendered when grpcSocket is TCP — in the
+        # production UDS default this port isn't bound and the rule would be moot. Operators
+        # can scope `from:` per environment (e.g. namespace-scoped source) when needed.
+        - { protocol: TCP, port: {{ .Values.ports.grpc }} }
+        {{- end }}
   egress:
     - ports:
         - { protocol: TCP, port: {{ .Values.ports.libp2p }} }  # peer-to-peer
