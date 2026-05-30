@@ -42,16 +42,34 @@ docker build \
   "$REPO_ROOT"
 
 echo "==> loading images into kind cluster '$CLUSTER'"
-# Use `save | load image-archive` instead of `kind load docker-image` — the latter is unreliable
-# under Podman (it talks to Docker's daemon and Podman's local image store may not be visible).
-# Save+archive uses the OCI archive format which kind handles identically regardless of the
-# underlying engine. Works for both Docker and Podman without environment-specific branching.
+# Use `save | load image-archive` instead of `kind load docker-image`. The latter is unreliable
+# under Podman: Podman stores images under a `localhost/` prefix by default, and kind's
+# `docker-image` path resolves names through Docker's daemon, not Podman's image store.
+#
+# Even with `save | image-archive`, Podman writes the saved archive's RepoTags using the
+# stored name (`localhost/creda-core:testbed`), which is not what kubelet asks for when the
+# Helm chart references `creda-core:testbed`. Containerd does not do partial-name matching, so
+# the image lands but kubelet can't find it.
+#
+# Fix: before save, ensure a canonical `docker.io/library/<image>` tag exists (containerd's
+# default resolution for a bare name), then save by that tag. This works under Docker (the
+# extra tag is harmless) and under Podman (it strips the localhost prefix in the archive).
 load_image_into_kind() {
   local image="$1"
+  local canonical="docker.io/library/$image"
   local tmp
   tmp="$(mktemp -t kind-load.XXXXXX.tar)"
   trap 'rm -f "$tmp"' RETURN
-  docker save "$image" -o "$tmp"
+
+  # Make the canonical tag exist regardless of how the image was stored locally.
+  docker tag "$image" "$canonical" 2>/dev/null \
+    || docker tag "localhost/$image" "$canonical" 2>/dev/null \
+    || {
+      echo "ERROR: cannot retag $image as $canonical; image not found locally" >&2
+      return 1
+    }
+
+  docker save "$canonical" -o "$tmp"
   kind load image-archive "$tmp" --name "$CLUSTER"
 }
 
