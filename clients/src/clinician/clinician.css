@@ -1,0 +1,61 @@
+/* Clinician-specific styles ported from design/clinician-review-mockup.html. */
+
+.searchrow { display: flex; gap: 10px; margin-bottom: 16px; }
+.searchrow input {
+  flex: 1; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+  font-size: 14px; background: var(--surface);
+}
+.searchrow input:focus { outline: 2px solid #bfe0ec; border-color: var(--primary); }
+
+.plist { display: grid; gap: 10px; }
+.pcard {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow); cursor: pointer;
+  transition: transform .06s ease, border-color .12s ease;
+  text-decoration: none; color: inherit;
+}
+.pcard:hover { transform: translateY(-1px); border-color: #c3d2e6; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+.pcard .nm { font-weight: 640; font-size: 15px; }
+.pcard .sub { color: var(--ink-3); font-size: 12.5px; }
+.pcard .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+.phead {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 16px;
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 16px; align-items: center;
+}
+.phead .avatar { width: 56px; height: 56px; font-size: 19px; }
+.phead .nm { font-size: 20px; font-weight: 700; }
+.phead .meta { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.phead .meta b { color: var(--ink); font-weight: 600; }
+.phead .score { text-align: right; }
+.phead .score .lab { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .5px; }
+.phead .score .val { font-size: 26px; font-weight: 750; line-height: 1.1; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 920px) { .grid2 { grid-template-columns: 1fr; } }
+
+.field { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.field:last-child { border-bottom: 0; }
+.field .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.field .key { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .5px; }
+.field .value { font-size: 15px; font-weight: 600; margin-top: 1px; }
+.field .srcs { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+.field.disputed { background: #fdf6ee; margin: 0 -16px; padding: 11px 16px; border-bottom: 1px solid #f0e1cc; }
+.conflict { margin-top: 8px; display: grid; gap: 6px; }
+.conflict .opt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; background: #fff; border: 1px solid #f0d9bd; border-radius: 8px; padding: 6px 9px; }
+.conflict .opt .v { font-weight: 600; }
+
+.chq { border: 1px solid var(--line); border-radius: 11px; padding: 14px; margin-bottom: 12px; background: var(--surface-2); }
+.chq:last-child { margin-bottom: 0; }
+.chq.resolved { opacity: .65; }
+.chq .qt { font-weight: 660; display: flex; align-items: center; gap: 8px; }
+.chq .qp { color: var(--ink-2); font-size: 13px; margin: 6px 0 12px; }
+.chq .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-tag { font-size: 11px; font-weight: 650; padding: 2px 8px; border-radius: 6px; }
+
+.log .row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+.log .row:last-child { border-bottom: 0; }
+.log .ic { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; flex: none; }

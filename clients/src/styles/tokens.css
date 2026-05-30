@@ -1,0 +1,87 @@
+/* Design tokens ported from design/*-mockup.html. The five mockups share most palette and
+   shape tokens; per-persona accent (--primary, --persona-accent-bg/-fg) varies. The persona
+   accent is set on a root data-attribute (data-persona) by AppShell. */
+
+:root {
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #f7f9fc;
+
+  --ink: #0f1b2d;
+  --ink-2: #475569;
+  --ink-3: #7c8aa0;
+  --line: #dde4ee;
+
+  /* Event-type palette, shared across all personas */
+  --assert: #2563eb;
+  --attest: #15803d;
+  --link: #7c3aed;
+  --contest: #c2410c;
+  --amend: #b45309;
+  --auth: #0891b2;
+  --tomb: #334155;
+  --grant: #1d4ed8;
+  --revoke: #b91c1c;
+  --export: #0e7490;
+  --access: #0e7490;
+
+  /* Severity */
+  --good: #15803d;
+  --warn: #b45309;
+  --bad: #b91c1c;
+  --pass: #15803d;
+  --violation: #b91c1c;
+  --info: #2563eb;
+
+  --shadow: 0 1px 2px rgba(15, 27, 45, 0.06), 0 6px 20px rgba(15, 27, 45, 0.06);
+  --radius: 12px;
+
+  /* Persona accent — defaults match the clinician (teal) */
+  --primary: #0e6e8e;
+  --primary-ink: #ffffff;
+  --persona-banner-bg: #e8f3f7;
+  --persona-banner-fg: #0e6e8e;
+  --persona-banner-border: #c8e2ea;
+  --persona-mark-from: #19b3d6;
+  --persona-mark-to: #0e6e8e;
+
+  font-synthesis: none;
+}
+
+/* Per-persona accents */
+[data-persona='clinician'],
+[data-persona='prior-auth'] {
+  --primary: #0e6e8e;
+  --persona-banner-bg: #e8f3f7;
+  --persona-banner-fg: #0e6e8e;
+  --persona-banner-border: #c8e2ea;
+  --persona-mark-from: #19b3d6;
+  --persona-mark-to: #0e6e8e;
+}
+
+[data-persona='steward'] {
+  --primary: #6d28d9;
+  --persona-banner-bg: #f1ebfb;
+  --persona-banner-fg: #6d28d9;
+  --persona-banner-border: #ddd0f4;
+  --persona-mark-from: #a78bfa;
+  --persona-mark-to: #6d28d9;
+}
+
+[data-persona='patient'] {
+  --primary: #1d4ed8;
+  --persona-banner-bg: #e8efff;
+  --persona-banner-fg: #1d4ed8;
+  --persona-banner-border: #cfe0ff;
+  --persona-mark-from: #60a5fa;
+  --persona-mark-to: #1d4ed8;
+}
+
+[data-persona='audit'] {
+  --primary: #4338ca;
+  --persona-banner-bg: #eef0fb;
+  --persona-banner-fg: #4338ca;
+  --persona-banner-border: #d6d9f5;
+  --persona-mark-from: #818cf8;
+  --persona-mark-to: #4338ca;
+}

@@ -1,0 +1,78 @@
+/* Patient consent — phone-column layout ported from design/patient-consent-mockup.html. */
+
+.patient-app {
+  max-width: 460px; margin: 0 auto; min-height: calc(100vh - 56px - 34px);
+  background: var(--surface); box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.patient-app .topbar {
+  background: var(--ink); color: #fff; padding: 16px 18px;
+  position: sticky; top: 56px; z-index: 20;
+}
+.patient-app .topbar .who { display: flex; align-items: center; gap: 11px; margin-top: 13px; }
+.patient-app .topbar .avatar {
+  width: 42px; height: 42px; border-radius: 50%; background: #3b82f6;
+  display: grid; place-items: center; font-weight: 700; font-size: 16px; color: #fff;
+}
+.patient-app .topbar .nm { font-weight: 650; }
+.patient-app .topbar .sub { font-size: 12px; color: #aebfd4; display: flex; align-items: center; gap: 6px; margin-top: 1px; }
+
+.tabs {
+  display: flex; background: var(--surface); border-bottom: 1px solid var(--line);
+  position: sticky; top: calc(56px + 34px); z-index: 10;
+}
+.tabs button {
+  flex: 1; border: 0; background: transparent; padding: 13px 6px;
+  font-size: 13.5px; font-weight: 600; color: var(--ink-3);
+  border-bottom: 2.5px solid transparent;
+}
+.tabs button.on { color: var(--primary); border-bottom-color: var(--primary); }
+
+.body { padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.lead-card {
+  font-size: 13.5px; color: var(--ink-2); background: #e8efff; border: 1px solid #cfe0ff;
+  border-radius: 12px; padding: 11px 13px;
+}
+.lead-card b { color: var(--ink); }
+
+h2.sec { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-3); margin: 6px 2px 0; }
+
+.gcard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 15px; }
+.gcard.rev { opacity: .62; }
+.gcard .ch { display: flex; align-items: flex-start; gap: 11px; }
+.gcard .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 700; flex: none; font-size: 15px; }
+.gcard .nm { font-weight: 650; font-size: 15px; }
+.gcard .meta { color: var(--ink-3); font-size: 12.5px; margin-top: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 11px 0 0; }
+.chip { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.chip.purpose { background: #e8efff; border-color: #cfe0ff; color: var(--primary); }
+.row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; }
+.small { font-size: 12px; color: var(--ink-3); }
+.b-active { background: #e7f6ec; color: #15803d; }
+.b-revoked { background: #f1f4f8; color: #64748b; }
+.b-expires { background: #fdf1e3; color: #b45309; }
+
+.linky { border: 0; background: transparent; color: var(--primary); padding: 6px 0; font-size: 12.5px; cursor: pointer; }
+.reveal { margin-top: 11px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.kv-grant { display: grid; grid-template-columns: 96px 1fr; gap: 4px 10px; font-size: 12px; }
+.kv-grant .k { color: var(--ink-3); }
+.kv-grant .v { font-weight: 550; word-break: break-word; }
+
+.formfield { display: flex; flex-direction: column; gap: 6px; }
+.formfield label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.formfield select, .formfield input {
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+  font-size: 14.5px; background: #fff; color: var(--ink);
+}
+.formfield select:focus, .formfield input:focus { outline: 2px solid #bcd2ff; border-color: var(--primary); }
+.seg2 { display: flex; gap: 8px; }
+.seg2 button { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.seg2 button.on { background: #e8efff; border-color: var(--primary); color: var(--primary); }
+.share-btn { width: 100%; padding: 13px; font-size: 15px; }
+
+.tl-events { display: flex; flex-direction: column; gap: 0; }
+.tl-events .item { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.tl-events .item:last-child { border-bottom: 0; }
+.tl-events .dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 12px; flex: none; }
+.tl-events .t { font-size: 13.5px; }
+.tl-events .w { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
