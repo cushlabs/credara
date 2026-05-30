@@ -20,14 +20,16 @@ pub mod authorization;
 pub mod confidence;
 pub mod error;
 pub mod identity;
+pub mod link_chain;
 pub mod subgraph;
 pub mod validation;
 
 pub use authorization::{
-    evaluate, responder_may_serve, AuthorizationDecision, AuthorizationQuery, DefaultPosture,
-    RequesterContext,
+    evaluate, evaluate_with_link_chain, responder_may_serve, AuthorizationDecision,
+    AuthorizationQuery, DefaultPosture, RequesterContext,
 };
 pub use confidence::{ConfidenceConfig, Contribution, FieldClass};
 pub use error::{Error, Result};
 pub use identity::{project, EffectiveIdentity, FieldEntry, FieldKey, FieldValue};
+pub use link_chain::{evaluate_link_chain, LinkChainConfig, LinkChainResult};
 pub use subgraph::Subgraph;

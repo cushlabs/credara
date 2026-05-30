@@ -295,6 +295,23 @@ When a Creda peer at Institution B receives a query from Institution A requestin
 
 **Step 5 — Check expiration and volume.** For each scope-matched Grant, evaluate temporal and quantitative bounds. Expired Grants are discarded. Grants whose volume limits are exhausted are discarded. The responding peer tracks Grant utilization — the count of requests served under each Grant — to enforce volume constraints.
 
+**Step 5.5 — Link-chain check (defense against rogue-Link cross-institutional attacks).** For each remaining Grant, evaluate whether the Grant is reachable from a *responder-anchored* event through `Link` events that meet the responding peer's link-quality requirements. A responder anchor is an event the responding peer treats as trusted in this subgraph — typically its own `Assert` or `Attest` events for the patient, plus events signed by institutions with prior established trust relationships. The check operates as follows:
+
+- **Fast path**: if the Grant is itself in the anchor set, or reachable from an anchor without traversing any `Link` event, it survives this step unchanged. This preserves the legitimate first-encounter pattern where a new clinic asserts a patient and self-issues a Grant against its own subgraph fragment.
+- **Per-Link effective confidence**: for each `Link` in the path from the Grant to a candidate anchor, the responding peer computes `effective_confidence = min(claimed_confidence, method_ceiling)` where `method_ceiling` is the responder's configured cap per `LinkMethod`. Defaults: `InsuranceCrosswalk` 9500, `Referral` 9000, `Algorithmic` 7000, `Manual` 5000, `Other` 3000 (calibration is institution policy per §5.3.2). If any `Link` on the path has effective confidence below the responder's configured `min_link_confidence` floor, that path is blocked and the BFS continues searching for another path.
+- **Author-standing requirement** (optional, recommended for deny-by-default and federal-program postures): when enabled, at least one `Link` on the path must be authored by an institution that has prior standing in the responder's anchor set — a predecessor `Assert` or `Attest` by the same institution that the responder treats as anchored. Self-issued Links from institutions with no prior relationship to the patient are discarded under this posture.
+- **Outcome**: if no path from the Grant to a responder anchor satisfies both filters, the Grant is discarded. The decision rationale surfaces which Grants were filtered and why, so operators can detect rogue-Link patterns rather than silently denying.
+
+This step is the structural defense against the rogue-Link attack: an admitted-but-misbehaving institution that Asserts a parallel patient, publishes a `Link` from its fragment into a real patient's subgraph, and self-issues an `AuthorizationGrant` is denied access to the responding peer's data because the merging `Link` cannot satisfy the floor and (under strict posture) cannot satisfy the standing requirement. The legitimate first-encounter pattern — a new clinic asserting a new patient and issuing a Grant against its own fragment — is unaffected because the Grant is reachable from the responder's anchor (its own Assert) without traversing any Link.
+
+The check is deployment-configurable per §9.3.2 posture, with these recommended starting points:
+
+- **Treatment-presumed-consent**: `min_link_confidence = 5000`, `require_author_standing = false`. Permits InsuranceCrosswalk and Referral Links from new institutions while blocking the most naive Manual overclaim attack.
+- **Deny-by-default**: `min_link_confidence = 6000`, `require_author_standing = false`. Higher floor for institutions choosing the stricter posture.
+- **Federal-program / high-sensitivity**: `min_link_confidence = 7000`, `require_author_standing = true`. Strict mode for VA, IHS, DoD Health, and behavioral-health subgraphs.
+
+The defaults are *policy starting points, not protocol invariants*. Per §5.3.2, network configuration is locally overridable and a Phase-0 calibration item. The protocol defines the algorithm; institutions calibrate the thresholds.
+
 **Step 6 — Apply cross-institutional policy honoring.** When Institution B holds events that originated at Institution C, and Institution A requests those events, Institution B must honor the intersection of three layers: the patient's Grant (Steps 1–5), Institution C's redistribution policy for events it originated, and Institution B's own posture. The most restrictive of the three governs. Institution B cannot become a laundering point for data from a stricter institution. Redistribution policy is carried as a `redistribution_policy` metadata field on each event node, set by the originating institution at creation time and evaluated per event — a single response may include events from multiple originating institutions with different policies.
 
 **Step 7 — Determine outcome.** If at least one Grant survives all steps, the request is authorized for the events those Grants cover. If no Grant survives, the responding peer applies its configured default posture (Section 9.3.2 — deny-by-default or treatment-presumed-authorization), with research, AI, and federal program scopes always requiring an explicit Grant regardless of posture.
@@ -585,6 +602,22 @@ When institutions assert **conflicting values** for the same demographic field (
 Resolution is left to the consuming institution. Creda's role is to surface the disagreement and provide the evidence (provenance chains for each competing assertion) — not to adjudicate. A consuming institution may choose the highest-confidence value, may flag the patient for manual review, or may apply its own resolution logic. The system makes the disagreement visible rather than silently choosing.
 
 This design reflects the reality that demographic conflicts often indicate real-world complexity (legal name vs. preferred name, old address vs. new address, data entry error at one institution) rather than a system failure. The correct resolution depends on context that only the consuming institution has.
+
+#### 5.3.5 Link Confidence Ceilings Per LinkMethod
+
+Link events carry a `confidence_score` set by the *signing institution*. The signing institution has incentive to overstate confidence (a `Manual` Link claimed at 10000 weights identically to an `InsuranceCrosswalk` Link claimed at 10000 in any model that takes the claim at face value). The responding institution caps the claim per `LinkMethod` at a configurable ceiling, and the *effective* confidence used in both projection (§5.2.4) and authorization (§4.6 step 5.5) is `min(claimed_score, method_ceiling)`.
+
+| LinkMethod | Default ceiling | Rationale |
+|---|---|---|
+| `InsuranceCrosswalk` | 9500 | Matching payer + member ID across institutions is mechanically rigorous; the ceiling reflects high but not absolute reliability. |
+| `Referral` | 9000 | A referral chains through a named referring institution and is corroborated by that institution's prior involvement in care. |
+| `Algorithmic` | 7000 | Probabilistic matching using demographic similarity, susceptible to false positives at high recall. |
+| `Manual` | 5000 | Human judgment, susceptible to error and to manipulation; the lowest non-trivial ceiling. |
+| `Other` | 3000 | Unspecified method, conservatively assumed to be the weakest. |
+
+These ceilings are *responder-configurable* — different institutions may calibrate differently based on their experience with link quality from peer institutions. They are not protocol invariants; the protocol commits only to the *mechanism* of per-method ceilings, not to specific numbers. Calibration is part of the Phase-0 calibration work (`TODO(open-question-confidence-calibration)`) and a reasonable target for empirical refinement during pilot operation.
+
+The ceiling mechanism is the structural complement to §4.6 step 5.5: even if the link-chain floor is satisfied by the claimed score, the effective score after ceiling determines whether the floor is actually met. A `Manual` Link claimed at 10000 with a floor of 6000 fails the §4.6 step 5.5 check because its effective score is 5000.
 
 ## 6. Network Architecture
 

@@ -12,13 +12,14 @@
 //! references are resolved locally. Signature verification happens at ingest (creda-core /
 //! the Store layer), so here "validated" means structurally resolved (parents present).
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use creda_events::{
     AuthorizationScope, CertificateFingerprint, EventId, EventPayload, GrantAudience, GrantPurpose,
     IdentityEventNode, IdentityEventType, RedistributionPolicy, UseMode,
 };
 
+use crate::link_chain::{evaluate_link_chain, LinkChainConfig, LinkChainResult};
 use crate::subgraph::Subgraph;
 
 /// The responding peer's posture when no Grant covers a request (spec §9.3.2).
@@ -81,6 +82,9 @@ pub struct AuthorizationDecision {
 ///
 /// `utilization` maps a Grant's id to the number of requests already served under it, for the
 /// volume check (§4.6 step 5); pass an empty map if not tracked.
+///
+/// This variant does **not** apply the Link-chain cross-institutional check (§4.6 step 5.5);
+/// callers that need it use [`evaluate_with_link_chain`].
 pub fn evaluate(
     subgraph: &Subgraph,
     query: &AuthorizationQuery,
@@ -88,7 +92,46 @@ pub fn evaluate(
     now_unix_secs: i64,
     utilization: &HashMap<EventId, u64>,
 ) -> AuthorizationDecision {
+    evaluate_inner(subgraph, query, posture, now_unix_secs, utilization, None)
+}
+
+/// Evaluate with the Link-chain check (§4.6 step 5.5). Each Grant must be reachable from a
+/// responder-anchored event through Links that meet the configured per-method ceilings and the
+/// floor. The check defends against rogue-Link attacks where an admitted-but-bad-actor
+/// institution merges a fabricated fragment into a real patient's subgraph.
+///
+/// `responder_anchors` is the set of event ids the responder considers already-trusted in the
+/// subgraph — typically its own Asserts/Attests for the patient. A Grant in an anchor's own
+/// fragment is always admitted (the legitimate first-encounter case).
+pub fn evaluate_with_link_chain(
+    subgraph: &Subgraph,
+    query: &AuthorizationQuery,
+    posture: DefaultPosture,
+    now_unix_secs: i64,
+    utilization: &HashMap<EventId, u64>,
+    responder_anchors: &BTreeSet<EventId>,
+    link_chain_config: &LinkChainConfig,
+) -> AuthorizationDecision {
+    evaluate_inner(
+        subgraph,
+        query,
+        posture,
+        now_unix_secs,
+        utilization,
+        Some((responder_anchors, link_chain_config)),
+    )
+}
+
+fn evaluate_inner(
+    subgraph: &Subgraph,
+    query: &AuthorizationQuery,
+    posture: DefaultPosture,
+    now_unix_secs: i64,
+    utilization: &HashMap<EventId, u64>,
+    link_chain: Option<(&BTreeSet<EventId>, &LinkChainConfig)>,
+) -> AuthorizationDecision {
     let mut covering = Vec::new();
+    let mut link_chain_denials: Vec<String> = Vec::new();
 
     // Step 1: collect AuthorizationGrants (sorted by id, deterministic).
     for grant in subgraph.nodes_of_type(IdentityEventType::AuthorizationGrant) {
@@ -135,6 +178,19 @@ pub fn evaluate(
             }
         }
 
+        // Step 5.5: Link-chain check. Only applies when the caller asked for it via
+        // `evaluate_with_link_chain`. Defends against rogue-Link cross-institutional attacks
+        // (see [`crate::link_chain`]).
+        if let Some((anchors, cfg)) = link_chain {
+            match evaluate_link_chain(subgraph, grant.id, anchors, cfg) {
+                LinkChainResult::Ok => {}
+                LinkChainResult::Deny { reason } => {
+                    link_chain_denials.push(format!("grant {}: {reason}", grant.id));
+                    continue;
+                }
+            }
+        }
+
         covering.push(grant.id);
     }
 
@@ -144,6 +200,21 @@ pub fn evaluate(
             authorized: true,
             covering_grants: covering,
             reason: "covered by an active AuthorizationGrant (§4.6 steps 1–5)".into(),
+        };
+    }
+
+    // If Link-chain denial happened for at least one Grant, surface it so the responder logs
+    // why apparently-covering Grants were filtered out. This is what makes a rogue-Link attack
+    // visible to operators instead of silently denied.
+    if !link_chain_denials.is_empty() {
+        return AuthorizationDecision {
+            authorized: false,
+            covering_grants: Vec::new(),
+            reason: format!(
+                "no covering Grant after §4.6 step 5.5 Link-chain check; {} candidate Grant(s) rejected: {}",
+                link_chain_denials.len(),
+                link_chain_denials.join("; ")
+            ),
         };
     }
 
