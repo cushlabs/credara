@@ -8,10 +8,10 @@ spire_version: 0.21.0
 creda_values:
   image:
     core:
-      repository: ghcr.io/REPLACE_ME/creda-core
+      repository: ghcr.io/cushlabs/creda-core
       tag: "0.1.0"
     bridge:
-      repository: ghcr.io/REPLACE_ME/creda-bridge
+      repository: ghcr.io/cushlabs/creda-bridge
       tag: "0.1.0"
   config:
     defaultPosture: treatment-presumed
