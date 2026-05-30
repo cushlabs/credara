@@ -87,16 +87,23 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
 - See `scenarios/gossip-convergence/README.md` for what the smoke test asserts and how to read
   the output.
 
-## Scenarios (planned)
+## Scenarios
 
-- `gossip-convergence/` — single event injected at peer A, observed at peer B within Bound 1 (~2s normal).
-- `anti-entropy-repair/` — partition peer B, mutate at peer A, heal, observe peer B catches up via AE.
-- `partition-rejoin/` — sustained partition, both sides keep working, reconcile on rejoin.
-- `revocation-latency/` — AuthorizationGrant + AuthorizationRevocation, measure propagation against §4.7 Bound 1.
+- `gossip-convergence/` — single event injected at peer A, observed at peer B within Bound 1
+  (~2s normal). `make smoke`.
+- `anti-entropy-repair/` — peer-a publishes events before peer-b exists; peer-b joins later;
+  events arrive at peer-b only via the periodic anti-entropy round (§6.1.8). `make ae-repair`.
+
+Planned (not yet implemented):
+
+- `partition-rejoin/` — sustained partition with NetworkPolicy / iptables, both sides keep
+  working, reconcile on rejoin.
+- `revocation-latency/` — `AuthorizationGrant` + `AuthorizationRevocation`, measure propagation
+  against §4.7 Bound 1.
 - `rolling-upgrade/` — Helm upgrade with peer rotation, verify no convergence loss (§10.6.7).
 - `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
-
-Only `gossip-convergence/` is implemented in this commit. The others follow.
+- `rogue-link/` — in-cluster realization of the conformance suite's rogue-Link scenarios
+  (§4.6 step 5.5).
 
 ## Relationship to the M9 conformance suite
 

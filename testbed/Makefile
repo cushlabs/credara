@@ -12,7 +12,7 @@ HELM         ?= helm
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean images smoke
+.PHONY: up down clean images smoke ae-repair
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -39,3 +39,9 @@ clean: down
 
 smoke:
 	$(REPO_ROOT)/testbed/scenarios/gossip-convergence/run.sh "$(CLUSTER_NAME)"
+
+# Anti-entropy repair: verifies §6.1.8 (AE backstop for gossip). Late-joining peer catches up
+# via periodic manifest exchange + delta fetch. Slower than smoke (75s budget) — AE_INTERVAL_SECS
+# is 30s today and the first useful round is at ~t=30s after the joining peer's daemon starts.
+ae-repair:
+	$(REPO_ROOT)/testbed/scenarios/anti-entropy-repair/run.sh "$(CLUSTER_NAME)"
