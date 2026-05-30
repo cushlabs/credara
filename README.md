@@ -22,17 +22,22 @@ authority or vendor lock-in.
 
 ## Status
 
-> **Pre-launch — all milestones implemented; hardening in progress.** The
-> [technical specification](docs/creda-technical-spec.md) (Sections 1–13 + appendices, ~81
-> pages) is complete and authoritative. All ten build milestones (M0–M9) are implemented:
-> the full Rust spine (event model → storage → graph reasoning → networking → Core daemon),
-> the dual-control Export Gate and Verifier, the HAPI FHIR Bridge, deployment packaging, and
-> the conformance suite with its synthetic-data generator. The default workspace build and
-> tests pass; the per-milestone table below records what is verified versus what is
-> feature-gated and still being reconciled.
+> **Pre-launch — all milestones implemented; hardening in progress. Open for testers.**
+> The [technical specification](docs/creda-technical-spec.md) (Sections 1–13 + appendices,
+> ~81 pages) is complete and authoritative. All ten build milestones (M0–M9) are
+> implemented: the full Rust spine (event model → storage → graph reasoning → networking →
+> Core daemon), the dual-control Export Gate and Verifier, the HAPI FHIR Bridge, deployment
+> packaging, and the conformance suite with its synthetic-data generator. The default
+> workspace build and tests pass; the per-milestone table below records what is verified
+> versus what is feature-gated and still being reconciled.
 >
 > This is **pre-launch software**: not yet deployed to a real network and not yet
 > independently security-reviewed. Do not use it with real PHI.
+>
+> **New testers start here:** [`docs/HOW_TO_TEST.md`](docs/HOW_TO_TEST.md) walks through
+> prerequisites, the in-process conformance suite (`anchor creda`), the multi-peer testbed
+> (`testbed/ make smoke`), what success looks like, and how to file what you find. New-tester
+> friction is the bug we most want to hear about during hardening.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
 
@@ -169,8 +174,7 @@ specification documents in `docs/`.
 
 ## Build milestones
 
-The build proceeds in strict dependency order (full detail in
-[`docs/COWORK_BUILD_GUIDE.md`](docs/COWORK_BUILD_GUIDE.md)):
+The build proceeds in strict dependency order:
 
 | Milestone | Component | Spec sections | Status |
 |---|---|---|---|

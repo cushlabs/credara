@@ -49,8 +49,6 @@ secrets/
 charts/*.tgz
 
 # ---- Cowork handoff files (kept locally, not tracked) ----
-docs/COWORK_CONTEXT.md
-docs/COWORK_BUILD_GUIDE.md
 docs/GITHUB_SETUP.md
 
 # ---- OS / editor cruft ----

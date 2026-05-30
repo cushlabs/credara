@@ -116,10 +116,10 @@ Full details — including the VS Code / Codespaces dev container — are in
 
 ## Build order
 
-Components are built in strict dependency order (M0→M9); see
-[`docs/COWORK_BUILD_GUIDE.md`](docs/COWORK_BUILD_GUIDE.md) and
-[`REPO_STRUCTURE.md`](REPO_STRUCTURE.md). The `creda-events → creda-store → creda-graph →
-creda-net → creda-core` chain (M1→M5) is a dependency spine and is not parallelized.
+Components are built in strict dependency order (M0→M9); see the milestone table in
+[`README.md`](README.md) and [`REPO_STRUCTURE.md`](REPO_STRUCTURE.md). The `creda-events →
+creda-store → creda-graph → creda-net → creda-core` chain (M1→M5) is a dependency spine
+and is not parallelized.
 
 ## Pull request checklist
 

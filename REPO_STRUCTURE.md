@@ -2,9 +2,10 @@
 
 This document defines the target layout of the Creda repository and which part of
 the technical specification governs each component. It is the map the build follows
-through milestones **M0–M9** (see `docs/COWORK_BUILD_GUIDE.md`). The authoritative
-source of truth for all technical decisions is `docs/creda-technical-spec.md`; where
-this document and the spec disagree, the spec wins.
+through milestones **M0–M9** (see the milestone table in `README.md`). The
+authoritative source of truth for all technical decisions is
+`docs/creda-technical-spec.md`; where this document and the spec disagree, the
+spec wins.
 
 ## Guiding principle
 
@@ -53,11 +54,10 @@ creda/
 ├── docs/
 │   ├── creda-technical-spec.md   # AUTHORITATIVE specification, Sections 1–13 + appendices.
 │   ├── creda-technical-spec.pdf  # Rendered spec for non-technical reviewers.
-│   ├── COWORK_CONTEXT.md         # Context & decision history (the "why").
-│   ├── COWORK_BUILD_GUIDE.md     # Milestone-by-milestone build instructions.
 │   ├── DESIGN_QUEUE.md           # Queued design reqs (DQ-1..DQ-5: non-root, ansible, testbed,
 │   │                             #   Hummingbird images, Docker-only dev env).
-│   └── DEVELOPMENT.md            # Docker-only developer workflow (DQ-5).
+│   ├── DEVELOPMENT.md            # Docker-only developer workflow (DQ-5).
+│   └── HOW_TO_TEST.md            # Getting-started reference for new testers.
 │
 ├── crates/                    # The Rust workspace members (Core, Export Gate, Verifier).
 │   ├── creda-events/          # M1 — event node schema, 10 event types, canonical CBOR,
@@ -125,7 +125,7 @@ green on the empty workspace. Each subsequent milestone:
 `creda-events → creda-store → creda-graph → creda-net → creda-core` is a strict
 dependency chain (M1→M5). `creda-export-gate` / `creda-verifier` (M6) and `bridge`
 (M7) proceed once `creda-core` is stable. `deploy` (M8) and `conformance` (M9) come
-last. See the build-order table in `docs/COWORK_BUILD_GUIDE.md` §4.
+last. See the milestone table in `README.md`.
 
 ## Open questions are scaffolded, never silently resolved
 
