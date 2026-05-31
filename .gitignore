@@ -72,3 +72,5 @@ Thumbs.db
 # leaves 0-byte _tmp_* files in the mount that can't be unlinked from inside).
 _tmp_*
 **/_tmp_*
+
+**/.pnpm-store/
