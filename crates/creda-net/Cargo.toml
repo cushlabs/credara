@@ -36,7 +36,7 @@ thiserror = "1"
 # NOTE TO FIRST BUILDER: rust-libp2p's API moves between minor versions; this is the most
 # likely place to need adjustment. It is isolated in src/libp2p_adapter.rs and is not part of the
 # default build, so an API mismatch here cannot break the rest of the workspace.
-libp2p = { version = "0.54", optional = true, features = [
+libp2p = { version = "0.56", optional = true, features = [
     "gossipsub",
     "kad",
     "noise",

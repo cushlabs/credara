@@ -152,6 +152,17 @@ impl Libp2pTransport {
             .with_tcp(
                 libp2p::tcp::Config::default(),
                 libp2p::noise::Config::new, // Noise transport (§6.2.3)
+                // SECURITY: pass `Config::default` as-is — do NOT call any setter
+                // (e.g. `set_max_num_streams`, `set_receive_window_size`) on the
+                // returned `yamux::Config`. `libp2p-yamux 0.47` carries TWO yamux
+                // implementations side-by-side: yamux 0.13 (default, fixed) and
+                // yamux 0.12 (vulnerable to the malformed-Data-frame panic CVE).
+                // ANY mutation of the config silently flips it from the v13 path
+                // to the v12 path — see libp2p-yamux `fn set` and the
+                // `config_set_switches_to_v012` test. Both versions negotiate on
+                // the wire as `/yamux/1.0.0`, so the choice is ours alone; a peer
+                // cannot force the v12 code path. Keep this default; re-audit if
+                // you ever need to tune yamux.
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| Error::Transport(format!("tcp/noise/yamux setup: {e}")))?
@@ -498,13 +509,11 @@ fn handle_command(
         }
         Command::Unsubscribe { bucket, reply } => {
             let topic = gossipsub::IdentTopic::new(topic_for_bucket(bucket));
-            let res = swarm
-                .behaviour_mut()
-                .gossipsub
-                .unsubscribe(&topic)
-                .map(|_| ())
-                .map_err(|e| Error::Transport(format!("unsubscribe: {e}")));
-            let _ = reply.send(res);
+            // libp2p-gossipsub 0.49 changed `unsubscribe` to return `bool`
+            // (true = was subscribed, false = no-op). It can no longer fail,
+            // so we always reply Ok(()) — caller never inspected the bool.
+            let _ = swarm.behaviour_mut().gossipsub.unsubscribe(&topic);
+            let _ = reply.send(Ok(()));
         }
         Command::PublishBatch { bucket, bytes, reply } => {
             let topic = gossipsub::IdentTopic::new(topic_for_bucket(bucket));
