@@ -15,6 +15,7 @@ import type {
   UseMode,
 } from '../fhir/types';
 import type {
+  AmendRequest,
   AttestRequest,
   AuthorizeRequest,
   ContestRequest,
@@ -30,23 +31,23 @@ function nextId(prefix: string): string {
 
 const initialProvenance: CredaProvenance[] = [
   // Maria Gonzalez (p1) — single consistent identity
-  prov('p1-a1', 'p1', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', parents: [], summary: 'Initial registration at Mercy General.', recorded: '2021-06-02T00:00:00Z' }),
-  prov('p1-a2', 'p1', 'Assert', 'Northside Clinic', { verificationMethod: 'Insurance card', parents: [], summary: 'Registration at Northside Clinic.', recorded: '2022-11-18T00:00:00Z' }),
+  prov('p1-a1', 'p1', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', dateOfBirth: '1984-03-12', nameFamily: 'gonzalez', nameGiven: 'maria', parents: [], summary: 'Initial registration at Mercy General.', recorded: '2021-06-02T00:00:00Z' }),
+  prov('p1-a2', 'p1', 'Assert', 'Northside Clinic', { verificationMethod: 'Insurance card', dateOfBirth: '1984-03-12', nameFamily: 'gonzalez', nameGiven: 'maria', parents: [], summary: 'Registration at Northside Clinic.', recorded: '2022-11-18T00:00:00Z' }),
   prov('p1-l1', 'p1', 'Link', 'Mercy General', { matchScore: '94%', linkMethod: 'Algorithmic', parents: ['p1-a1', 'p1-a2'], summary: 'Algorithmic match linked the two records.', recorded: '2022-11-20T00:00:00Z' }),
   prov('p1-at1', 'p1', 'Attest', 'Mercy General', { purpose: 'Treatment', parents: ['p1-l1'], summary: 'Treatment reliance recorded.', recorded: '2023-02-10T00:00:00Z' }),
 
   // James Whitfield (p2) — DOB conflict
-  prov('p2-a1', 'p2', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', parents: [], summary: 'DOB 1971-08-04 (photo ID).', recorded: '2020-01-09T00:00:00Z' }),
-  prov('p2-a2', 'p2', 'Assert', 'Lakeside Hospital', { verificationMethod: 'Self-report', parents: [], summary: 'DOB 1971-08-14 (self-reported).', recorded: '2023-07-22T00:00:00Z' }),
+  prov('p2-a1', 'p2', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', dateOfBirth: '1971-08-04', nameFamily: 'whitfield', nameGiven: 'james', parents: [], summary: 'DOB 1971-08-04 (photo ID).', recorded: '2020-01-09T00:00:00Z' }),
+  prov('p2-a2', 'p2', 'Assert', 'Lakeside Hospital', { verificationMethod: 'Self-report', dateOfBirth: '1971-08-14', nameFamily: 'whitfield', nameGiven: 'james', parents: [], summary: 'DOB 1971-08-14 (self-reported).', recorded: '2023-07-22T00:00:00Z' }),
   prov('p2-l1', 'p2', 'Link', 'Lakeside Hospital', { matchScore: '82%', linkMethod: 'Algorithmic', parents: ['p2-a1', 'p2-a2'], summary: 'Records linked despite DOB mismatch.', recorded: '2023-07-23T00:00:00Z' }),
 
   // Robert Chen (p3) — possible duplicate
-  prov('p3-a1', 'p3', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', parents: [], summary: 'Robert Chen, Madison address.', recorded: '2019-09-14T00:00:00Z' }),
-  prov('p3-a2', 'p3', 'Assert', 'Eastgate Urgent Care', { verificationMethod: 'Self-report', parents: [], summary: '"Bob" Chen, Clinton address.', recorded: '2024-03-30T00:00:00Z' }),
+  prov('p3-a1', 'p3', 'Assert', 'Mercy General', { verificationMethod: 'Government photo ID', dateOfBirth: '1990-05-27', nameFamily: 'chen', nameGiven: 'robert', parents: [], summary: 'Robert Chen, Madison address.', recorded: '2019-09-14T00:00:00Z' }),
+  prov('p3-a2', 'p3', 'Assert', 'Eastgate Urgent Care', { verificationMethod: 'Self-report', dateOfBirth: '1990-05-27', nameFamily: 'chen', nameGiven: 'robert', parents: [], summary: '"Bob" Chen, Clinton address.', recorded: '2024-03-30T00:00:00Z' }),
   prov('p3-l1', 'p3', 'Link', 'Eastgate Urgent Care', { matchScore: '63%', linkMethod: 'Algorithmic', parents: ['p3-a1', 'p3-a2'], summary: 'Probabilistic match (low confidence).', recorded: '2024-03-30T00:00:00Z' }),
 
   // Eleanor Petrova (p4) — stale verification
-  prov('p4-a1', 'p4', 'Assert', 'Mercy General', { verificationMethod: 'Birth certificate', parents: [], summary: 'Verified by birth certificate in 2019.', recorded: '2019-08-15T00:00:00Z' }),
+  prov('p4-a1', 'p4', 'Assert', 'Mercy General', { verificationMethod: 'Birth certificate', dateOfBirth: '1949-12-01', nameFamily: 'petrova', nameGiven: 'eleanor', parents: [], summary: 'Verified by birth certificate in 2019.', recorded: '2019-08-15T00:00:00Z' }),
 ];
 
 const initialAuth: CredaAuthorization[] = [
@@ -66,6 +67,9 @@ function prov(
     matchScore?: string;
     linkMethod?: CredaProvenance['linkMethod'];
     purpose?: string;
+    dateOfBirth?: string;
+    nameFamily?: string;
+    nameGiven?: string;
     parents: string[];
     summary?: string;
     recorded: string;
@@ -82,6 +86,9 @@ function prov(
     matchScore: rest.matchScore,
     linkMethod: rest.linkMethod,
     purpose: rest.purpose,
+    dateOfBirth: rest.dateOfBirth,
+    nameFamily: rest.nameFamily,
+    nameGiven: rest.nameGiven,
     parents: rest.parents,
     summary: rest.summary,
     signature: { algorithm: 'ed25519', verified: true },
@@ -128,8 +135,18 @@ export function mockBridge(): FhirBridge {
     });
 
   return {
-    async searchPatientsByToken(): Promise<string[]> {
-      return delay(['p1', 'p2', 'p3', 'p4']);
+    async searchPatientsByToken(tokens: string[]): Promise<string[]> {
+      // Mirror the real bridge's MatchByTokens: a family token resolves to that patient's id.
+      // Demo families map to the fixture ids so one resolution path serves both modes; an
+      // empty/unknown query returns the full set (the patient app passes a single family token).
+      const FAMILY_TO_ID: Record<string, string> = {
+        'tok:demo:gonzalez': 'p1',
+        'tok:demo:whitfield': 'p2',
+        'tok:demo:chen': 'p3',
+        'tok:demo:petrova': 'p4',
+      };
+      const matched = tokens.map((t) => FAMILY_TO_ID[t]).filter(Boolean);
+      return delay(matched.length ? matched : ['p1', 'p2', 'p3', 'p4']);
     },
 
     async readPatient(id) {
@@ -167,6 +184,16 @@ export function mockBridge(): FhirBridge {
       const ev = prov(nextId('c'), 'unknown', 'Contest', 'Mercy General (you)', {
         parents: [req.linkId],
         summary: req.reason,
+        recorded: new Date().toISOString(),
+      });
+      provenance.push(ev);
+      return delay(ev);
+    },
+
+    async amend(req: AmendRequest) {
+      const ev = prov(nextId('am'), req.patientId, 'Amend', 'Mercy General (you)', {
+        parents: [req.targetEventId],
+        summary: `DOB amended to ${req.dateOfBirth}: ${req.reason}`,
         recorded: new Date().toISOString(),
       });
       provenance.push(ev);
@@ -229,6 +256,11 @@ export function mockBridge(): FhirBridge {
           (['AuthorizationGrant', 'AuthorizationRevocation', 'ExportReceipt'] as CredaEventType[]).includes(p.eventType),
         ),
       );
+    },
+
+    async listAuthorizations(patientId: string) {
+      // Mirrors the real bridge's `Consent?patient={id}` search over the in-memory state.
+      return delay(authorizations.filter((a) => a.patient.reference === `Patient/${patientId}`));
     },
   };
 }

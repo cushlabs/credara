@@ -43,6 +43,15 @@ export interface RevokeRequest {
   grantId: string;
 }
 
+export interface AmendRequest {
+  patientId: string;
+  /** The Assert event being amended (must be a real event UUID). */
+  targetEventId: string;
+  /** Corrected DOB (token form against the real bridge). */
+  dateOfBirth: string;
+  reason: string;
+}
+
 export interface ContestRequest {
   /** The Provenance.id of the Link being contested. */
   linkId: string;
@@ -62,6 +71,8 @@ export interface FhirBridge {
   attest(req: AttestRequest): Promise<CredaProvenance>;
   /** `$creda-contest` — contest a Link Provenance. */
   contest(req: ContestRequest): Promise<CredaProvenance>;
+  /** `$creda-amend` — amend a prior Assert's demographics (DOB-resolution flow, §3.4.5). */
+  amend(req: AmendRequest): Promise<CredaProvenance>;
   /** `$creda-authorize` — create an AuthorizationGrant. */
   authorize(req: AuthorizeRequest): Promise<CredaAuthorization>;
   /** `$creda-revoke` — revoke a prior Grant. */
@@ -75,6 +86,11 @@ export interface FhirBridge {
   }): Promise<AuthorizationDecision>;
   /** Listing for the audit reviewer — all grants/revocations/exports in a window. */
   listAuthorizationEvents(): Promise<CredaProvenance[]>;
+  /**
+   * The patient's authorizations — `GET /Consent?patient={id}` (§8.2.9 read-back). Grants a
+   * revocation references come back with status `revoked`.
+   */
+  listAuthorizations(patientId: string): Promise<CredaAuthorization[]>;
 }
 
 class HttpBridge implements FhirBridge {
@@ -106,44 +122,83 @@ class HttpBridge implements FhirBridge {
 
   async readSubgraph(patientId: string): Promise<CredaProvenance[]> {
     interface Bundle {
-      entry?: { resource: CredaProvenance }[];
+      entry?: { resource: FhirProvenanceResource }[];
     }
     const bundle = await this.req<Bundle>(
       `/Patient/${encodeURIComponent(patientId)}/$creda-provenance`,
     );
-    return (bundle.entry ?? []).map((e) => e.resource);
+    // Real FHIR Provenance -> UI shape at the transport boundary, like every other read.
+    return (bundle.entry ?? []).map((e) => provenanceFromFhir(e.resource));
   }
 
   readProvenance(id: string): Promise<CredaProvenance> {
     return this.req<CredaProvenance>(`/Provenance/${encodeURIComponent(id)}`);
   }
 
-  attest(req: AttestRequest): Promise<CredaProvenance> {
-    return this.req<CredaProvenance>(`/Patient/${encodeURIComponent(req.patientId)}/$creda-attest`, {
-      method: 'POST',
-      body: JSON.stringify(parametersOf({ ...req })),
-    });
+  async attest(req: AttestRequest): Promise<CredaProvenance> {
+    const res = await this.req<FhirProvenanceResource>(
+      `/Patient/${encodeURIComponent(req.patientId)}/$creda-attest`,
+      { method: 'POST', body: JSON.stringify(parametersOf({ ...req })) },
+    );
+    return provenanceFromFhir(res);
   }
 
-  contest(req: ContestRequest): Promise<CredaProvenance> {
-    return this.req<CredaProvenance>(`/Provenance/${encodeURIComponent(req.linkId)}/$creda-contest`, {
-      method: 'POST',
-      body: JSON.stringify(parametersOf({ reason: req.reason })),
-    });
+  async contest(req: ContestRequest): Promise<CredaProvenance> {
+    const res = await this.req<FhirProvenanceResource>(
+      `/Provenance/${encodeURIComponent(req.linkId)}/$creda-contest`,
+      { method: 'POST', body: JSON.stringify(parametersOf({ reason: req.reason })) },
+    );
+    return provenanceFromFhir(res);
   }
 
-  authorize(req: AuthorizeRequest): Promise<CredaAuthorization> {
-    return this.req<CredaAuthorization>(`/Patient/${encodeURIComponent(req.patientId)}/$creda-authorize`, {
-      method: 'POST',
-      body: JSON.stringify(parametersOf({ ...req })),
-    });
+  async amend(req: AmendRequest): Promise<CredaProvenance> {
+    const res = await this.req<FhirProvenanceResource>(
+      `/Patient/${encodeURIComponent(req.patientId)}/$creda-amend`,
+      {
+        method: 'POST',
+        body: JSON.stringify(
+          fhirParameters([
+            { name: 'target', valueReference: { reference: `Provenance/${req.targetEventId}` } },
+            { name: 'dateOfBirth', valueString: req.dateOfBirth },
+            { name: 'reason', valueString: req.reason },
+          ]),
+        ),
+      },
+    );
+    return provenanceFromFhir(res);
   }
 
-  revoke(req: RevokeRequest): Promise<CredaAuthorization> {
-    return this.req<CredaAuthorization>(`/Patient/${encodeURIComponent(req.patientId)}/$creda-revoke`, {
-      method: 'POST',
-      body: JSON.stringify(parametersOf({ grantId: req.grantId })),
-    });
+  async authorize(req: AuthorizeRequest): Promise<CredaAuthorization> {
+    // Conform to the bridge contract (§8.2.9) in BOTH directions: requests carry spec parameter
+    // names + FHIR codes; the response is a real FHIR R4 Consent, translated back to the UI's
+    // display model here at the transport boundary (never in components).
+    const parameter: FhirParam[] = [
+      { name: 'audience', valueString: req.audience },
+      { name: 'purpose', valueCode: PURPOSE_CODE[req.purpose] },
+      { name: 'useMode', valueCode: USE_CODE[req.use] },
+      { name: 'scope', valueCode: SCOPE_CODE[req.scope] },
+    ];
+    if (req.expires && req.expires !== 'No expiry') {
+      parameter.push({ name: 'expiration', valueDateTime: req.expires });
+    }
+    const res = await this.req<FhirConsentResource>(
+      `/Patient/${encodeURIComponent(req.patientId)}/$creda-authorize`,
+      { method: 'POST', body: JSON.stringify(fhirParameters(parameter)) },
+    );
+    return consentToAuthorization(res, req);
+  }
+
+  async revoke(req: RevokeRequest): Promise<CredaAuthorization> {
+    const res = await this.req<FhirConsentResource>(
+      `/Patient/${encodeURIComponent(req.patientId)}/$creda-revoke`,
+      {
+        method: 'POST',
+        body: JSON.stringify(
+          fhirParameters([{ name: 'grant', valueReference: { reference: `Consent/${req.grantId}` } }]),
+        ),
+      },
+    );
+    return consentToAuthorization(res);
   }
 
   async verifyAuthorization(args: {
@@ -157,7 +212,13 @@ class HttpBridge implements FhirBridge {
     }
     const raw = await this.req<Parameters>(`/Patient/${encodeURIComponent(args.patientId)}/$creda-verify`, {
       method: 'POST',
-      body: JSON.stringify(parametersOf({ ...args })),
+      body: JSON.stringify(
+        fhirParameters([
+          { name: 'requester', valueString: args.requester },
+          { name: 'purpose', valueCode: PURPOSE_CODE[args.purpose] },
+          { name: 'useMode', valueCode: USE_CODE[args.use] },
+        ]),
+      ),
     });
     const decision = raw.parameter?.find((p) => p.name === 'decision')?.valueCode ?? 'denied-no-grant';
     const reason = raw.parameter?.find((p) => p.name === 'reason')?.valueString ?? '';
@@ -170,6 +231,14 @@ class HttpBridge implements FhirBridge {
     }
     const bundle = await this.req<Bundle>(`/Provenance?_creda-eventType=AuthorizationGrant,AuthorizationRevocation,ExportReceipt`);
     return (bundle.entry ?? []).map((e) => e.resource);
+  }
+
+  async listAuthorizations(patientId: string): Promise<CredaAuthorization[]> {
+    interface Bundle {
+      entry?: { resource: FhirConsentResource }[];
+    }
+    const bundle = await this.req<Bundle>(`/Consent?patient=${encodeURIComponent(patientId)}`);
+    return (bundle.entry ?? []).map((e) => consentToAuthorization(e.resource));
   }
 }
 
@@ -187,10 +256,187 @@ function parametersOf(obj: object): {
   };
 }
 
+/** A typed FHIR Parameters.parameter entry — one of the value[x] forms the bridge accepts. */
+type FhirParam =
+  | { name: string; valueString: string }
+  | { name: string; valueCode: string }
+  | { name: string; valueDateTime: string }
+  | { name: string; valueReference: { reference: string } };
+
+/** Build a FHIR Parameters resource from typed entries (used for the authorization operations). */
+function fhirParameters(parameter: FhirParam[]): { resourceType: 'Parameters'; parameter: FhirParam[] } {
+  return { resourceType: 'Parameters', parameter };
+}
+
+// UI display label -> FHIR code (the §4.3.1 / Rust-enum kebab-case codes the bridge validates).
+const PURPOSE_CODE: Record<GrantPurpose, string> = {
+  Treatment: 'treatment',
+  Payment: 'payment',
+  Operations: 'operations',
+  'Public health': 'public-health',
+  Research: 'research',
+  'AI training': 'ai-training',
+  'AI inference': 'ai-inference',
+  'Federal program': 'federal-program',
+};
+const USE_CODE: Record<UseMode, string> = {
+  'Read only': 'read-only',
+  'Read & rely': 'read-and-rely',
+  'Read & export': 'read-and-export',
+};
+const SCOPE_CODE: Record<GrantScope, string> = {
+  'Identity only': 'identity-only',
+  'Identity + history': 'identity-history',
+  'Identity (de-identified)': 'identity-deidentified',
+};
+
+// Inverse maps: FHIR code -> UI display label, for translating bridge responses back.
+const CODE_TO_PURPOSE = Object.fromEntries(
+  Object.entries(PURPOSE_CODE).map(([label, code]) => [code, label]),
+) as Record<string, GrantPurpose>;
+const CODE_TO_USE = Object.fromEntries(
+  Object.entries(USE_CODE).map(([label, code]) => [code, label]),
+) as Record<string, UseMode>;
+
+/** The slice of a real FHIR R4 Provenance (the bridge's CredaProvenance projection) the UI reads. */
+interface FhirProvenanceResource {
+  resourceType: 'Provenance';
+  id?: string;
+  recorded?: string;
+  target?: { reference?: string }[];
+  activity?: { coding?: { code?: string }[] };
+  agent?: { who?: { reference?: string } }[];
+  entity?: { what?: { reference?: string } }[];
+  extension?: {
+    url?: string;
+    extension?: { url?: string; valueCode?: string; valueString?: string; valueUnsignedInt?: number }[];
+  }[];
+}
+
+// Payload-extension code -> UI display label maps (the bridge sends the Rust kebab-case
+// discriminants; components render the human labels the mock fixtures established).
+const VM_LABEL: Record<string, string> = {
+  'government-photo-id': 'Government photo ID',
+  'birth-certificate': 'Birth certificate',
+  'vital-records': 'Vital records',
+  'insurance-card': 'Insurance card',
+  biometric: 'Biometric',
+  'self-report': 'Self-reported',
+  'referral-inherited': 'Referral (inherited)',
+  other: 'Other',
+};
+const LINK_METHOD_LABEL: Record<string, NonNullable<CredaProvenance['linkMethod']>> = {
+  manual: 'Manual',
+  algorithmic: 'Algorithmic',
+  referral: 'Referral',
+  'insurance-crosswalk': 'InsuranceCrosswalk',
+  other: 'Other',
+};
+const PURPOSE_LABEL: Record<string, string> = {
+  treatment: 'Treatment',
+  payment: 'Payment',
+  operations: 'Operations',
+  'public-health': 'Public health',
+  research: 'Research',
+  other: 'Other',
+};
+
+/**
+ * Translate the bridge's FHIR Provenance (§8.2.3 mapping) into the UI display shape. Transport
+ * owns this — components never see raw FHIR. The event-signature extension's presence means the
+ * node carries a signature Core verified at ingest (§3.6).
+ */
+function provenanceFromFhir(res: FhirProvenanceResource): CredaProvenance {
+  const sigExt = res.extension?.find((e) => e.url?.endsWith('/event-signature'));
+  const algorithm = sigExt?.extension?.find((e) => e.url === 'algorithm')?.valueCode ?? 'Ed25519';
+  const who = res.agent?.[0]?.who?.reference ?? '';
+
+  // event-payload extension: the type-specific fields the clinician projection reads. Sub-
+  // extensions are present only when the variant carries the field (see ProvenanceMapper).
+  const payloadExt = res.extension?.find((e) => e.url?.endsWith('/event-payload'))?.extension ?? [];
+  const sub = (name: string) => payloadExt.find((e) => e.url === name);
+  const vmCode = sub('verificationMethod')?.valueCode;
+  const linkCode = sub('linkMethod')?.valueCode;
+  const purposeCode = sub('purpose')?.valueCode;
+  const bps = sub('confidenceScore')?.valueUnsignedInt;
+
+  return {
+    resourceType: 'Provenance',
+    id: res.id ?? '',
+    recorded: res.recorded ?? '',
+    target: (res.target ?? []).map((t) => ({ reference: t.reference ?? '' })),
+    eventType: (res.activity?.coding?.[0]?.code ?? 'Assert') as CredaProvenance['eventType'],
+    institution: who.replace('Organization/', '').slice(0, 16),
+    parents: (res.entity ?? [])
+      .map((e) => e.what?.reference?.replace('Provenance/', '') ?? '')
+      .filter(Boolean),
+    verificationMethod: vmCode ? (VM_LABEL[vmCode] ?? vmCode) : undefined,
+    matchScore: typeof bps === 'number' ? `${Math.round(bps / 100)}%` : undefined,
+    linkMethod: linkCode ? LINK_METHOD_LABEL[linkCode] : undefined,
+    purpose: purposeCode ? (PURPOSE_LABEL[purposeCode] ?? purposeCode) : undefined,
+    dateOfBirth: sub('dateOfBirth')?.valueString,
+    nameFamily: sub('nameFamily')?.valueString,
+    nameGiven: sub('nameGiven')?.valueString,
+    summary: sub('amendmentReason')?.valueString ?? sub('contestReason')?.valueString,
+    signature: sigExt ? { algorithm, verified: true } : undefined,
+  };
+}
+
+/** The slice of a FHIR R4 Consent (the bridge's CredaAuthorization projection) the UI reads. */
+interface FhirConsentResource {
+  resourceType: 'Consent';
+  id?: string;
+  status?: string;
+  patient?: { reference?: string };
+  dateTime?: string;
+  provision?: {
+    period?: { end?: string };
+    purpose?: { code?: string }[];
+    actor?: { reference?: { display?: string; identifier?: { value?: string } } }[];
+    extension?: { url?: string; valueCode?: string }[];
+  };
+}
+
+/**
+ * Translate the bridge's FHIR Consent into the UI display model. The transport owns this mapping
+ * (components never see raw FHIR). Fields the projection doesn't carry yet (scope, audienceKind)
+ * fall back to the request that produced the Consent when available.
+ */
+function consentToAuthorization(
+  res: FhirConsentResource,
+  requested?: Pick<AuthorizeRequest, 'audience' | 'audienceKind' | 'purpose' | 'use' | 'scope'>,
+): CredaAuthorization {
+  const actorRef = res.provision?.actor?.[0]?.reference;
+  const purposeCode = res.provision?.purpose?.[0]?.code;
+  const useCode = res.provision?.extension?.find((e) => e.url?.endsWith('/use-mode'))?.valueCode;
+  return {
+    resourceType: 'Consent',
+    id: res.id ?? '',
+    status: res.status === 'active' ? 'active' : 'revoked',
+    patient: { reference: res.patient?.reference ?? '' },
+    audience: actorRef?.display ?? actorRef?.identifier?.value ?? requested?.audience ?? 'Unknown institution',
+    audienceKind: requested?.audienceKind ?? 'institution',
+    purpose: (purposeCode ? CODE_TO_PURPOSE[purposeCode] : undefined) ?? requested?.purpose ?? 'Treatment',
+    use: (useCode ? CODE_TO_USE[useCode] : undefined) ?? requested?.use ?? 'Read only',
+    scope: requested?.scope ?? 'Identity only',
+    since: (res.dateTime ?? '').slice(0, 10),
+    expires: res.provision?.period?.end ?? 'No expiry',
+  };
+}
+
 let _bridge: FhirBridge | null = null;
 let _isMock = true;
 
 function bridgeBase(): string | undefined {
+  // Priority order:
+  //   1. window.__CREDA_FHIR_BASE__ — runtime-injected by the docker entrypoint's sed step.
+  //      Lets one built image switch between mock and real mode based on the FHIR_BASE env
+  //      var the chart passes in. If the entrypoint did not replace the placeholder (e.g.
+  //      `pnpm dev` serves the raw index.html), the value will be the literal sentinel
+  //      "__CREDA_FHIR_BASE_PLACEHOLDER__" and we fall through to (2).
+  //   2. import.meta.env.VITE_FHIR_BASE — build-time default for `pnpm dev` / host-side work.
+  const runtime = (globalThis as unknown as { __CREDA_FHIR_BASE__?: string }).__CREDA_FHIR_BASE__;
+  if (runtime && runtime !== '__CREDA_FHIR_BASE_PLACEHOLDER__') return runtime;
   return (import.meta as ImportMeta & { env: { VITE_FHIR_BASE?: string } }).env.VITE_FHIR_BASE;
 }
 

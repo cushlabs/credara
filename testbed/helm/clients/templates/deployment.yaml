@@ -36,13 +36,13 @@ spec:
             readOnlyRootFilesystem: false   # nginx writes /var/cache/nginx
             capabilities: { drop: ["ALL"] }
           env:
-            {{- if .Values.fhirBase }}
-            # The clients pick up VITE_FHIR_BASE at build time; this is informational only
-            # (the env is reflected in /healthz for debug). Real switching requires rebuilding
-            # the image with the right --build-arg.
-            - name: VITE_FHIR_BASE_INFO
+            # Picked up by /docker-entrypoint.d/40-creda.sh — empty / "mock" leaves the SPA
+            # in mock mode; "/fhir" turns on the nginx /fhir/* → bridgeUpstream proxy and
+            # makes the SPA's FHIR client switch to the HTTP transport (same origin, no CORS).
+            - name: FHIR_BASE
               value: {{ .Values.fhirBase | quote }}
-            {{- end }}
+            - name: BRIDGE_UPSTREAM
+              value: {{ .Values.bridgeUpstream | quote }}
           readinessProbe:
             httpGet: { path: /healthz, port: http }
             periodSeconds: 2

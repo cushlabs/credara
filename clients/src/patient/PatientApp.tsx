@@ -9,7 +9,19 @@ import { avatarColor, classNames, initials } from '@shared/lib/format';
 
 import './patient.css';
 
-const PATIENT_ID = 'p1';
+// Resolve the demo patient the way a real Creda client would: demographic-token lookup
+// (`Patient?_creda-token=`, §8.2.11) against the seeded dataset — never a hardcoded id, because
+// `make -C testbed reset` reseeds with fresh event ids while the tok:demo:* tokens stay stable.
+// The mock's token search returns its fixture ids, so one path serves both modes. Cached after
+// the first resolution.
+let resolvedPatientId: string | null = null;
+async function patientId(bridge: ReturnType<typeof getBridge>): Promise<string> {
+  if (!resolvedPatientId) {
+    const ids = await bridge.searchPatientsByToken(['tok:demo:gonzalez']);
+    resolvedPatientId = ids[0] ?? 'p1';
+  }
+  return resolvedPatientId;
+}
 const PATIENT_NAME = 'Maria Gonzalez';
 const PURPOSES: GrantPurpose[] = ['Treatment', 'Payment', 'Operations', 'Public health', 'Research', 'AI training', 'AI inference', 'Federal program'];
 const USES: UseMode[] = ['Read only', 'Read & rely', 'Read & export'];
@@ -60,18 +72,22 @@ function ConsentApp() {
   ]);
 
   const refresh = useCallback(async () => {
-    // The bridge mock returns CredaAuthorization synthesized from its in-memory store; in the
-    // real bridge this would be a Consent search bound to this patient.
-    const events = await bridge.listAuthorizationEvents();
-    // Hydrate grants from the seed authorizations the mock already holds — we treat the
-    // initial set as the patient's current state.
-    setGrants(await loadGrants(bridge));
-    // Synthesize an activity feed from the auth events.
+    // Real data both ways: the bridge's `Consent?patient={id}` search (§8.2.9 read-back) returns
+    // the patient's grants with revoked ones marked; the mock implements the same method over its
+    // seed state. The access list now survives a page refresh against the real peer.
+    const list = await bridge.listAuthorizations(await patientId(bridge));
+    setGrants(list);
+    // Seed the activity feed from the authorization state on first load.
     setActivity((prev) => {
       if (prev.length > 1) return prev;
-      const seeded: ActivityEntry[] = events
-        .filter((e) => e.eventType === 'AuthorizationGrant')
-        .map((e) => ({ ev: 'grant', text: e.summary ?? 'Grant', when: e.recorded.slice(0, 10) }));
+      const seeded: ActivityEntry[] = list.map((g) => ({
+        ev: g.status === 'revoked' ? ('revoke' as const) : ('grant' as const),
+        text:
+          g.status === 'revoked'
+            ? `Stopped sharing with ${g.audience}`
+            : `Granted ${g.purpose} access to ${g.audience}`,
+        when: g.since || '—',
+      }));
       return [...prev, ...seeded].slice(0, 12);
     });
   }, [bridge]);
@@ -110,7 +126,7 @@ function ConsentApp() {
             grants={grants}
             onRevoke={async (g) => {
               try {
-                await bridge.revoke({ patientId: PATIENT_ID, grantId: g.id });
+                await bridge.revoke({ patientId: await patientId(bridge), grantId: g.id });
                 await refresh();
                 setActivity((a) => [{ ev: 'revoke', text: `Stopped sharing with ${g.audience}`, when: 'Just now' }, ...a]);
                 toast.show(gossipToast('Revocation'));
@@ -134,22 +150,6 @@ function ConsentApp() {
       </div>
     </div>
   );
-}
-
-async function loadGrants(bridge: ReturnType<typeof getBridge>): Promise<CredaAuthorization[]> {
-  // Mock bridge does not (yet) expose a $consent-list operation; the seed auths are surfaced
-  // by querying for each known purpose against the mock state. In the real bridge a
-  // Patient/$creda-grants operation would return this directly.
-  const checked: CredaAuthorization[] = [];
-  // Trigger one verify per purpose to flush the seed auth list through the bridge — purely
-  // diagnostic; the real bridge will replace this with a single Consent?patient=... search.
-  for (const p of ['Treatment', 'Research'] as GrantPurpose[]) {
-    await bridge.verifyAuthorization({ patientId: PATIENT_ID, requester: 'self', purpose: p, use: 'Read only' });
-  }
-  // Pull the in-memory auths the mock created at boot. We re-import the seed list rather
-  // than going through a non-existent list endpoint.
-  const { mockSeedAuthorizations } = await import('./seed');
-  return [...mockSeedAuthorizations(), ...checked];
 }
 
 function AccessTab({ grants, onRevoke }: { grants: CredaAuthorization[]; onRevoke: (g: CredaAuthorization) => Promise<void> }) {
@@ -304,7 +304,7 @@ function ShareTab({ onAuthorized }: { onAuthorized: (g: CredaAuthorization) => v
   const commit = async () => {
     try {
       const grant = await bridge.authorize({
-        patientId: PATIENT_ID,
+        patientId: await patientId(bridge),
         audience: form.who,
         audienceKind: form.kind,
         purpose: form.purpose,

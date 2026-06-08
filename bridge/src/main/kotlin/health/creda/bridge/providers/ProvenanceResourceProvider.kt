@@ -5,11 +5,13 @@ import ca.uhn.fhir.rest.annotation.Operation
 import ca.uhn.fhir.rest.annotation.Read
 import ca.uhn.fhir.rest.annotation.ResourceParam
 import ca.uhn.fhir.rest.server.IResourceProvider
+import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Parameters
 import org.hl7.fhir.r4.model.Provenance
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 /**
  * Each Creda identity event maps to a CredaProvenance resource (§8.2.3) — Provenance, not
@@ -25,19 +27,33 @@ class ProvenanceResourceProvider(
 
     @Read
     fun read(@IdParam id: IdType): Provenance {
-        val eventCbor = core.getEvent(id.idPart.toByteArray())
+        val uuid = try {
+            UUID.fromString(id.idPart)
+        } catch (_: IllegalArgumentException) {
+            throw ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException(id)
+        }
+        val eventCbor = core.getEvent(EventPayloadCbor.uuidBytes(uuid))
             ?: throw ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException(id)
-        return ProvenanceMapper.fromEventCbor(eventCbor) // TODO(bridge-verify)
+        return ProvenanceMapper.fromEventCbor(eventCbor)
     }
 
     /** `$creda-contest` (§8.2.7): contest a Link Provenance. Party-of-subgraph is enforced in Core. */
     @Operation(name = "\$creda-contest")
     fun contest(@IdParam linkId: IdType, @ResourceParam params: Parameters): Provenance {
-        val payloadCbor = encodeContest(params)
-        val eventCbor = core.createEvent(payloadCbor, listOf(linkId.idPart.toByteArray()))
+        val targetLinkUuid = try {
+            UUID.fromString(linkId.idPart)
+        } catch (_: IllegalArgumentException) {
+            throw ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException(linkId)
+        }
+        val reason = params.parameter
+            .firstOrNull { it.name == "reason" }
+            ?.value
+            ?.primitiveValue()
+            ?: "contested by reviewer"
+
+        val payloadCbor = EventPayloadCbor.encodeContest(targetLinkUuid, reason)
+        val parentBytes = EventPayloadCbor.uuidBytes(targetLinkUuid)
+        val eventCbor = core.createEvent(payloadCbor, listOf(parentBytes))
         return ProvenanceMapper.fromEventCbor(eventCbor)
     }
 }
-
-internal fun encodeContest(@Suppress("UNUSED_PARAMETER") params: Parameters): ByteArray =
-    TODO("bridge-verify: encode a Contest EventPayload (reason) as canonical CBOR")

@@ -9,7 +9,14 @@ set -euo pipefail
 CLUSTER="${1:-creda-testbed}"
 LOCAL_PORT="${UI_FORWARD_PORT:-5173}"
 
-NS="creda-ui"
+# UAT=1 targets the real-mode install (namespace 'creda-uat'); default is mock-mode UAT
+# (namespace 'creda-ui'). The two namespaces can both be up; setting UAT picks which one
+# the port-forward attaches to.
+if [[ "${UAT:-0}" = "1" ]]; then
+  NS="creda-uat"
+else
+  NS="creda-ui"
+fi
 CTX="kind-${CLUSTER}"
 kc="kubectl --context=${CTX}"
 

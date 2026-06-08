@@ -34,6 +34,14 @@ export interface ChallengeOption {
   eventType: 'Attest' | 'Contest' | 'Amend' | null;
   /** Steward note shown in the confirm dialog. */
   note: string;
+  /**
+   * The real subgraph event this action targets — set when the challenge is projected from a
+   * live subgraph (Amend/Attest → the Assert id; Contest → the Link id). Absent for the static
+   * fixtures, where onCommit falls back to a heuristic head/Link lookup.
+   */
+  targetEventId?: string;
+  /** Corrected DOB token to carry on an Amend (the value being affirmed). */
+  amendDob?: string;
 }
 
 export interface PatientProjection {

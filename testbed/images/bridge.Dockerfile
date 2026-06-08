@@ -12,6 +12,12 @@ ARG GRADLE_BUILDER=docker.io/library/gradle:8.10-jdk21
 ARG RUNTIME=docker.io/library/eclipse-temurin:21-jre-jammy
 
 FROM ${GRADLE_BUILDER} AS builder
+# CACHEBUST is a content hash of the bridge sources, supplied by build-and-load.sh. Consuming it
+# in a RUN *before* the source COPY invalidates the COPY + Gradle layers whenever the bridge
+# changes — defeating podman-machine's stale COPY-layer cache — while leaving them cached (fast)
+# when nothing changed. Without this, a bridge edit can silently ship a stale jar.
+ARG CACHEBUST=dev
+RUN echo "bridge source hash: ${CACHEBUST}"
 WORKDIR /src
 COPY . .
 WORKDIR /src/bridge

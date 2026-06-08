@@ -45,6 +45,7 @@ use pb::creda_server::{Creda, CredaServer};
 use pb::{
     AuthReply, AuthRequest, CreateEventRequest, EffectiveIdentityReply, Empty, EntryPoints,
     EventReply, GetEventReply, GetEventRequest, MatchReply, MatchRequest, Metrics,
+    SubgraphEventsReply, SubgraphEventsRequest,
 };
 
 /// Fire-and-forget hook the gRPC service invokes after a locally created event has been signed
@@ -164,6 +165,39 @@ impl Creda for CredaService {
             }
             None => Ok(Response::new(GetEventReply { found: false, event_cbor: Vec::new() })),
         }
+    }
+
+    /// List a subgraph's events, optionally filtered by type (§10.1.3) — the read surface behind
+    /// the Bridge's `Consent?patient=` search. Sorted by logical clock for a causally-coherent
+    /// order (the same convention as `$creda-provenance`, §8.2.5).
+    async fn get_subgraph_events(
+        &self,
+        request: Request<SubgraphEventsRequest>,
+    ) -> std::result::Result<Response<SubgraphEventsReply>, Status> {
+        let req = request.into_inner();
+        let entries = ids_from_bytes(&req.entry_points)?;
+        let types = req
+            .event_types
+            .iter()
+            .map(|s| parse_event_type(s.as_str()))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let core = self.core.clone();
+        let nodes = blocking(move || {
+            let subgraph = core.get_subgraph(&entries)?;
+            let mut nodes: Vec<IdentityEventNode> = subgraph
+                .nodes()
+                .filter(|n| types.is_empty() || types.contains(&n.event_type))
+                .cloned()
+                .collect();
+            nodes.sort_by_key(|n| n.logical_clock);
+            Ok(nodes)
+        })
+        .await?;
+        let event_cbor = nodes
+            .iter()
+            .map(|n| canonical::to_vec(n).map_err(|e| Status::internal(e.to_string())))
+            .collect::<std::result::Result<Vec<_>, Status>>()?;
+        Ok(Response::new(SubgraphEventsReply { event_cbor }))
     }
 
     async fn get_effective_identity(
@@ -673,6 +707,51 @@ mod tests {
         service.create_event(req).await.unwrap();
 
         assert_eq!(counter.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    /// The read path behind `Consent?patient=`: a Grant whose parent entry-point node is NOT in
+    /// the store (the first-encounter / demo-patient case) must still be returned by
+    /// GetSubgraphEvents — this exercises both the new RPC and the materialize fix that follows
+    /// the parent→child index past absent nodes.
+    #[tokio::test]
+    async fn subgraph_events_finds_grant_under_absent_entry_point() {
+        let core = Arc::new(CredaCore::new(
+            Box::new(MemoryStore::new()),
+            Box::new(InMemorySigner::generate().unwrap()),
+            CredaConfig::default(),
+        ));
+        let service = CredaService { core, publisher: None };
+
+        // An entry-point id with no stored node — exactly the demo-patient shape.
+        let entry = creda_events::EventId::from_u128(0x00010203_0405_0607_0809_0a0b0c0d0e0f);
+
+        let grant = creda_events::EventPayload::AuthorizationGrant {
+            scope: creda_events::AuthorizationScope::default(),
+            audience: creda_events::GrantAudience::InstitutionClass("any-tefca-qhin".into()),
+            purpose: GrantPurpose::Treatment,
+            expiration: None,
+            volume_constraints: None,
+            use_mode: UseMode::ReadAndRely,
+        };
+        let create = Request::new(pb::CreateEventRequest {
+            event_payload_cbor: canonical::to_vec(&grant).unwrap(),
+            parent_ids: vec![entry.as_bytes().to_vec()],
+        });
+        service.create_event(create).await.unwrap();
+
+        let reply = service
+            .get_subgraph_events(Request::new(pb::SubgraphEventsRequest {
+                entry_points: vec![entry.as_bytes().to_vec()],
+                event_types: vec!["AuthorizationGrant".into()],
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(reply.event_cbor.len(), 1, "grant under an absent entry point must be found");
+        let node: IdentityEventNode = canonical::from_slice(&reply.event_cbor[0]).unwrap();
+        assert_eq!(node.event_type, IdentityEventType::AuthorizationGrant);
+        assert_eq!(node.parent_ids, vec![entry]);
     }
 
     #[tokio::test]

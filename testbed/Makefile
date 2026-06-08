@@ -16,18 +16,26 @@ KIND         ?= kind
 KUBECTL      ?= kubectl
 HELM         ?= helm
 BASH         ?= bash
+# Container engine for image reclaim. `docker` resolves to podman on the maintainers' macs (the
+# same way build-and-load.sh shells out to `docker build`); override with ENGINE=podman if needed.
+ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean images smoke ae-repair ui-smoke ui-up ui-forward ui-down
+.PHONY: up down clean reclaim images smoke ae-repair ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
 ## the dev container and shipped as an image; it runs in-cluster as a Kubernetes Job. No host
 ## Rust toolchain required.
 
-up: cluster images
-	@echo "==> testbed cluster up. next: make smoke"
+## `up` is a *clean* bring-up: tear down any existing cluster, reclaim dangling images + build
+## cache, then recreate and load. This keeps repeated triage iterations from stacking stale
+## clusters/containers and accreting image layers (the "hundreds of processes" problem). Prereqs
+## run in listed order (the testbed never runs make with -j). To bring up WITHOUT the teardown,
+## run `make cluster images` directly.
+up: down reclaim cluster images
+	@echo "==> testbed cluster up (clean). next: make smoke"
 
 cluster:
 	$(BASH) $(REPO_ROOT)/testbed/kind/up.sh "$(CLUSTER_NAME)"
@@ -37,6 +45,15 @@ images:
 
 down:
 	$(BASH) $(REPO_ROOT)/testbed/kind/down.sh "$(CLUSTER_NAME)"
+
+## Reclaim ONLY dangling (untagged) images and stale build cache — never tagged/in-use images
+## like creda-*:testbed or creda-dev:local, so the next build still hits its cache. This is the
+## accretion left by repeated rebuilds (each `:testbed` rebuild orphans the previous layer). The
+## leading `-` keeps a prune failure (e.g. engine not running) from aborting `up`.
+reclaim:
+	@echo "==> reclaiming dangling images + build cache ($(ENGINE))"
+	-$(ENGINE) image prune -f
+	-$(ENGINE) builder prune -f
 
 clean: down
 	@rm -rf $(REPO_ROOT)/testbed/.run
@@ -73,3 +90,29 @@ ui-forward:
 
 ui-down:
 	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-down.sh "$(CLUSTER_NAME)"
+
+## --- Real-mode UAT ---
+##
+## ui-up-real brings up a real Creda peer (Core + Bridge) alongside the clients, points the
+## clients' nginx /fhir proxy at the bridge, and leaves it all running. Clicking 'Attest' in
+## the clinician UI then produces a signed event in Core and publishes it to the gossip mesh
+## for real. After it returns: `UAT=1 make ui-forward` in a second terminal to open the UI at
+## http://localhost:5173. Distinct from ui-up (mock mode) — the two namespaces coexist.
+ui-up-real:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-up-real.sh "$(CLUSTER_NAME)"
+
+ui-down-real:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/ui-down-real.sh "$(CLUSTER_NAME)"
+
+## --- UAT data lifecycle ---
+##
+## The DAG is append-forward — events cannot be deleted — so returning the UAT peer to a known
+## base state means wiping its event store and reseeding, NOT cycling the cluster or images.
+## `reset` does exactly that (~60-90s): scale peer down, drop the data PVC, scale up, seed the
+## demo dataset (Maria Gonzalez + James Whitfield, stable tok:demo:* lookup tokens). `seed`
+## seeds WITHOUT wiping — note repeated seeds append duplicate demo events; prefer `reset`.
+reset:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/reset-uat.sh "$(CLUSTER_NAME)"
+
+seed:
+	$(BASH) $(REPO_ROOT)/testbed/scripts/seed-demo.sh "$(CLUSTER_NAME)"

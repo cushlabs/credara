@@ -159,6 +159,48 @@ The UAT install lives in its own `creda-ui` namespace and is **not** affected by
 `make ui-up` is idempotent (`helm upgrade --install`), so re-running it after a code change
 upgrades the chart in place.
 
+**Manual — drive the UI against a real bridge + peer (end-to-end gossip):**
+
+Mock mode lets you walk the UI end-to-end visually, but no event ever lands on the wire.
+For end-to-end verification — clinician's "Attest" button producing a signed event in Core
+and publishing it to the libp2p gossip mesh — bring everything up together:
+
+```sh
+cd testbed
+make ui-up-real
+```
+
+Brings up a single Creda peer (Core + Bridge) in namespace `creda-uat`, deploys the
+clients chart alongside it, and wires the clients' nginx `/fhir` reverse proxy at the
+bridge's in-cluster Service. Same image as mock-mode UAT — the SPA switches modes at
+container start based on the `FHIR_BASE` env var the chart passes in.
+
+Open the UI by port-forwarding to the real-mode namespace:
+
+```sh
+cd testbed
+UAT=1 make ui-forward
+```
+
+`UAT=1` picks the real-mode namespace `creda-uat`; default targets the mock-mode namespace
+`creda-ui`. Both can coexist.
+
+You'll see the yellow `MOCK BRIDGE · no gossip` chip is gone. Click `1971-08-04 is correct`
+on James Whitfield. The toast now reads `Attest recorded — propagating to peers` because
+the event actually went on the wire. To confirm at the protocol layer, tail the Core log
+in another terminal:
+
+```sh
+kubectl -n creda-uat logs peer-0 -c creda-core -f
+```
+
+You should see an ingest-level log line for the Attest event the moment the toast appears.
+The audit reviewer's ledger is still fixture-backed in this build (it doesn't yet read
+from the bridge), so don't expect the new event to show up there — that's the next piece.
+The on-wire event is what proves the system is working.
+
+Tear down with `make ui-down-real` when you're done.
+
 Persona URLs after `make ui-forward`:
 
 | URL | What it is |

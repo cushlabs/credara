@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Badge } from '@shared/components/Badge';
 import { CodeCard } from '@shared/components/CodeCard';
@@ -26,6 +26,48 @@ export function PatientDetailPage() {
   const patient = patients.find((p) => p.id === patientId);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [pending, setPending] = useState<{ challengeId: string; option: ChallengeOption } | null>(null);
+
+  // Live consent state from the bridge (`Consent?patient=`, §8.2.9 read-back). The fixture
+  // consent.state is only the fallback when no real authorization data exists — a grant or
+  // revocation made in the patient app shows here because both views read the same DAG. The
+  // real patient is resolved by demographic token (stable across `make -C testbed reset`).
+  const [liveConsent, setLiveConsent] = useState<PatientProjection['consent'] | null>(null);
+  useEffect(() => {
+    if (!patient) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const family = patient.name.split(' ').pop()?.toLowerCase() ?? '';
+        const ids = await bridge.searchPatientsByToken([`tok:demo:${family}`]);
+        const grants = await bridge.listAuthorizations(ids[0] ?? patient.id);
+        if (cancelled || grants.length === 0) return;
+        const active = grants.find((g) => g.status === 'active');
+        const revoked = grants.find((g) => g.status === 'revoked');
+        if (active) {
+          setLiveConsent({
+            state: 'granted',
+            purpose: active.purpose,
+            use: active.use,
+            source: `Patient grant to ${active.audience}`,
+            expires: active.expires,
+          });
+        } else if (revoked) {
+          setLiveConsent({
+            state: 'restricted',
+            purpose: revoked.purpose,
+            use: '—',
+            source: `Patient revoked access (${revoked.audience})`,
+            expires: '—',
+          });
+        }
+      } catch {
+        // Bridge read unavailable — keep the fixture fallback rather than blanking the panel.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bridge, patient]);
 
   const logEntries = actionLog[patientId] ?? [];
 
@@ -63,7 +105,9 @@ export function PatientDetailPage() {
     );
   }
 
-  const cm = consentMeta(patient.consent);
+  // Effective view: live bridge consent overrides the fixture when present.
+  const patientView: PatientProjection = liveConsent ? { ...patient, consent: liveConsent } : patient;
+  const cm = consentMeta(patientView.consent);
   const accessRequestedFlag = !!accessRequested[patient.id];
 
   const onChallenge = (challenge: Challenge, option: ChallengeOption) => {
@@ -140,7 +184,7 @@ export function PatientDetailPage() {
       <div className="grid2">
         <div style={{ display: 'grid', gap: 16 }}>
           <ConsentCard
-            patient={patient}
+            patient={patientView}
             requested={accessRequestedFlag}
             onRequestAccess={() => {
               requestAccess(patient.id);

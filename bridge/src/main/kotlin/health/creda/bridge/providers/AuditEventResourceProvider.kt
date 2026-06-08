@@ -1,5 +1,6 @@
 package health.creda.bridge.providers
 
+import ca.uhn.fhir.rest.annotation.Search
 import ca.uhn.fhir.rest.server.IResourceProvider
 import org.hl7.fhir.r4.model.AuditEvent
 import org.springframework.stereotype.Component
@@ -10,9 +11,19 @@ import org.springframework.stereotype.Component
  * CredaProvenance). This provider exposes read/search over those access records.
  *
  * TODO(bridge-verify): wire HAPI's AuditEvent interceptor to capture reads, and back read/search
- * with that store. Stubbed here to keep the M7 scaffold bounded.
+ * with that store. Stubbed here to keep the M7 scaffold bounded — search returns empty until
+ * the interceptor lands.
+ *
+ * The stub `@Search` is required even though the body is empty: HAPI's RestfulServer rejects
+ * any IResourceProvider with zero annotated methods (`HAPI-0289`). Removing this provider
+ * from the registered list would be the alternative, but keeping it advertises the resource
+ * type in the CapabilityStatement which is what FHIR clients expect to see.
  */
 @Component
 class AuditEventResourceProvider : IResourceProvider {
     override fun getResourceType(): Class<AuditEvent> = AuditEvent::class.java
+
+    /** Stub search — returns an empty list until the auditing interceptor is wired in. */
+    @Search
+    fun searchAll(): List<AuditEvent> = emptyList()
 }

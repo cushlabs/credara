@@ -11,6 +11,7 @@ import health.creda.grpc.GetEventRequest
 import health.creda.grpc.GrantPurpose
 import health.creda.grpc.MatchRequest
 import health.creda.grpc.RequesterContext
+import health.creda.grpc.SubgraphEventsRequest
 import health.creda.grpc.UseMode
 import io.grpc.netty.NettyChannelBuilder
 import io.netty.channel.epoll.EpollDomainSocketChannel
@@ -34,13 +35,36 @@ import org.springframework.stereotype.Component
 class CredaCoreClient(
     @Value("\${creda.core-socket}") socketPath: String,
 ) {
-    private val eventLoopGroup = EpollEventLoopGroup()
-    private val channel = NettyChannelBuilder
-        .forAddress(DomainSocketAddress(socketPath))
-        .eventLoopGroup(eventLoopGroup)
-        .channelType(EpollDomainSocketChannel::class.java)
-        .usePlaintext() // confidentiality/auth are provided by the pod boundary, not TLS here
-        .build()
+    // Two transports, mirroring Core's parse_endpoint (grpc.rs): a `tcp://host:port` value means
+    // Core listens on TCP (the testbed's seed/reset Jobs need TCP to reach Core, and TCP also
+    // works on macOS where netty's epoll is unavailable); anything else is a Unix-domain-socket
+    // path (the in-pod default, §8.3.1). In TCP mode `0.0.0.0` is Core's *listen* address — from
+    // the bridge (same pod) the dial address is loopback.
+    private val eventLoopGroup: EpollEventLoopGroup?
+    private val channel: io.grpc.ManagedChannel
+
+    init {
+        if (socketPath.startsWith("tcp://")) {
+            val target = socketPath.removePrefix("tcp://").replace("0.0.0.0", "127.0.0.1")
+            eventLoopGroup = null
+            channel = NettyChannelBuilder.forTarget(target).usePlaintext().build()
+        } else {
+            eventLoopGroup = EpollEventLoopGroup()
+            channel = NettyChannelBuilder
+                .forAddress(DomainSocketAddress(socketPath))
+                .eventLoopGroup(eventLoopGroup)
+                .channelType(EpollDomainSocketChannel::class.java)
+                // HTTP/2 :authority must be a valid host:port-style authority (RFC 3986); the
+                // default for forAddress(DomainSocketAddress) is the socket path, which contains
+                // slashes and is rejected by Core's tonic server as a PROTOCOL_ERROR (RST_STREAM
+                // closes every stream before the handler runs). Override to a fixed sentinel —
+                // the value is arbitrary, only validity matters; no virtual-hosting on Core.
+                .overrideAuthority("creda-core.local")
+                .usePlaintext() // confidentiality/auth are provided by the pod boundary, not TLS
+                .build()
+        }
+    }
+
     private val stub = CredaGrpc.newBlockingStub(channel)
 
     /** CreateEvent (§10.1.3): payload is canonical-CBOR EventPayload; returns the event's CBOR. */
@@ -56,6 +80,19 @@ class CredaCoreClient(
     fun getEvent(id: ByteArray): ByteArray? {
         val reply = stub.getEvent(GetEventRequest.newBuilder().setId(ByteString.copyFrom(id)).build())
         return if (reply.found) reply.eventCbor.toByteArray() else null
+    }
+
+    /**
+     * GetSubgraphEvents (§10.1.3): a subgraph's events as canonical CBOR, optionally filtered by
+     * IdentityEventType variant names, sorted by logical clock. The read surface behind the
+     * `Consent?patient=` search (§8.2.9 read-back).
+     */
+    fun getSubgraphEvents(entryPoints: List<ByteArray>, eventTypes: List<String>): List<ByteArray> {
+        val req = SubgraphEventsRequest.newBuilder()
+            .apply { entryPoints.forEach { addEntryPoints(ByteString.copyFrom(it)) } }
+            .addAllEventTypes(eventTypes)
+            .build()
+        return stub.getSubgraphEvents(req).eventCborList.map { it.toByteArray() }
     }
 
     /** GetEffectiveIdentity (§5.2.4). Core currently returns a debug rendering (see core grpc.rs). */
@@ -108,6 +145,6 @@ class CredaCoreClient(
     @PreDestroy
     fun shutdown() {
         channel.shutdownNow()
-        eventLoopGroup.shutdownGracefully()
+        eventLoopGroup?.shutdownGracefully()
     }
 }

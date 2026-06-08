@@ -50,6 +50,12 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:$protobufVersion")
     implementation("io.netty:netty-transport-native-epoll:$nettyVersion:linux-x86_64")
     implementation("io.netty:netty-transport-native-epoll:$nettyVersion:linux-aarch_64")
+
+    // Canonical CBOR codec for the wire-shape exchange with Core. EventPayload travels as
+    // RFC 8949 deterministic CBOR (§3.4, see crates/creda-events/src/canonical.rs); the
+    // upokecenter library supports the deterministic-encoding spec out of the box and is the
+    // standard JVM choice for this. Used by AttestPayloadEncoder + ProvenanceMapper.
+    implementation("com.upokecenter:cbor:4.5.4")
     // Needed for the @Generated annotation grpc-java emits when compiled with newer JDKs.
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 

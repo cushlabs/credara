@@ -3,7 +3,7 @@
 **Version:** 0.1.0-draft
 **Status:** Draft
 **Audience:** Engineering Team
-**Last Updated:** 2026-04-28
+**Last Updated:** 2026-06-03
 
 ---
 
@@ -1592,6 +1592,105 @@ The IAS interface for Creda-aware patients includes:
 
 These patient-facing operations require patient authentication via OAuth2/OIDC (as IAS already specifies) and are gated by the patient's own consent — patients can always access and act on their own identity chain.
 
+### 8.5 FAST Consent Framework Alignment
+
+The HL7 FHIR-at-Scale Taskforce (FAST) is producing a consent framework — published as the **Scalable Consent Management** Implementation Guide (`hl7.fhir.us.consent-management`, US Realm, FHIR R4, STU 1 ballot as of late 2025). Because Creda's portable-authorization layer (Section 4) and the FAST Consent IG address overlapping problems — recording a patient's directive once and keeping it consistent and enforceable as data moves across many institutions — implementers and standards reviewers will ask how Creda relates to FAST Consent. This section answers that directly: it states what the FAST Consent IG actually specifies in its first edition, maps each FAST actor, operation, and profile to a Creda component with a conformance status, identifies where Creda exceeds the IG and where it diverges, and defines the implementation plan for Creda to expose conformant FAST Consent roles through the Bridge.
+
+The framing is deliberate. Creda does **not** adopt FAST Consent's repository-and-subscription transport as its internal model — Creda's internal model is the signed-event DAG of Sections 4–7, which is strictly stronger. Rather, Creda treats the FAST Consent IG as an **interoperability surface at the Bridge**, in exactly the same spirit as US Core (Section 8.2.1) and TEFCA/QHIN (Section 8.4): Creda can present a conformant FAST Consent face to the ecosystem while its substrate remains the DAG.
+
+**Scoping decision: adopt the vocabulary, not the infrastructure.** FAST Consent Edition 1 and Creda solve the *same* problem — discoverable, consistent consent at scale — with *different* fabrics. FAST's scale mechanism is repository federation: Admin Services act as holders of record and stay consistent by notifying one another over a SubscriptionTopic. Creda's portable-authorization layer (Section 4) dissolves that problem rather than coordinating it: a Grant is a signed event already replicated by gossip/anti-entropy and, on the path this section's reviewers care about, *already attached to the data reference it authorizes* (Section 4.4) and re-verified locally at the point of use (Section 4.5.2). When the directive travels with the data and is in the relying peer's DAG view, there is nothing to discover across a federation of repositories. Consequently Creda adopts **only** the parts of FAST Consent that add interoperability value at the edge — the `FASTConsent` profile shape, the three operation semantics, and the associated value sets — and deliberately declines the repository-federation infrastructure, which is redundant with the DAG and weaker than it. The committed scope is the thin Bridge face defined in Section 8.5.6 (phases F0–F2); repository synchronization, ceremony-document capture, and full federated conformance are explicitly out of the default build and are added only on demand (a mandate or a legacy FAST-only counterparty). This keeps the implementation aligned with the Creda tenets — *verification, not mediation*; *provenance by structure*; *standards over invention* — instead of bolting a second, weaker consent fabric onto a substrate that already does the job.
+
+#### 8.5.1 What the FAST Consent IG Specifies (Edition 1)
+
+The first-edition IG is narrower and more concrete than the broader FAST "computable consent" vision sometimes described in FAST communications. What it normatively defines is a **consent-management transport**: how consent records are filed, revoked, and disclosure-logged against consent administration services, and how those records stay synchronized across multiple consent repositories at scale. Specifically:
+
+- **Actors.** Two — a **Client** (files and reviews consents) and an **Admin Service** (a consent administration server / consent repository that receives, stores, and serves consents). The IG ships a CapabilityStatement for each: *Consent Client Capabilities* and *Consent Administrative Server Capabilities*.
+- **Operations.** Three custom FHIR operations: **`$file-consent`** (file a Consent, optionally with a DocumentReference or QuestionnaireResponse capturing the consent ceremony), **`$revoke-consent`** (revoke a prior Consent — modeled as a status transition to `inactive`), and **`$record-disclosure`** (log that a disclosure decision was made under a given Consent, as a Consent AuditEvent referencing the governing Consent).
+- **Profiles.** `FASTConsent` (on FHIR R4 `Consent`), `FASTConsentAuditEvent` (on `AuditEvent`, recording whether a decision to disclose was made), `FASTDocumentReference`, `FASTSubscription`, the three operation-parameter profiles, and `FASTReference` (a Reference datatype profile carrying an identifier plus additional identifiers).
+- **Scale mechanism.** Repositories are kept consistent through FHIR **Subscriptions** on a defined `FASTConsentSubscriptionTopic` — "ensuring Consent records are updated amongst a set of Consent Registries." This is the IG's answer to *scale*: many repositories, eventually consistent via subscription notification.
+- **Vocabulary.** `FAST Consent Statuses` (`active` / `inactive`), LOINC consent-document types, and search parameters for `controller`, `grantee`, `manager`, `organizationId`, and `patientId`.
+
+What the Edition-1 ballot **does not** normatively define is a runtime consent **decision** operation (a `$consent-decision`-style PDP call) or a consent **enforcement** point. Adjudication — evaluating whether a given request is permitted by the stored consent — is left to implementers and to companion work (e.g., the Data Access Policies IG and prior LEAP/CDS experiments). This matters for the mapping below: Creda's *enforcement* machinery (Sections 4.5–4.6, 9.3) has no normative FAST Consent counterpart to conform to yet, whereas Creda's *record-and-replicate* machinery maps onto the IG almost one-to-one.
+
+#### 8.5.2 Conceptual Fit
+
+At the level of intent, the alignment is strong. Both systems treat a patient's directive as a first-class, machine-processable artifact that must remain valid and discoverable after the moment of capture, across institutional boundaries, at scale. The three FAST operations correspond directly to three of Creda's authorization event types:
+
+- `$file-consent` ↔ **`AuthorizationGrant`** (Section 4.3.1). Filing a consent is creating a Grant; a bare consent directive is, in Creda's own words, "an AuthorizationGrant with a minimal scope."
+- `$revoke-consent` ↔ **`AuthorizationRevocation`** (Section 4.3.2). Both withdraw a prior directive; FAST flips a status to `inactive`, Creda appends a signed Revocation referencing the Grant's UUID.
+- `$record-disclosure` ↔ **`ExportReceipt`** (Section 4.3.3). Both create a durable, queryable record that data moved under a specific governing directive.
+
+The replication intents also rhyme: FAST keeps consent consistent across repositories via SubscriptionTopic notification; Creda keeps Grants consistent across peers via gossip and anti-entropy (Sections 6–7). They solve the same consistency problem with different fabrics.
+
+#### 8.5.3 Actor, Operation, and Profile Mapping
+
+The table maps each FAST Consent IG artifact to its Creda counterpart and a conformance status. Status values: **Native** (Creda already implements the equivalent semantics, no FAST-facing surface yet), **Bridge-mappable** (achievable by extending the Bridge with no Core changes), **Bridge + Core** (requires Bridge work plus a Core capability), and **Divergent** (Creda's model intentionally differs).
+
+| FAST Consent artifact | Kind | Creda counterpart | Conformance status |
+|---|---|---|---|
+| **Admin Service** (consent administration server / repository) | Actor | The peer + HAPI FHIR Bridge (Sections 8.3, 10.4) acting as a consent repository over the DAG | Bridge-mappable |
+| **Client** (files/reviews consents) | Actor | Any FHIR client of the Bridge; the patient-side IAS surface (Section 8.4.4) is the natural patient Client | Bridge-mappable |
+| `$file-consent` | Operation | `$creda-authorize` (Section 8.2.9) → `AuthorizationGrant` | Bridge-mappable (add the `$file-consent` signature + ceremony docs) |
+| `$revoke-consent` | Operation | `$creda-revoke` (Section 8.2.9) → `AuthorizationRevocation` | Bridge-mappable |
+| `$record-disclosure` | Operation | `$creda-export` (Section 8.2.9) → `ExportReceipt` | Bridge-mappable |
+| `FASTConsent` (on `Consent`) | Profile | `CredaAuthorization` (on `Consent`, Section 8.2.12) projecting an `AuthorizationGrant` | Bridge + Core (add FASTConsent-conformant projection + grantee/controller/manager mapping) |
+| `FASTConsentAuditEvent` (on `AuditEvent`) | Profile | ExportReceipt projected as AuditEvent (cf. Provenance-vs-AuditEvent split, Section 8.2.4) | Bridge-mappable |
+| `FASTDocumentReference` / `QuestionnaireResponse` (consent ceremony) | Profile | No counterpart — Creda records the *directive*, not the *ceremony artifact* | Bridge + Core (attach ceremony DocumentReference to the Grant) |
+| `FASTConsentSubscriptionTopic` (repository sync) | SubscriptionTopic | Gossip + anti-entropy replication (Sections 6.1.1, 6.2.5); FHIR Subscription bridging (Section 8.2.13) | Divergent (Creda's DAG sync supersedes; a FAST Subscription face is optional) |
+| `FAST Consent Statuses` (`active`/`inactive`) | ValueSet | Grant active vs. validated-Revocation-present (Section 4.6 steps 1–2) | Bridge-mappable |
+| search params: `grantee`, `controller`, `manager`, `organizationId`, `patientId` | SearchParameter | Grant `audience`, patient subgraph id, originating institution | Bridge-mappable |
+| Runtime consent **decision** (not in Edition 1) | — | Seven-step evaluation algorithm (Section 4.6); Verifier (Section 4.5.2) | Native (no FAST artifact to conform to yet) |
+| Consent **enforcement point** (not in Edition 1) | — | Export Gate + Verifier dual control (Section 4.5) | Native |
+
+The summary the table is meant to convey: **every record-and-replicate role in the FAST Consent IG is reachable from the Bridge**, most of them without touching Core. The only artifacts requiring Core involvement are the FASTConsent projection fidelity (grantee/controller/manager semantics) and consent-ceremony document capture. And the parts of Creda with no FAST counterpart — runtime decision and enforcement — are precisely Creda's differentiators, not gaps.
+
+#### 8.5.4 Where Creda Exceeds the FAST Consent IG
+
+Conforming to the FAST Consent transport does not require Creda to weaken any of its properties, and on several axes Creda is materially stronger than a baseline FAST Consent repository:
+
+- **Tamper-evidence.** A `FASTConsent` is a mutable REST resource whose integrity depends on the repository that holds it. A Creda `AuthorizationGrant` is a signed event in an append-forward DAG (Section 7.2.2); its integrity is structural and independently verifiable.
+- **Verification at point of use.** FAST Consent has no normative point-of-use re-verification; once a repository discloses, the consent's continued validity is not checked downstream. Creda's Portable Authorization Artifact (Section 4.4) and Verifier (Section 4.5.2) re-verify locally at every point of use, including offline.
+- **Bounded revocation latency.** FAST repository sync is eventually consistent with no stated bound. Creda commits to measurable revocation-propagation bounds (Section 4.7).
+- **Non-repudiable disclosure chain.** `$record-disclosure` writes an AuditEvent at the disclosing repository. Creda's `ExportReceipt` is a signed event that both source and recipient can be bound to (Section 4.3.3), producing a two-sided chain of custody.
+- **No central or semi-central repository.** FAST presumes consent repositories (Admin Services) as holders of record. Creda has no holder of record; every peer that needs a Grant holds a verifiable copy.
+
+These should be stated to standards reviewers as **profile-compatible enhancements**, not deviations: a FAST Consent Client interacting with a Creda Admin Service gets everything the IG promises, plus signatures, portability, and bounded revocation it can ignore if it does not understand them — the same additive posture as the rest of the Creda IG (Section 8.4.3).
+
+#### 8.5.5 Gaps and Divergences
+
+Honest accounting of what is not conformant today and what will not be made conformant by design:
+
+- **Bridge mappers are unbuilt (gap).** The FHIR↔CBOR mappers in the Bridge are stubs at M7 (see README milestone table). No FAST Consent operation can be served until the authorization-event mappers are real. This is the gating prerequisite.
+- **No FASTConsent profile yet (gap).** Creda profiles `CredaAuthorization` on the FHIR `Consent` base, not on `FASTConsent`. Conformance requires either deriving `CredaAuthorization` from `FASTConsent` or publishing a FASTConsent-conformant projection, including the `grantee` / `controller` / `manager` extensions and the `FASTReference` datatype.
+- **Operation signatures differ (gap, mechanical).** Creda exposes `$creda-authorize` / `$creda-revoke` / `$creda-export`; FAST expects `$file-consent` / `$revoke-consent` / `$record-disclosure`. The Bridge must advertise the FAST operation names and parameter profiles (it may keep the `$creda-*` aliases).
+- **Consent-ceremony artifacts (gap).** Creda records the directive but not the `DocumentReference` / `QuestionnaireResponse` evidence of the ceremony. Supporting `$file-consent`'s optional documentation means attaching a ceremony reference to the Grant — a Core schema consideration tracked as an open question (Section 13.6.3).
+- **Repository-subscription transport (divergence, intentional).** Creda will not replicate Grants between peers via FAST `SubscriptionTopic` notification; it replicates via the DAG. A Creda Admin Service may optionally *expose* a FAST Subscription face for non-Creda repositories that want notifications, but Creda-to-Creda consistency remains gossip/anti-entropy. This is a deliberate "substrate beneath FAST," not a conformance failure.
+- **Moving target (caveat).** The IG is at STU 1 ballot; operation names, profiles, and especially any future decision/enforcement operations may change. Conformance claims must pin a specific IG version.
+
+#### 8.5.6 Implementation Plan: A Thin FAST Consent Face
+
+Per the scoping decision in Section 8.5, Creda implements a **thin FAST Consent face** — the `FASTConsent` profile shape and the three operation semantics, exposed at the Bridge over the existing authorization Core — and stops there by default. The committed scope is phases **F0–F2**. Phases F3–F5 are defined but **deferred**: they are built only when a concrete driver appears (a network mandate requiring federated conformance, or a legacy FAST-only counterparty), never speculatively. No phase, committed or deferred, alters the substrate: the DAG remains the source of truth, gossip/anti-entropy remains the replication fabric, and the seven-step evaluation and dual-control enforcement are untouched.
+
+Committed scope (F0–F2):
+
+**Phase F0 — Prerequisite: real authorization mappers (M7 closure).** Replace the stub FHIR↔CBOR mappers for the authorization event types with working bidirectional mappers: `AuthorizationGrant` ↔ `Consent`, `AuthorizationRevocation` ↔ Consent status transition, `ExportReceipt` ↔ `AuditEvent`. This is on the M7 critical path regardless of FAST and gates everything below.
+
+**Phase F1 — FASTConsent projection.** Publish a `FASTConsent`-conformant projection of `AuthorizationGrant`, mapping Grant `audience` → `grantee`, originating/managing institution → `controller` / `manager`, scope/purpose/use-mode → provisions, and Grant/Revocation state → `active` / `inactive`. Derive or align `CredaAuthorization` with `FASTConsent` and adopt the `FASTReference` datatype. The projection is read/write at the Bridge boundary only — it is never a stored holder-of-record. Validate against the IG's profiles in the conformance suite (M9).
+
+**Phase F2 — FAST operation surface.** Add the `$file-consent`, `$revoke-consent`, and `$record-disclosure` operations to the Bridge as FAST-named entry points over the existing `$creda-authorize` / `$creda-revoke` / `$creda-export` logic, with the FAST operation-parameter profiles. Advertise the *Consent Administrative Server Capabilities* CapabilityStatement (and *Consent Client Capabilities* for the patient/institutional client). Extend Section 8.2.12 to list the FAST operations and the FAST CapabilityStatements.
+
+Phases F0–F2 deliver a usefully conformant Admin Service face — a non-Creda system can file, revoke, and disclosure-log consents against a Creda peer using standard FASTConsent shapes — while the substrate stays the DAG.
+
+Deferred, demand-driven (F3–F5) — not in the default build:
+
+**Phase F3 — Consent ceremony capture.** Support the optional `DocumentReference` / `QuestionnaireResponse` on `$file-consent` by attaching a ceremony-evidence reference to the originating Grant. Deferred until a counterparty requires ceremony evidence; the attachment mechanism is an open question (Section 13.6.3) and should stay off the signed payload.
+
+**Phase F4 — Optional FAST Subscription edge adapter.** This is the part of FAST that is redundant with gossip and is therefore *not* part of the substrate. If interoperability with an external non-Creda consent repository is ever required, expose the `FASTConsentSubscriptionTopic` Subscription surface as an **opt-in edge adapter** at the Bridge, fed by the peer's gossip stream (reusing Section 8.2.13's Subscription bridging). Creda-to-Creda consistency always uses gossip/anti-entropy; this adapter exists solely to feed external FAST repositories and is never on the Creda-internal path.
+
+**Phase F5 — Federated conformance and publication.** If a network mandate requires it, add federated FAST Consent conformance scenarios to the M9 suite and declare conformance to a specific Scalable Consent Management version in the published Creda IG and CapabilityStatement. Absent a mandate, the published conformance claim is scoped to the FASTConsent profile and the Administrative-Server operations (F0–F2), not the repository-federation model.
+
+This staging is what keeps the implementation evolvable rather than a Frankenstein: Creda commits only to the FAST data shape and operation surface, so when the IG advances — most likely adding a runtime decision/enforcement operation in a later edition — Creda maps its existing evaluator (Section 4.6) and Verifier (Section 4.5.2) onto the new operation rather than refactoring storage or replication.
+
 ## 9. Security and Access Control
 
 ### 9.1 Institutional Identity and Authentication
@@ -1710,6 +1809,49 @@ Distributed denial of service attacks on the network can take several forms, eac
 - **Bridge-level DDOS**: standard FHIR endpoint DDOS protections apply at the Bridge — WAF rules, rate limiting at the institution's ingress, request size limits. These are operational concerns not unique to Creda.
 
 The design philosophy: shift validation cost to the attacker. Cheap signature verification rejects most fraudulent traffic before it reaches expensive graph operations. Reputation downgrades amplify the cost of sustained attacks. Rate limits cap the worst case.
+
+#### 9.1.10 Patient Application Authentication and Submission Gateway
+
+Patient clients are architecturally distinct from institutional peers. They sit outside the institutional trust boundary established by UDAP and SPIFFE/SPIRE (Sections 3.6, 6.2.3, 9.1.1–9.1.4), they run on devices the network has no governance over (a phone, a tablet, a browser), and they cannot be issued UDAP certificates. This section specifies how a patient application authenticates, submits signed events, and connects to the network without becoming either a trust hole or an operational liability.
+
+**Two architectural choices that make this work.**
+
+- **The patient is a client, not a peer.** Mobile devices do not run servers well, NAT and battery constraints make sustained libp2p connectivity unrealistic, and institutional NetworkPolicies block inbound connections from arbitrary endpoints. The patient application does not participate in gossipsub directly. Instead, it submits signed events to *any* admitted institutional peer that exposes a patient-mediated endpoint, and that peer gossips the event onward.
+- **The institutional peer is plumbing, not a trust anchor.** The receiving peer verifies the patient's signature against the registered patient public key and accepts or refuses the event on that basis. The peer cannot author events on the patient's behalf, cannot forge the patient's signature (the patient's private key never leaves the patient's device), and cannot censor the patient durably (the patient can submit the same event through a different peer concurrently).
+
+**Credential model: OIDC + WebAuthn/passkey.** The patient's cryptographic identity is established by Section 9.1.6 — a key pair backed by the device's secure element (Apple Secure Enclave, Android StrongBox, FIDO2 security key) or a cloud-backed passkey, bound to an OIDC `sub` claim from an identity provider the network trusts. Realistic identity providers at launch:
+
+- **Institutional patient portals** that already run SMART-on-FHIR and have completed patient identity proofing as part of portal enrollment.
+- **Federal identity services** for federal-program patients (Login.gov for VA, Medicare beneficiaries; ID.me for VHA and supported state systems).
+- **TEFCA Individual Access Services (IAS) identity providers** as that infrastructure matures under the Sequoia Project's coordination.
+
+The identity proofing level (NIST 800-63 IAL2 vs IAL3, AAL2 vs AAL3) required for a patient key to be admitted to the network is an open question tracked at §13.8.4. Initial deployments use whatever level the chosen IdPs already perform; the network's governance body raises the floor as the IAS framework matures.
+
+**Submission flow.** When the patient creates a Grant, Revocation, Attest, or co-signed Link in their application, the following sequence executes:
+
+1. **Patient app authenticates to OIDC IdP** and obtains an access token with appropriate SMART-on-FHIR patient scopes (e.g., `patient/AuthorizationGrant.write`, `patient/Link.cosign`).
+2. **Patient app constructs the event payload** as a canonical CBOR `EventPayload` (Section 5.1).
+3. **Patient app signs the event on-device** using its passkey-backed signing key. The private key never leaves the secure element; the signing operation is invoked through the platform's WebAuthn / FIDO2 API.
+4. **Patient app POSTs the signed event** to a `/fhir/$creda-submit-patient-event` operation on the chosen institutional peer's Bridge, with the SMART access token in the Authorization header.
+5. **Bridge verifies the OIDC access token** through the institution's existing SMART authorization server. The institution's IdP confirms the patient's identity and that the SMART scope covers this operation.
+6. **Bridge calls Core's ingest gate** (Section 3.6, `Replicator::ingest_batch`) with the signed event. Core verifies the patient's signature against the registered patient public key in the participant registry, applies the same structural-validation gate every other event passes through, and accepts or refuses the event.
+7. **On acceptance**, the event is stored locally, returned to the patient app as a `Patient` resource confirming the new identifier, and gossiped via normal Section 6 mechanisms. Receiving peers verify the patient's signature with their own copy of the patient-key registry.
+
+**Why the institutional peer is not a trust hole.** Three properties make the gateway architecture safe:
+
+- **Cryptographic signing is on-device, not server-side.** The institutional peer holds neither the patient's private key nor any credential that could derive it. A compromised gateway can refuse to forward an event but cannot author one that looks like the patient.
+- **Multiple gateways are an explicit feature, not a fallback.** The patient app can be configured with several gateway URLs and can submit the same signed event through more than one in parallel. The event id is content-addressed (UUIDv7 namespaced to the patient's institution, Section 5.1), so duplicate submissions deduplicate at receiving peers without ambiguity. A bad gateway is routed around without breaking the patient's ability to act.
+- **The audit trail names the gateway.** Each accepted submission carries metadata identifying which institutional peer the patient used as gateway, so misbehavior is attributable and surfaces in §9.4 audit review. A gateway that repeatedly refuses or delays patient submissions can be reported to the legal coordinator and lose admission under Section 10.7 mechanisms.
+
+**FHIR endpoint specifics.** The IG defines `$creda-submit-patient-event` as a `system`-level operation (not `Patient`-level — the patient is *authoring* the event, not selecting one from their record). Input is a `Parameters` resource carrying the canonical-CBOR `event_payload_cbor` bytes plus the patient's `CryptoSignature`. Output is the resulting `IdentityEventNode` if accepted, or an `OperationOutcome` with a structured error code on refusal (`invalid-signature`, `unknown-patient-key`, `out-of-scope`, etc.). The bridge enforces SMART-on-FHIR scope, the patient's IdP enforces patient identity, the registered patient public key enforces event authorship — three orthogonal checks.
+
+**Key recovery.** When a patient loses their phone, their key is lost with it. Section 9.1.6 references recovery via OIDC-mediated re-enrollment; the full ceremony is the closure deliverable for open question §13.8.1 (Patient Key Recovery Flow). Until that closes, deployments document a manual recovery process that combines the IdP's account-recovery mechanism (re-establish the OIDC identity) with a new `patient-self-attestation` Assert that binds a fresh key to the same subgraph, followed by a Revocation of the lost key. The lost key's historical signatures remain valid; only forward authority transfers.
+
+**Open questions that touch this section.**
+
+- §13.8.1 — Patient Key Recovery Flow (the ceremony). Closure deliverable defines the exact handoff between IdP re-authentication, the new-key binding event, and old-key revocation.
+- §13.8.4 — Identity assurance level required for patient-key admission. Closure depends on Sequoia/IAS guidance and FIDO Alliance recommendations.
+- §13.2.6 — Patient-co-signed Links. The submission flow above is the same vehicle: the patient signs the proposed Link on-device, submits through a gateway, and the network honors the co-signature with floor-defeating weight (Section 4.6 step 5.5).
 
 ### 9.2 Patient Privacy and Data Minimization
 
@@ -3374,6 +3516,16 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Partial closure:** Section 10.8 (added post-initial-publication) specifies the three versioning surfaces (protocol, event schema, IG), the `CredaCapabilityProfile` advertised on libp2p identify and in the FHIR CapabilityStatement, and the negotiation handshake. Remaining open: exact semver rules per surface, transition-window mechanics for major version bumps, and the coordinator's role in advertising network-wide deprecation events.
 
+#### 13.6.3 FAST Consent Framework Conformance
+
+**Reference:** Section 8.5
+
+**The question:** Section 8.5 commits Creda to a *thin* FAST Consent face — the committed scope is phases F0–F2 (FASTConsent projection plus the Administrative-Server operations), with repository federation (F4) and ceremony capture (F3) deferred and demand-driven. Two sub-questions remain open within even that thin scope: (a) whether `CredaAuthorization` should be *derived from* `FASTConsent` or published as a separate FASTConsent-conformant projection, and (b) if and when ceremony capture (F3) is triggered, how to attach consent-ceremony evidence (`DocumentReference` / `QuestionnaireResponse` from `$file-consent`) to an `AuthorizationGrant` — whether by a new optional payload field, a paired event, or a Bridge-side association outside the signed event.
+
+**Why it's open:** The FAST Consent IG is at STU 1 ballot (FHIR R4, US Realm) and its profiles, operation signatures, and any future runtime decision/enforcement operations may change before publication. Pinning Creda's projection design to a moving target risks rework. The ceremony-attachment question touches the signed event schema (Section 5.1), so it should not be decided casually — adding fields to the signed payload has cryptographic and canonicalization consequences (Section 5.1.1).
+
+**Closure condition:** Pin a specific Scalable Consent Management version, decide the `FASTConsent` derivation-vs-projection question against that version, and specify the ceremony-attachment mechanism (preferring a Bridge-side association or paired event over expanding the signed Grant payload, unless ceremony evidence must itself be signed and replicated). Validate with FAST Consent conformance scenarios in the M9 suite (Phase F5). Track IG ballot progress and re-pin on each substantive IG revision.
+
 ### 13.7 Adoption and Operations
 
 #### 13.7.1 First QHIN Target
@@ -3434,6 +3586,16 @@ Each question includes the relevant section, a description of what is unresolved
 **Why it's open:** Multi-region deployment is a Phase 3+ concern. We have not designed it in detail because the v1 deployment scope is single-region.
 
 **Closure condition:** Design document for multi-region deployment, developed when at least one founding institution requires multi-region operation. Cover: per-region snapshot storage, cross-region replication patterns, regional failover procedures, and consistency guarantees for cross-region anti-entropy.
+
+#### 13.8.4 Patient Identity Assurance Level for Key Admission
+
+**Reference:** Section 9.1.10
+
+**The question:** Section 9.1.10 specifies that a patient signing key is admitted to the network when bound to an OIDC `sub` claim from a trusted identity provider, but does not specify the minimum identity assurance (IAL) and authenticator assurance (AAL) levels per NIST 800-63 that the IdP must perform before the binding is admitted. A patient key admitted under IAL1 (self-asserted identity) is qualitatively different evidence than one admitted under IAL2 (verified evidence) or IAL3 (in-person or supervised remote verification).
+
+**Why it's open:** The right floor depends on (a) what level the realistic launch IdPs already perform (institutional patient portals vary, Login.gov is IAL2, ID.me is IAL2/IAL3 by tier, IAS-future is undefined), (b) what level the network's governance body decides is acceptable for granting authorization over PHI, and (c) what the FIDO Alliance recommends for passkey-bound healthcare identities. None of these has a settled answer.
+
+**Closure condition:** Engagement with the Sequoia Project's IAS technical workgroup, FIDO Alliance recommendations on healthcare passkey assurance, and security review by founding institutions. Document the minimum IAL/AAL required for patient-key admission, the verification protocol the IdP must attest to, and the procedure by which the legal coordinator admits IdPs into the trust framework. Re-evaluate annually as the IAS framework matures.
 
 ### 13.9 Tracking and Closure
 

@@ -93,10 +93,19 @@ export interface CredaProvenance {
   verificationMethod?: string;
   /** Match score for Link events (e.g. "94%" or 9400 / 10000). */
   matchScore?: string;
+  /**
+   * Date of birth for Assert events (asserted) or Amend events (corrected). Token form against
+   * the real bridge (`tok:demo:1971-08-04` — demo tokens embed their display form); the mock
+   * uses plain dates. De-tokenization for display is the client's concern (§3.2).
+   */
+  dateOfBirth?: string;
   /** Link method for Link events. */
   linkMethod?: 'InsuranceCrosswalk' | 'Referral' | 'Algorithmic' | 'Manual' | 'Other';
   /** Purpose for Attest / Grant. */
   purpose?: string;
+  /** Asserted family / given name tokens (Assert events). Token form against the real bridge. */
+  nameFamily?: string;
+  nameGiven?: string;
   /** Parent provenance ids (DAG edges). */
   parents: string[];
   /** Human summary the projection rendered. */

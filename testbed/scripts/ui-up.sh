@@ -19,15 +19,25 @@ CTX="kind-${CLUSTER}"
 kc="kubectl --context=${CTX}"
 hm="helm --kube-context=${CTX}"
 
-if ! docker image inspect "$CLIENTS_IMAGE" >/dev/null 2>&1; then
-  echo "ERROR: image $CLIENTS_IMAGE not present locally; run 'make up' (or 'make images') first" >&2
-  exit 2
-fi
-
 # Ensure the cluster is reachable before we touch helm — the error from helm if the cluster
 # is down is cryptic. `kubectl version --request-timeout` returns within a second.
 if ! $kc version --request-timeout=2s >/dev/null 2>&1; then
   echo "ERROR: kind cluster '$CLUSTER' is not reachable; run 'make up' first" >&2
+  exit 2
+fi
+
+# Always rebuild + reload images (cheap via Docker layer cache when unchanged). Same reason
+# as ui-up-real.sh — `:testbed` + pullPolicy: Never means the kubelet sticks with whatever
+# image bytes are already on the node, so an edit loop ("change source, rerun ui-up") needs
+# a manual `make images` otherwise. Set CREDA_SKIP_IMAGES=1 to skip when iterating on chart
+# values only.
+if [[ "${CREDA_SKIP_IMAGES:-0}" != "1" ]]; then
+  echo "==> ensuring images are up to date (set CREDA_SKIP_IMAGES=1 to skip)"
+  bash "$REPO_ROOT/testbed/images/build-and-load.sh" "$CLUSTER"
+fi
+
+if ! docker image inspect "$CLIENTS_IMAGE" >/dev/null 2>&1; then
+  echo "ERROR: image $CLIENTS_IMAGE not present locally after build; check the build output above" >&2
   exit 2
 fi
 
@@ -52,6 +62,14 @@ dump_diagnostics() {
 }
 trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "==> ui-up failed (rc=$rc); dumping diagnostics" >&2; dump_diagnostics; fi' EXIT
 
+# Force-delete any stuck clients pods from a previous iteration so the new ReplicaSet
+# creates pods that pick up the freshly-loaded image bytes. With pullPolicy: Never +
+# unchanged tag, kubelet doesn't restart a CrashLoopBackOff container even when the bytes
+# on the node have been updated by `kind load`. See ui-up-real.sh for the longer note.
+echo "==> clearing any stuck clients pods so fresh bytes can take effect"
+$kc -n "$NS" delete pod -l app.kubernetes.io/name=creda-clients \
+  --force --grace-period=0 --ignore-not-found 2>/dev/null || true
+
 # `helm upgrade --install` so the first run installs and subsequent runs upgrade in place.
 echo "==> installing clients into namespace $NS"
 $hm upgrade --install -n "$NS" clients "$CHART" \
@@ -60,6 +78,13 @@ $hm upgrade --install -n "$NS" clients "$CHART" \
   --set image.pullPolicy=Never \
   --wait --timeout 120s >/dev/null
 
+# Force a roll *every* run. Helm only triggers a pod restart when the rendered template
+# changes; here the image tag stays at `:testbed` between code iterations and the rendered
+# YAML is byte-identical, so helm says "no diff" and leaves the running pod alone — even
+# though `make images` just refreshed the bytes on each kind node. `kubectl rollout restart`
+# recreates the pod so the kubelet picks up the new image archive.
+echo "==> forcing clients rollout to pick up the latest creda-clients image"
+$kc -n "$NS" rollout restart deploy/creda-clients >/dev/null
 $kc -n "$NS" rollout status deploy/creda-clients --timeout=120s
 
 cat <<EOF

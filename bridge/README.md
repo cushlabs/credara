@@ -43,14 +43,26 @@ those operations are not yet functional — see below.
     §8.2.3, `$creda-contest`), `AuditEventResourceProvider` (read-side audit only §8.2.4).
 
 ### Translator-not-reasoner discipline
-Every provider method does only FHIR↔gRPC mapping. The FHIR↔CBOR encoders/mappers
-(`*PayloadEncoder`, `ProvenanceMapper`, `ConsentMapper`) and the remaining operations
-(`$creda-provenance`/`link`/`tombstone`/`disambiguate`/`self-verify`/`$match`/`$export`,
-Subscription→gossip §8.2.13, Bulk Data §8.2.14, CapabilityStatement customization §8.2.12, the
-CredaPatient US-Core profile §8.2.2) follow the same thin pattern and are documented stubs in
-this scaffold. They depend on Core exposing structured projections over gRPC (today
-`GetEffectiveIdentity` returns a debug string and `EvaluateAuthorization` is unimplemented — see
-`crates/creda-core/src/grpc.rs`), so completing them is paired with that Core gRPC follow-up.
+Every provider method does only FHIR↔gRPC mapping.
+
+**Implemented (F0, §8.5.6):** the authorization FHIR↔CBOR mappers and the four authorization
+operations. `EventPayloadCbor` now encodes/decodes the three authorization payloads
+(`AuthorizationGrant`, `AuthorizationRevocation`, `ExportReceipt`) as canonical CBOR, and
+`AuthorizationResourceProvider` wires `$creda-authorize` → Consent, `$creda-revoke` → Consent
+(inactive), `$creda-export` → AuditEvent, and `$creda-verify` → decision. Wire shapes are pinned
+by golden-vector tests (`src/test/.../AuthorizationPayloadCborTest.kt`) generated from an
+independent CBOR oracle to match serde+ciborium 0.2.2 exactly — notably `Uuid` as a 16-byte byte
+string but `Vec<u8>` fingerprints as a **CBOR array of ints** (the one easy mistake). This also
+fixed a latent bug in `decodeEventNode`, which read those `Vec<u8>` fields as byte strings.
+
+**Still stubs:** the remaining encoders/mappers (`ProvenanceMapper`) and operations
+(`$creda-provenance`/`link`/`tombstone`/`disambiguate`/`self-verify`/`$match`, Subscription→gossip
+§8.2.13, Bulk Data §8.2.14, CapabilityStatement customization §8.2.12, the CredaPatient US-Core
+profile §8.2.2) follow the same thin pattern and are documented stubs in this scaffold. The FHIR
+projection here is the minimal-but-faithful CredaAuthorization shape; the FASTConsent-conformant
+projection (grantee/controller/manager, FASTReference) is F1 (§8.5.6). `$creda-verify` depends on
+Core's `EvaluateAuthorization` gRPC (the engine path exists; the gRPC wiring is a Core follow-up —
+see `crates/creda-core/src/grpc.rs`).
 
 ### Build
 Needs a JDK 21 + Gradle (not in the Rust dev image). CI builds it via `ci-java.yml`

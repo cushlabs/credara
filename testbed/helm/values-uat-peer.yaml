@@ -1,0 +1,48 @@
+# Real-mode UAT peer values — derived from values-peer-a.yaml but with the bridge enabled so
+# the front-end clients can drive end-to-end: clinician button → bridge → core → libp2p
+# gossip mesh. The bridge stays disabled in values-peer-a/b because gossip-convergence and
+# anti-entropy-repair only exercise the protocol layer (gRPC + libp2p); they don't need the
+# FHIR translator and the bridge adds ~3 GB Java heap per peer. Real-mode UAT *does* need
+# it — the whole point is to see the bridge wired up.
+
+fullnameOverride: peer
+
+replicaCount: 1
+
+# Bridge ON. The chart's existing wiring shares a `/var/run/creda` emptyDir between the
+# core and bridge containers; bridge env var CREDA_CORE_SOCKET points at the UDS that Core
+# binds (default /var/run/creda/core.sock). No TCP between them — keeps the surface tight.
+bridge:
+  enabled: true
+
+image:
+  core:
+    repository: creda-core
+    tag: testbed
+    pullPolicy: Never
+  bridge:
+    repository: creda-bridge
+    tag: testbed
+    pullPolicy: Never
+
+config:
+  dataDir: /var/lib/creda
+  # TCP (was UDS): the seed/reset Jobs (`make -C testbed reset|seed`) run the peer-driver as a
+  # separate pod and must reach Core's gRPC — a Unix socket inside peer-0 is unreachable from a
+  # Job. The chart exposes the `grpc` Service port automatically for tcp:// values, and the
+  # bridge's CredaCoreClient dials loopback when handed a tcp:// endpoint (same pod).
+  grpcSocket: tcp://0.0.0.0:50051
+  libp2pListen: /ip4/0.0.0.0/tcp/4001
+  defaultPosture: treatment-presumed
+  snapshotIntervalSecs: 21600
+  subscribedBuckets: [0]
+  subscribeAllBuckets: true
+  bootstrapPeers: []
+
+# Snapshot CronJob off — adds noise to the UAT logs and isn't useful here.
+snapshotCronJob:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

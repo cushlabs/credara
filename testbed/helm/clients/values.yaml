@@ -5,10 +5,14 @@ image:
   tag: testbed
   pullPolicy: Never   # see testbed/helm/values-peer-a.yaml for why
 
-# When set, points the SPA at a real bridge (`http://creda-bridge:8080/fhir`); empty falls
-# back to the build-time default (mock). For ui-smoke we deliberately leave it empty so the
-# spec runs deterministically against fixtures.
+# Runtime FHIR-base selection — see clients/docker-entrypoint.sh. Empty / "mock" leaves the
+# SPA in mock mode (in-memory fixtures); "/fhir" makes the SPA fetch from the same origin,
+# and nginx proxies /fhir/* to bridgeUpstream.
 fhirBase: ""
+
+# Upstream the nginx /fhir/* proxy points at. Only consulted when fhirBase == "/fhir".
+# Empty disables the proxy block. Typical real-mode value: http://creda-bridge:8080.
+bridgeUpstream: ""
 
 service:
   type: ClusterIP

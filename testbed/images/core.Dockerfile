@@ -22,6 +22,12 @@ FROM ${RUST_BUILDER} AS builder
 # cargo builds with default features only (no grpc, no libp2p) — and `creda serve` errors out
 # at runtime saying gRPC is missing.
 ARG FEATURES
+# CACHEBUST is a content hash of the Rust sources, supplied by build-and-load.sh. Consuming it in
+# a RUN before the COPY invalidates the COPY + cargo layers whenever the workspace changes —
+# defeating podman-machine's stale COPY-layer cache (same fix as bridge.Dockerfile) — while
+# leaving them cached (fast) when nothing changed.
+ARG CACHEBUST=dev
+RUN echo "core source hash: ${CACHEBUST}"
 WORKDIR /src
 COPY . .
 # CARGO_HOME / target live inside the layer so the build artifacts go into the image. We set

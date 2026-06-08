@@ -39,6 +39,19 @@ message EffectiveIdentityReply {
 message MatchRequest { repeated string tokens = 1; }
 message MatchReply { repeated bytes ids = 1; }
 
+// List the events of a patient subgraph, optionally filtered by type — the read surface behind
+// the Bridge's `Consent?patient=` search (§8.2.9 read-back) and future Provenance reads.
+message SubgraphEventsRequest {
+  // Entry-point event ids identifying the subgraph (16 bytes each).
+  repeated bytes entry_points = 1;
+  // IdentityEventType variant names to include (e.g. "AuthorizationGrant"); empty = all types.
+  repeated string event_types = 2;
+}
+message SubgraphEventsReply {
+  // Canonical-CBOR-encoded IdentityEventNodes, sorted by logical clock.
+  repeated bytes event_cbor = 1;
+}
+
 // Grant purpose (§4.3.1). Mirrors creda_events::GrantPurpose; UNSPECIFIED is rejected so a
 // client that forgets to set a purpose fails loudly rather than defaulting silently.
 enum GrantPurpose {
@@ -95,6 +108,7 @@ message Metrics { uint64 event_count = 1; }
 service Creda {
   rpc CreateEvent(CreateEventRequest) returns (EventReply);
   rpc GetEvent(GetEventRequest) returns (GetEventReply);
+  rpc GetSubgraphEvents(SubgraphEventsRequest) returns (SubgraphEventsReply);
   rpc GetEffectiveIdentity(EntryPoints) returns (EffectiveIdentityReply);
   rpc MatchByTokens(MatchRequest) returns (MatchReply);
   rpc EvaluateAuthorization(AuthRequest) returns (AuthReply);

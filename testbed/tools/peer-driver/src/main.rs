@@ -15,8 +15,9 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use creda_events::{
-    canonical, AdministrativeGender, Demographics, EventPayload, StructuredAddress,
-    TokenizedDate, TokenizedString, VerificationMethod,
+    canonical, AdministrativeGender, AttestPurpose, AuthorizationScope, Demographics,
+    EventPayload, GrantAudience, GrantPurpose, LinkMethod, StructuredAddress, TokenizedDate,
+    TokenizedString, UseMode, VerificationMethod,
 };
 
 mod pb {
@@ -64,6 +65,12 @@ enum Command {
         #[arg(long)]
         secret_file: String,
     },
+    /// Seed the demo dataset the persona clients render (Maria Gonzalez: two linked Asserts +
+    /// Attest + a Mercy General grant; James Whitfield: two Asserts with conflicting DOBs +
+    /// a low-confidence Link). Tokens are stable (`tok:demo:*`) so clients resolve patients via
+    /// `Patient?_creda-token=` rather than hardcoded ids; event ids are fresh per seeding.
+    /// Prints `name=<uuid>` lines for every created event. Used by `make -C testbed reset/seed`.
+    SeedDemo,
 }
 
 #[tokio::main]
@@ -88,8 +95,122 @@ async fn main() -> Result<()> {
         Command::Observe { event_id, timeout_ms, poll_ms } => {
             observe(&mut client, &event_id, timeout_ms, poll_ms).await
         }
+        Command::SeedDemo => seed_demo(&mut client).await,
         Command::DerivePubkey { .. } => unreachable!("handled above"),
     }
+}
+
+/// Create one event via CreateEvent and return its id (the peer signs with its own key).
+async fn create(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    payload: &EventPayload,
+    parents: &[creda_events::EventId],
+) -> Result<creda_events::EventId> {
+    let req = pb::CreateEventRequest {
+        event_payload_cbor: canonical::to_vec(payload).context("serialize EventPayload")?,
+        parent_ids: parents.iter().map(|p| p.as_bytes().to_vec()).collect(),
+    };
+    let node: creda_events::IdentityEventNode = canonical::from_slice(
+        &client.create_event(req).await.context("CreateEvent RPC")?.into_inner().event_cbor,
+    )
+    .context("decode reply event")?;
+    Ok(node.id)
+}
+
+/// An Assert with stable demo tokens, so clients can find the patient with
+/// `Patient?_creda-token=tok:demo:<family>` after every reseed.
+fn demo_assert(family: &str, given: &str, dob: &str, vm: VerificationMethod) -> EventPayload {
+    EventPayload::Assert {
+        demographics: Demographics {
+            name_family: Some(vec![TokenizedString(format!("tok:demo:{family}"))]),
+            name_given: Some(vec![TokenizedString(format!("tok:demo:{given}"))]),
+            date_of_birth: Some(TokenizedDate(format!("tok:demo:{dob}"))),
+            sex: Some(AdministrativeGender::Other),
+            ..Default::default()
+        },
+        verification_method: vm,
+    }
+}
+
+async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Result<()> {
+    // ---- Maria Gonzalez: the well-linked patient with an active Mercy General grant ----------
+    let m_mercy = create(
+        client,
+        &demo_assert("gonzalez", "maria", "1984-03-12", VerificationMethod::GovernmentPhotoId),
+        &[],
+    )
+    .await?;
+    let m_north = create(
+        client,
+        &demo_assert("gonzalez", "maria", "1984-03-12", VerificationMethod::InsuranceCard),
+        &[],
+    )
+    .await?;
+    let m_link = create(
+        client,
+        &EventPayload::Link {
+            target_subgraph_heads: (m_mercy, m_north),
+            confidence_score: 9400,
+            method: LinkMethod::Algorithmic,
+        },
+        &[m_mercy, m_north],
+    )
+    .await?;
+    let m_attest = create(
+        client,
+        &EventPayload::Attest { target_event_ids: vec![m_link], purpose: AttestPurpose::Treatment },
+        &[m_link],
+    )
+    .await?;
+    let m_grant = create(
+        client,
+        &EventPayload::AuthorizationGrant {
+            scope: AuthorizationScope::default(),
+            audience: GrantAudience::InstitutionClass("Mercy General Hospital".into()),
+            purpose: GrantPurpose::Treatment,
+            expiration: None,
+            volume_constraints: None,
+            use_mode: UseMode::ReadAndRely,
+        },
+        &[m_mercy],
+    )
+    .await?;
+
+    // ---- James Whitfield: two Asserts that DISAGREE on DOB, joined by a tentative Link --------
+    // The clinician app's "resolve DOB" challenge derives from this real conflict; an Amend
+    // against one of these Asserts is how a resolution persists.
+    let j_mercy = create(
+        client,
+        &demo_assert("whitfield", "james", "1971-08-04", VerificationMethod::GovernmentPhotoId),
+        &[],
+    )
+    .await?;
+    let j_lakeside = create(
+        client,
+        &demo_assert("whitfield", "james", "1971-08-14", VerificationMethod::SelfReport),
+        &[],
+    )
+    .await?;
+    let j_link = create(
+        client,
+        &EventPayload::Link {
+            target_subgraph_heads: (j_mercy, j_lakeside),
+            confidence_score: 7100,
+            method: LinkMethod::Algorithmic,
+        },
+        &[j_mercy, j_lakeside],
+    )
+    .await?;
+
+    println!("maria-assert-mercy={m_mercy}");
+    println!("maria-assert-northside={m_north}");
+    println!("maria-link={m_link}");
+    println!("maria-attest={m_attest}");
+    println!("maria-grant-mercy={m_grant}");
+    println!("james-assert-mercy={j_mercy}");
+    println!("james-assert-lakeside={j_lakeside}");
+    println!("james-link={j_link}");
+    Ok(())
 }
 
 fn derive_pubkey(secret_file: &str) -> Result<()> {

@@ -108,7 +108,7 @@ $hm install -n "$NS_A" peer "$CHART" \
   --set participantRegistry.configMapName=creda-participants \
   --wait --timeout 180s >/dev/null
 
-bash "$TESTBED/scripts/wait-ready.sh" "$NS_A" peer 180
+KUBE_CONTEXT="$CTX" bash "$TESTBED/scripts/wait-ready.sh" "$NS_A" peer 180
 
 # ---- inject N events at peer-a -------------------------------------------------------------
 # Each inject runs as its own kubectl Job (unique name per event); we capture event ids from the
@@ -219,7 +219,7 @@ $hm install -n "$NS_B" peer "$CHART" \
   --set-string "config.bootstrapPeers[0]=$PEER_A_MULTIADDR" \
   --wait --timeout 180s >/dev/null
 
-bash "$TESTBED/scripts/wait-ready.sh" "$NS_B" peer 180
+KUBE_CONTEXT="$CTX" bash "$TESTBED/scripts/wait-ready.sh" "$NS_B" peer 180
 
 # ---- observe each event at peer-b — only AE can deliver these now --------------------------
 echo "==> waiting for anti-entropy to heal peer-b (budget ${AE_BUDGET_MS} ms per event)"

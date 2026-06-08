@@ -24,7 +24,7 @@ authority or vendor lock-in.
 
 > **Pre-launch — all milestones implemented; multi-peer testbed green; hardening in progress.
 > Open for testers.** The [technical specification](docs/creda-technical-spec.md) (Sections
-> 1–13 + appendices, ~83 pages) is complete and authoritative. All ten build milestones
+> 1–13 + appendices, ~90 pages) is complete and authoritative. All ten build milestones
 > (M0–M9) are implemented and verified, the default workspace builds and tests green, the
 > opt-in libp2p adapter compiles and lints clean against the pinned version, and the
 > **multi-peer testbed under kind passes its gossip-convergence and anti-entropy-repair
@@ -38,8 +38,10 @@ authority or vendor lock-in.
 >
 > **New testers start here:** [`docs/HOW_TO_TEST.md`](docs/HOW_TO_TEST.md) walks through
 > prerequisites, the in-process conformance suite (`anchor creda`), the multi-peer testbed
-> (`make -C testbed up && make -C testbed smoke`), what success looks like, and how to file
-> what you find. New-tester friction is the bug we most want to hear about during hardening.
+> (`make -C testbed up && make -C testbed smoke`), the anti-entropy scenario
+> (`make -C testbed ae-repair`), what success looks like, and how to file what you find. The
+> testbed itself has its own deeper guide under [`testbed/README.md`](testbed/README.md).
+> New-tester friction is the bug we most want to hear about during hardening.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
 
@@ -165,7 +167,7 @@ sequenceDiagram
 | Networking | **libp2p** — gossipsub, Kademlia DHT, Noise transport |
 | Storage | `Store` trait — **RocksDB** impl first, **libgit2** scaffolded (open question 13.1) |
 | Serialization | **Canonical CBOR** (ciborium, RFC 8949 deterministic encoding) |
-| Hashing | **Blake3** |
+| Hashing | **Blake3** (content integrity, Merkle roots) · **SHA-512** (DHT routing key, FIPS-validated) |
 | Node IDs | **UUIDv7** |
 | Signatures | **Algorithm-agile** — Ed25519 default; ML-DSA-65 (FIPS 204) and SLH-DSA (FIPS 205) for PQC; hybrid mode |
 | Identity | **UDAP** (institutional) + **SPIFFE/SPIRE** (workload), cert-manager rotation |

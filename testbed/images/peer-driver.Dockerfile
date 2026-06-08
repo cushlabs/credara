@@ -12,6 +12,11 @@ ARG RUST_BUILDER=creda-dev:local
 ARG RUNTIME=registry.fedoraproject.org/fedora-minimal:41
 
 FROM ${RUST_BUILDER} AS builder
+# CACHEBUST: content hash of the driver sources + shared crates, supplied by build-and-load.sh.
+# Same podman stale-COPY-cache defeat as core/bridge: changed sources force a rebuild, unchanged
+# sources stay a fast cache hit.
+ARG CACHEBUST=dev
+RUN echo "driver source hash: ${CACHEBUST}"
 WORKDIR /src
 COPY . .
 ENV HOME=/tmp CARGO_HOME=/tmp/cargo-cache

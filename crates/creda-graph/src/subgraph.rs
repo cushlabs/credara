@@ -33,7 +33,19 @@ impl Subgraph {
 
         while let Some(id) = queue.pop_front() {
             let Some(node) = store.get_event(&id)? else {
-                continue; // not replicated locally
+                // The node itself is not replicated locally — but events that *reference* it may
+                // be. The parent→child index is maintained on every put regardless of whether the
+                // parent is present, so follow it even here. This is the first-encounter /
+                // partial-view case (§5.2.4): e.g. an AuthorizationGrant whose parent entry-point
+                // Assert has not arrived. Without this, the entire branch hanging off an absent
+                // entry point is silently dropped — blinding subgraph reads AND authorization
+                // evaluation (§4.6 step 1 collects Grants from this materialization).
+                for child in store.children_of(&id)? {
+                    if seen.insert(child) {
+                        queue.push_back(child);
+                    }
+                }
+                continue;
             };
 
             let enqueue = |next: EventId, seen: &mut BTreeSet<EventId>, q: &mut VecDeque<EventId>| {

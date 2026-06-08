@@ -74,7 +74,7 @@ $hm install -n "$NS" clients "$CHART" \
   --set image.pullPolicy=Never \
   --wait --timeout 120s >/dev/null
 
-bash "$TESTBED/scripts/wait-ready.sh" "$NS" "" 120 \
+KUBE_CONTEXT="$CTX" bash "$TESTBED/scripts/wait-ready.sh" "$NS" "" 120 \
   || $kc -n "$NS" rollout status deploy/creda-clients --timeout=120s
 
 # ---- run Playwright as an in-cluster Job -------------------------------------------------
