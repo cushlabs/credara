@@ -151,34 +151,45 @@ object EventPayloadCbor {
      */
     fun decodePayloadDetails(cbor: ByteArray): PayloadDetails {
         val obj = CBORObject.DecodeFromBytes(cbor)
-        val payload = obj["payload"] ?: return PayloadDetails()
+        val payload = opt(obj, "payload") ?: return PayloadDetails()
         // EventPayload is a serde externally-tagged enum: a one-pair map {VariantName: fields}.
+        if (payload.getType() != com.upokecenter.cbor.CBORType.Map || payload.size() == 0) {
+            return PayloadDetails()
+        }
         val variant = payload.keys.firstOrNull()?.AsString() ?: return PayloadDetails()
-        val body = payload[variant] ?: return PayloadDetails()
+        val body = opt(payload, variant) ?: return PayloadDetails()
         return when (variant) {
             "Assert" -> {
-                val demo = body["demographics"]
+                val demo = opt(body, "demographics")
                 PayloadDetails(
-                    verificationMethod = body["verification_method"]?.AsString(),
-                    dateOfBirthToken = demo?.get("date_of_birth")?.AsString(),
-                    nameFamilyToken = firstToken(demo?.get("name_family")),
-                    nameGivenToken = firstToken(demo?.get("name_given")),
+                    verificationMethod = opt(body, "verification_method")?.AsString(),
+                    dateOfBirthToken = opt(demo, "date_of_birth")?.AsString(),
+                    nameFamilyToken = firstToken(opt(demo, "name_family")),
+                    nameGivenToken = firstToken(opt(demo, "name_given")),
                 )
             }
             "Link" -> PayloadDetails(
-                confidenceScoreBps = body["confidence_score"]?.AsInt32Value(),
-                linkMethod = body["method"]?.AsString(),
+                confidenceScoreBps = opt(body, "confidence_score")?.AsInt32Value(),
+                linkMethod = opt(body, "method")?.AsString(),
             )
-            "Attest" -> PayloadDetails(purpose = body["purpose"]?.AsString())
+            "Attest" -> PayloadDetails(purpose = opt(body, "purpose")?.AsString())
             "Amend" -> PayloadDetails(
-                dateOfBirthToken = body["updated_demographics"]?.get("date_of_birth")?.AsString(),
-                amendmentReason = body["amendment_reason"]?.AsString(),
+                dateOfBirthToken = opt(opt(body, "updated_demographics"), "date_of_birth")?.AsString(),
+                amendmentReason = opt(body, "amendment_reason")?.AsString(),
             )
-            "Contest" -> PayloadDetails(contestReason = decodeContestReason(body["reason"]))
-            "AuthorizationGrant" -> PayloadDetails(purpose = body["purpose"]?.AsString())
+            "Contest" -> PayloadDetails(contestReason = decodeContestReason(opt(body, "reason")))
+            "AuthorizationGrant" -> PayloadDetails(purpose = opt(body, "purpose")?.AsString())
             else -> PayloadDetails()
         }
     }
+
+    /** Map-safe key lookup: the value at [key] if [obj] is a map containing it, else null. */
+    private fun opt(obj: CBORObject?, key: String): CBORObject? =
+        if (obj != null && obj.getType() == com.upokecenter.cbor.CBORType.Map && obj.ContainsKey(key)) {
+            obj[key]
+        } else {
+            null
+        }
 
     /**
      * Lenient ContestReason rendering. The Rust struct is `{code, detail?}`; the bridge's own
@@ -187,20 +198,19 @@ object EventPayloadCbor {
      */
     private fun decodeContestReason(reason: CBORObject?): String? = when {
         reason == null -> null
-        reason.type == com.upokecenter.cbor.CBORType.Map && reason.ContainsKey("code") -> {
+        opt(reason, "code") != null -> {
             val code = reason["code"].AsString()
-            val detail = reason["detail"]?.AsString()
+            val detail = opt(reason, "detail")?.AsString()
             if (detail != null) "$code: $detail" else code
         }
-        reason.type == com.upokecenter.cbor.CBORType.Map && reason.ContainsKey("Other") ->
-            reason["Other"].AsString()
-        reason.type == com.upokecenter.cbor.CBORType.TextString -> reason.AsString()
+        opt(reason, "Other") != null -> reason["Other"].AsString()
+        reason.getType() == com.upokecenter.cbor.CBORType.TextString -> reason.AsString()
         else -> null
     }
 
     /** First entry of a `Vec<TokenizedString>` CBOR array, or null. */
     private fun firstToken(arr: CBORObject?): String? =
-        if (arr != null && arr.type == com.upokecenter.cbor.CBORType.Array && arr.size() > 0) {
+        if (arr != null && arr.getType() == com.upokecenter.cbor.CBORType.Array && arr.size() > 0) {
             arr[0].AsString()
         } else {
             null

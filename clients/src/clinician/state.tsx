@@ -1,6 +1,8 @@
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getBridge } from '@shared/fhir/client';
 import type { ActionLogEntry, PatientProjection } from './fixtures';
 import { PATIENTS } from './fixtures';
+import { enrichWithSubgraph } from './project';
 
 interface ClinicianState {
   patients: PatientProjection[];
@@ -20,6 +22,37 @@ const Ctx = createContext<ClinicianState | null>(null);
 export function ClinicianStateProvider({ children }: { children: ReactNode }) {
   const [patients, setPatients] = useState<PatientProjection[]>(PATIENTS);
   const [resolved, setResolved] = useState<Record<string, string>>({});
+
+  // Rewire the DAG + DOB-conflict challenge to the live subgraph (handoff item 1). Each fixture
+  // patient is resolved by its stable family token (`tok:demo:<family>`, never a hardcoded id —
+  // reset reseeds with fresh ids) and overlaid with real events; presentation fields stay from
+  // the fixture. Patients the seed doesn't carry (no token match) keep the fixture untouched.
+  // Fixtures render first so the worklist is never blank and the read is purely enriching.
+  useEffect(() => {
+    const bridge = getBridge();
+    let cancelled = false;
+    (async () => {
+      const enriched = await Promise.all(
+        PATIENTS.map(async (p) => {
+          try {
+            const family = p.name.split(' ').pop()?.toLowerCase() ?? '';
+            const ids = await bridge.searchPatientsByToken([`tok:demo:${family}`]);
+            const realId = ids[0];
+            if (!realId) return p;
+            const subgraph = await bridge.readSubgraph(realId);
+            // Keep the fixture's stable id for routing/testids; overlay live events + challenge.
+            return enrichWithSubgraph(p, subgraph);
+          } catch {
+            return p; // bridge read unavailable — keep the fixture rather than blanking a row.
+          }
+        }),
+      );
+      if (!cancelled) setPatients(enriched);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [actionLog, setActionLog] = useState<Record<string, ActionLogEntry[]>>(
     () => Object.fromEntries(PATIENTS.map((p) => [p.id, [] as ActionLogEntry[]])),
   );

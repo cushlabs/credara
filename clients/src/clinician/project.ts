@@ -1,33 +1,18 @@
-// Clinician projection — build a PatientProjection from a REAL subgraph (the bridge's
-// `$creda-provenance` read, mapped to CredaProvenance[] at the transport boundary). This is the
-// read path the handoff calls item 1: demographics, the provenance DAG, and DOB-conflict
-// challenges whose Amend/Attest/Contest targets are real Core event ids — so a resolution
-// written from here persists across `make -C testbed reset` (the tok:demo:* anchors are stable).
+// Clinician read rewiring (handoff item 1). The clinician worklist/detail are seeded by the
+// static fixtures for presentation parity, but the identity-critical surfaces — the provenance
+// DAG and the DOB-conflict challenge — are rewired here to a REAL subgraph (the bridge's
+// `$creda-provenance` read, mapped to CredaProvenance[] at the transport boundary).
 //
-// The subgraph carries identity-critical facts (events, verification, asserted DOBs, link
-// scores). Presentation-only fields the seed does not model — address, MRNs, a headline
-// summary — come from a per-name overlay so the UI keeps mockup parity; everything that drives
-// a write is derived from the live events, never the overlay.
+// `enrichWithSubgraph` overlays a fixture patient with live data: it replaces the DAG with the
+// real events and rebuilds any DOB-conflict challenge so its Amend/Attest/Contest options carry
+// REAL Core event ids. A resolution written from those options therefore lands on the actual
+// Assert/Link in the patient's subgraph and persists across `make -C testbed reset` (the
+// tok:demo:* anchors are stable). Link/stale challenges and presentation fields are left to the
+// fixture — those are not in scope for this item and are not modeled by the seed dataset.
 
 import type { EventType } from '@shared/components/EventDag';
 import type { CredaProvenance } from '@shared/fhir/types';
-import type {
-  Challenge,
-  ChallengeOption,
-  PatientField,
-  PatientProjection,
-  ProjectedEvent,
-} from './fixtures';
-
-/** Presentation-only overlay: fields the seed dataset doesn't carry, keyed by family name. */
-export interface PresentationOverlay {
-  /** Display name, when the caller wants the mockup's exact form (e.g. "Maria Elena Gonzalez"). */
-  name?: string;
-  sex?: string;
-  mrns?: string[];
-  address?: { value: string; conf: number; sources: string[]; stale?: boolean };
-  summary?: string;
-}
+import type { Challenge, ChallengeOption, PatientField, PatientProjection, ProjectedEvent } from './fixtures';
 
 /** Demo tokens embed their display form (`tok:demo:1971-08-04`). Strip the namespace prefix. */
 export function detokenize(token: string | undefined): string | undefined {
@@ -36,33 +21,25 @@ export function detokenize(token: string | undefined): string | undefined {
   return m ? m[1] : token;
 }
 
-/** Title-case a detokenized name fragment (`whitfield` -> `Whitfield`). */
-function titleCase(s: string): string {
-  return s.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 /**
- * Lay the DAG out left-to-right by causal depth (longest parent chain) and top-to-bottom by
- * order within a depth column — the same visual grammar the static fixtures used, but computed
- * from real parent edges so any topology renders.
+ * Lay the DAG out left-to-right by causal depth (longest parent chain) and top-to-bottom within
+ * a column — the visual grammar the fixtures used, computed from real parent edges so any
+ * topology renders.
  */
 function layout(events: CredaProvenance[]): Map<string, { x: number; y: number }> {
   const byId = new Map(events.map((e) => [e.id, e]));
   const depthMemo = new Map<string, number>();
   const depthOf = (id: string, seen: Set<string> = new Set()): number => {
     if (depthMemo.has(id)) return depthMemo.get(id)!;
-    if (seen.has(id)) return 0; // cycle guard (shouldn't happen in a DAG)
+    if (seen.has(id)) return 0;
     seen.add(id);
-    const ev = byId.get(id);
-    const parents = (ev?.parents ?? []).filter((p) => byId.has(p));
+    const parents = (byId.get(id)?.parents ?? []).filter((p) => byId.has(p));
     const d = parents.length === 0 ? 0 : 1 + Math.max(...parents.map((p) => depthOf(p, seen)));
     depthMemo.set(id, d);
     return d;
   };
-
   const rowCursor = new Map<number, number>();
   const pos = new Map<string, { x: number; y: number }>();
-  // Stable order: recorded time, so columns fill top-to-bottom predictably.
   const ordered = [...events].sort((a, b) => a.recorded.localeCompare(b.recorded));
   for (const e of ordered) {
     const d = depthOf(e.id);
@@ -71,24 +48,6 @@ function layout(events: CredaProvenance[]): Map<string, { x: number; y: number }
     pos.set(e.id, { x: 120 + d * 240, y: 70 + row * 90 });
   }
   return pos;
-}
-
-function toProjectedEvent(e: CredaProvenance, pos: { x: number; y: number }): ProjectedEvent {
-  const dob = detokenize(e.dateOfBirth);
-  return {
-    id: e.id,
-    type: e.eventType as EventType,
-    inst: e.institution,
-    when: (e.recorded || '').slice(0, 10),
-    vm: e.verificationMethod,
-    dob,
-    conf: e.matchScore,
-    purpose: e.purpose,
-    parents: e.parents,
-    summary: e.summary ?? defaultSummary(e, dob),
-    x: pos.x,
-    y: pos.y,
-  };
 }
 
 function defaultSummary(e: CredaProvenance, dob: string | undefined): string {
@@ -108,136 +67,119 @@ function defaultSummary(e: CredaProvenance, dob: string | undefined): string {
   }
 }
 
-/**
- * Build a clinician PatientProjection from a subgraph. Identity-critical fields (name, DOB,
- * verification, the DAG, conflict challenges with real targets) come from the events; `overlay`
- * supplies presentation-only fields the seed dataset omits.
- */
-export function projectPatient(
-  patientId: string,
-  subgraph: CredaProvenance[],
-  overlay: PresentationOverlay = {},
-): PatientProjection {
-  const asserts = subgraph.filter((e) => e.eventType === 'Assert');
-  const amends = subgraph.filter((e) => e.eventType === 'Amend');
-  const links = subgraph.filter((e) => e.eventType === 'Link');
-
-  // ---- Name: from Assert demographic tokens (given + family), else the overlay's form. -----
-  const named = asserts.find((a) => a.nameFamily || a.nameGiven);
-  const nameFromTokens = (() => {
-    const given = detokenize(named?.nameGiven);
-    const family = detokenize(named?.nameFamily);
-    const parts = [given, family].filter(Boolean).map((p) => titleCase(p as string));
-    return parts.length ? parts.join(' ') : undefined;
-  })();
-  const displayName = overlay.name ?? nameFromTokens ?? patientId;
-
-  // ---- DOB: the latest Amend wins; else agreement among Asserts; else a conflict. ----------
-  const assertDobs = asserts
-    .map((a) => ({ id: a.id, inst: a.institution, vm: a.verificationMethod, dob: detokenize(a.dateOfBirth) }))
-    .filter((d): d is { id: string; inst: string; vm?: string; dob: string } => !!d.dob);
-  const latestAmendDob = amends
-    .slice()
-    .sort((a, b) => a.recorded.localeCompare(b.recorded))
-    .map((a) => detokenize(a.dateOfBirth))
-    .filter(Boolean)
-    .pop();
-  const distinctDobs = [...new Set(assertDobs.map((d) => d.dob))];
-  const dobResolved = latestAmendDob ?? (distinctDobs.length === 1 ? distinctDobs[0] : undefined);
-  const dobConflict = !dobResolved && distinctDobs.length > 1;
-
-  // ---- Confidence: a simple, honest proxy — top link score, penalized by an open conflict. -
-  const topLinkBps = Math.max(0, ...links.map((l) => parseInt(l.matchScore ?? '0', 10) || 0));
-  const confidence = dobConflict ? Math.min(topLinkBps, 64) : topLinkBps || 90;
-
-  // ---- Effective-identity fields. -----------------------------------------------------------
-  const fields: PatientField[] = [];
-  const allInsts = [...new Set(subgraph.map((e) => e.institution).filter(Boolean))];
-  if (displayName !== patientId) {
-    fields.push({ key: 'Legal name', value: displayName, conf: 93, sources: allInsts });
-  }
-  if (dobConflict) {
-    fields.push({
-      key: 'Date of birth',
-      disputed: true,
-      options: assertDobs.map((d) => ({ inst: d.inst, v: d.dob, vm: d.vm ?? 'unspecified' })),
-    });
-  } else if (dobResolved) {
-    fields.push({
-      key: 'Date of birth',
-      value: dobResolved,
-      conf: latestAmendDob ? 96 : 90,
-      sources: latestAmendDob ? ['Resolved by amendment'] : allInsts,
-    });
-  }
-  if (overlay.sex) fields.push({ key: 'Sex', value: overlay.sex, conf: 99, sources: allInsts.slice(0, 1) });
-  if (overlay.address) {
-    fields.push({
-      key: 'Address',
-      value: overlay.address.value,
-      conf: overlay.address.conf,
-      sources: overlay.address.sources,
-      stale: overlay.address.stale,
-    });
-  }
-
-  // ---- Challenges: a DOB conflict becomes a resolvable challenge with REAL targets. --------
-  const challenges: Challenge[] = [];
-  if (dobConflict) {
-    const govId = assertDobs.find((d) => (d.vm ?? '').toLowerCase().includes('photo'));
-    const options: ChallengeOption[] = assertDobs.map((d) => ({
-      label: `${d.dob} is correct`,
-      // Affirming the photo-ID DOB is an Attest on that Assert; affirming the other value
-      // requires an Amend to the conflicting Assert so the effective DOB changes.
-      eventType: govId && d.id === govId.id ? 'Attest' : 'Amend',
-      note:
-        govId && d.id === govId.id
-          ? `Records a treatment-purpose attestation affirming ${d.dob} (${d.vm}).`
-          : `Amends the record so the effective DOB reflects ${d.dob}.`,
-      targetEventId: d.id,
-      amendDob: d.dob,
-    }));
-    // Always offer a no-assert escape that contests the Link instead.
-    const link = links[0];
-    options.push({
-      label: 'Neither / unsure',
-      eventType: link ? 'Contest' : null,
-      note: link
-        ? 'Flags the demographic conflict by contesting the link, without asserting a value.'
-        : 'Routes to the identity team. No event is written.',
-      targetEventId: link?.id,
-    });
-    challenges.push({
-      id: 'dob-conflict',
-      kind: 'dob',
-      tag: 'Conflicting DOB',
-      title: 'Which date of birth matches the patient in front of you?',
-      prompt: `Institutions disagree: ${assertDobs
-        .map((d) => `${d.inst} has ${d.dob} (${d.vm ?? 'unspecified'})`)
-        .join('; ')}. Confirm against the patient or their ID.`,
-      options,
-    });
-  }
-
+/** Map the real subgraph to the UI's ProjectedEvent[] (DAG nodes), laid out by causal depth. */
+export function projectEvents(subgraph: CredaProvenance[]): ProjectedEvent[] {
   const pos = layout(subgraph);
-  const events = subgraph
-    .map((e) => toProjectedEvent(e, pos.get(e.id) ?? { x: 120, y: 70 }))
+  return subgraph
+    .map((e) => {
+      const dob = detokenize(e.dateOfBirth);
+      const p = pos.get(e.id) ?? { x: 120, y: 70 };
+      return {
+        id: e.id,
+        type: e.eventType as EventType,
+        inst: e.institution,
+        when: (e.recorded || '').slice(0, 10),
+        vm: e.verificationMethod,
+        dob,
+        conf: e.matchScore,
+        purpose: e.purpose,
+        parents: e.parents,
+        summary: e.summary ?? defaultSummary(e, dob),
+        x: p.x,
+        y: p.y,
+      } satisfies ProjectedEvent;
+    })
     .sort((a, b) => a.x - b.x || a.y - b.y);
+}
 
+interface AssertDob {
+  id: string;
+  inst: string;
+  vm?: string;
+  /** Detokenized DOB for display. */
+  dob: string;
+  /** Raw DOB token as asserted, carried onto an Amend so it round-trips like the seed. */
+  dobToken: string;
+}
+
+function conflictingAssertDobs(subgraph: CredaProvenance[]): AssertDob[] {
+  const dobs: AssertDob[] = [];
+  for (const a of subgraph) {
+    if (a.eventType !== 'Assert') continue;
+    const dob = detokenize(a.dateOfBirth);
+    if (!dob || !a.dateOfBirth) continue;
+    dobs.push({ id: a.id, inst: a.institution, vm: a.verificationMethod, dob, dobToken: a.dateOfBirth });
+  }
+  const distinct = new Set(dobs.map((d) => d.dob));
+  return distinct.size > 1 ? dobs : [];
+}
+
+/**
+ * Build a DOB-conflict challenge whose options reference REAL events: affirming the photo-ID DOB
+ * is an Attest on that Assert; affirming the other value is an Amend to the conflicting Assert;
+ * "neither" contests the Link. Returns null when the subgraph has no DOB disagreement.
+ */
+export function projectDobChallenge(subgraph: CredaProvenance[]): Challenge | null {
+  const dobs = conflictingAssertDobs(subgraph);
+  if (dobs.length === 0) return null;
+  const govId = dobs.find((d) => (d.vm ?? '').toLowerCase().includes('photo'));
+  const link = subgraph.find((e) => e.eventType === 'Link');
+  const options: ChallengeOption[] = dobs.map((d) => {
+    const isGov = govId && d.id === govId.id;
+    return {
+      label: `${d.dob} is correct`,
+      eventType: isGov ? 'Attest' : 'Amend',
+      note: isGov
+        ? `Records a treatment-purpose attestation affirming ${d.dob} (${d.vm}).`
+        : `Amends the record so the effective DOB reflects ${d.dob}.`,
+      targetEventId: d.id,
+      amendDob: d.dobToken,
+    };
+  });
+  options.push({
+    label: 'Neither / unsure',
+    eventType: link ? 'Contest' : null,
+    note: link
+      ? 'Flags the demographic conflict by contesting the link, without asserting a value.'
+      : 'Routes to the identity team. No event is written.',
+    targetEventId: link?.id,
+  });
   return {
-    id: patientId,
-    name: displayName,
-    dob: dobResolved ?? '—',
-    sex: overlay.sex ?? '—',
-    mrns: overlay.mrns ?? allInsts.map((i) => `${i}`),
-    confidence,
-    summary: overlay.summary ?? (dobConflict ? 'Institutions disagree on date of birth — needs confirmation.' : 'Identity projected from the subgraph.'),
-    needsReview: dobConflict,
-    // Consent is read separately (Consent?patient=) and overlaid by the detail page; default to
-    // the treatment-presumed posture until that read resolves.
-    consent: { state: 'presumed', purpose: 'Treatment', use: 'Read & rely', source: 'HIPAA treatment posture', expires: '—' },
-    fields,
-    events,
-    challenges,
+    id: 'dob-conflict',
+    kind: 'dob',
+    tag: 'Conflicting DOB',
+    title: 'Which date of birth matches the patient in front of you?',
+    prompt: `${dobs
+      .map((d) => `${d.inst} has ${d.dob} (${d.vm ?? 'unspecified'})`)
+      .join('; ')}. Confirm against the patient or their ID.`,
+    options,
   };
+}
+
+/**
+ * Overlay a fixture patient with live subgraph data. Replaces the DAG with the real events and,
+ * where the subgraph shows a DOB disagreement, rebuilds the patient's DOB challenge + disputed
+ * field so the write targets are real Core ids. Everything else (presentation, link/stale
+ * challenges, consent) is left to the fixture. An empty subgraph returns the fixture unchanged.
+ */
+export function enrichWithSubgraph(fixture: PatientProjection, subgraph: CredaProvenance[]): PatientProjection {
+  if (subgraph.length === 0) return fixture;
+
+  const events = projectEvents(subgraph);
+  const dobChallenge = projectDobChallenge(subgraph);
+
+  // Swap the fixture's DOB challenge for the real-target one; keep any other challenges as-is.
+  const otherChallenges = fixture.challenges.filter((c) => c.kind !== 'dob');
+  const challenges = dobChallenge ? [dobChallenge, ...otherChallenges] : otherChallenges;
+
+  // Rebuild the disputed DOB field from the real conflicting Asserts (display only).
+  const dobs = conflictingAssertDobs(subgraph);
+  const fields: PatientField[] = fixture.fields.map((f) => {
+    if (f.key === 'Date of birth' && dobs.length > 0) {
+      return { key: 'Date of birth', disputed: true, options: dobs.map((d) => ({ inst: d.inst, v: d.dob, vm: d.vm ?? 'unspecified' })) };
+    }
+    return f;
+  });
+
+  return { ...fixture, events, challenges, fields, needsReview: dobChallenge ? true : fixture.needsReview };
 }

@@ -122,22 +122,37 @@ export function PatientDetailPage() {
       try {
         let receipt = null;
         if (option.eventType === 'Attest') {
+          // Prefer the challenge's real target (the Assert being affirmed); fall back to the
+          // subgraph head for the static fixtures that carry no target.
+          const target = option.targetEventId ?? patient.events[patient.events.length - 1]?.id ?? patient.id;
           receipt = await bridge.attest({
             patientId: patient.id,
             purpose: 'Treatment',
-            references: [patient.events[patient.events.length - 1]?.id ?? patient.id],
+            references: [target],
             summary: option.label,
           });
         } else if (option.eventType === 'Contest') {
-          const link = patient.events.find((e) => e.type === 'Link');
-          receipt = await bridge.contest({ linkId: link?.id ?? patient.id, reason: option.label });
+          const link = option.targetEventId ?? patient.events.find((e) => e.type === 'Link')?.id ?? patient.id;
+          receipt = await bridge.contest({ linkId: link, reason: option.label });
+        } else if (option.eventType === 'Amend') {
+          // Wired to $creda-amend (handoff item 1): the corrected DOB is written as a real
+          // Amend against the conflicting Assert, so the resolution persists past a reseed.
+          // Only the projected challenge carries a real target; the static fixtures don't, so
+          // those still record locally.
+          if (option.targetEventId) {
+            receipt = await bridge.amend({
+              patientId: patient.id,
+              targetEventId: option.targetEventId,
+              dateOfBirth: option.amendDob ?? '',
+              reason: option.label,
+            });
+          }
         }
-        // Amend would map to $creda-amend (not yet wired in the bridge); record locally.
         const entry: ActionLogEntry = {
           eventType: option.eventType,
           summary: option.label,
           when: 'just now · pending replication',
-          receipt: option.eventType === 'Amend' ? null : receipt,
+          receipt,
         };
         appendAction(patient.id, entry);
         toast.show(gossipToast(option.eventType));
@@ -441,7 +456,7 @@ function EventDetail({
   eventId: string;
   logEntries: ActionLogEntry[];
 }) {
-  let e: ProjectedEvent | null = findEvent(patient.events, eventId);
+  const e: ProjectedEvent | null = findEvent(patient.events, eventId);
   let actionEntry: ActionLogEntry | null = null;
   if (!e && eventId.startsWith('x-')) {
     const idx = Number.parseInt(eventId.slice(2), 10);
