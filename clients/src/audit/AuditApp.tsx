@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AppShell } from '@shared/components/AppShell';
+import { DemoData } from '@shared/components/DemoData';
 import { Modal } from '@shared/components/Modal';
 import { useToast } from '@shared/components/Toast';
 import { classNames } from '@shared/lib/format';
@@ -117,8 +118,9 @@ export function AuditApp() {
 
       <div className="audit-layout">
         <div className="ledger">
-          <div className="lh">
-            Audit ledger <span className="muted" style={{ fontWeight: 500 }}>· {filtered.length} event{filtered.length !== 1 ? 's' : ''}</span>
+          <div className="lh" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>Audit ledger <span className="muted" style={{ fontWeight: 500 }}>· {filtered.length} event{filtered.length !== 1 ? 's' : ''}</span></span>
+            <DemoData what="Demo ledger" detail="This audit ledger is fixture data — it does not query the bridge. Real grants/revocations/export receipts are not shown here yet." />
           </div>
           {filtered.length === 0 ? (
             <div className="empty" style={{ padding: 24, textAlign: 'center' }}>

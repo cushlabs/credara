@@ -75,6 +75,12 @@ pub struct CredaConfig {
     /// peer); fine for kind/k3d test beds where the synthetic data could land anywhere in the
     /// bucket space and the gossip volume is negligible.
     pub subscribe_all_buckets: bool,
+    /// **Synthetic-only guardrail** (closed-pilot safety, §11.4 / docs/PILOT.md). When `true`:
+    /// every locally created event is auto-tagged as `test_data`, and any ingested event that is
+    /// NOT `test_data`-tagged is **rejected**. This makes "synthetic only" an enforced network
+    /// invariant rather than a policy — a misconfigured client physically cannot put real data on
+    /// the network, and untagged events cannot propagate in. Default `false` (normal operation).
+    pub synthetic_only: bool,
 }
 
 impl Default for CredaConfig {
@@ -94,6 +100,7 @@ impl Default for CredaConfig {
             // CREDA_HEALTH_LISTEN if you bind a different port.
             health_listen: "0.0.0.0:9090".into(),
             subscribe_all_buckets: false,
+            synthetic_only: false,
         }
     }
 }
@@ -215,6 +222,10 @@ impl CredaConfig {
         if let Ok(v) = std::env::var("CREDA_SUBSCRIBE_ALL_BUCKETS") {
             let lower = v.trim().to_ascii_lowercase();
             self.subscribe_all_buckets = matches!(lower.as_str(), "1" | "true" | "yes" | "on");
+        }
+        if let Ok(v) = std::env::var("CREDA_SYNTHETIC_ONLY") {
+            let lower = v.trim().to_ascii_lowercase();
+            self.synthetic_only = matches!(lower.as_str(), "1" | "true" | "yes" | "on");
         }
         Ok(())
     }

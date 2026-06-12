@@ -22,6 +22,12 @@ data:
   # data can land in any bucket.
   CREDA_SUBSCRIBE_ALL_BUCKETS: "true"
   {{- end }}
+  {{- if .Values.config.syntheticOnly }}
+  # Synthetic-only guardrail (closed-pilot safety, docs/PILOT.md): auto-tag every locally
+  # created event as test_data and REFUSE any ingested event that is not test_data-tagged.
+  # Makes "synthetic only, no PHI" an enforced network invariant. Leave unset in production.
+  CREDA_SYNTHETIC_ONLY: "true"
+  {{- end }}
   {{- if .Values.participantRegistry.configMapName }}
   CREDA_PARTICIPANT_REGISTRY: "/etc/creda/participants"
   {{- end }}

@@ -1,6 +1,19 @@
 # Creda Clients (M-clients)
 
-Five persona-specific front-end clients ported from `design/*-mockup.html` into real,
+> ⚠️ **DEMONSTRATION CODE + the project's MANUAL END-TO-END HARNESS — not production software.**
+> These persona apps are not shipped products; they serve two jobs: (1) showcase the Creda bridge
+> surface, and (2) act as the hands-on **end-to-end test harness** — driven against a *real* bridge
+> they exercise client → FHIR → bridge → gRPC → Core → DAG → gossip, the same path external clients
+> will use. Run them as the pre-pilot E2E pass per **`docs/E2E.md`**.
+>
+> They run in **mock** mode (in-memory fixtures; global "MOCK BRIDGE" chip) and **real** mode
+> (against a live peer). In real mode, any surface still backed by fixtures shows an amber
+> **`DEMO DATA`** chip — which for testing purposes means *"this surface tests nothing yet"* (a
+> coverage gap). See `docs/STATUS.md` for the authoritative real-vs-fixture map and `docs/HANDOFF.md`
+> for the de-fixturing backlog. Don't treat these as a reference production EHR / patient / payer
+> integration.
+
+Five persona-specific front-end clients ported from `design/*-mockup.html` into
 type-checked, FHIR-bridge-wired React apps:
 
 | Route | Persona | Mockup source |

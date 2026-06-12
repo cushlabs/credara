@@ -121,6 +121,32 @@ class AuthorizationResourceProvider(
     }
 
     /**
+     * `$creda-effective-identity` (§5.2.4 / §5.3): the patient's computed effective identity —
+     * per-field values with confidence + a disputed flag — as a Parameters resource. Identity
+     * reasoning lives in Core (§8.3.2); this only translates. Each `field` part carries the kebab
+     * field key, a `disputed` boolean, and one `value` part per asserted value (value + confidence).
+     */
+    @Operation(name = "\$creda-effective-identity", typeName = "Patient", idempotent = true)
+    fun effectiveIdentity(@IdParam patient: IdType): Parameters {
+        val fields = core.effectiveIdentity(listOf(entryPointBytes(patient)))
+        return Parameters().apply {
+            fields.forEach { f ->
+                val field = addParameter().setName("field")
+                field.addPart().setName("key").value = StringType(f.key)
+                field.addPart().setName("disputed").value = org.hl7.fhir.r4.model.BooleanType(f.disputed)
+                f.values.forEach { v ->
+                    val value = field.addPart().setName("value")
+                    value.addPart().setName("token").value = StringType(v.value)
+                    value.addPart().setName("confidence").value =
+                        org.hl7.fhir.r4.model.IntegerType(v.confidence)
+                    // Supporting Assert ids: the client attests one of these to affirm the value.
+                    v.supporting.forEach { s -> value.addPart().setName("support").value = StringType(s) }
+                }
+            }
+        }
+    }
+
+    /**
      * `$creda-amend` (§3.4.5): amend a prior Assert's demographics — the clinician DOB-resolution
      * flow. Identity-side rather than authorization-side, but it lives in this plain provider
      * because that is where Patient-typed operations attach (see class comment). DOB-only for

@@ -31,9 +31,24 @@ message GetEventReply {
 
 message EntryPoints { repeated bytes ids = 1; }
 
+// One asserted value for a demographic field (§5.3) — the tokenized value plus its
+// confidence-weighted, attestation-amplified score. Values within a field arrive confidence-desc.
+message EffectiveIdentityValue {
+  string value = 1;             // tokenized value (opaque; never raw PII)
+  uint32 confidence = 2;        // basis points 0–10000
+  repeated bytes supporting = 3; // Assert event ids backing this value
+}
+message EffectiveIdentityField {
+  string key = 1;               // kebab FieldKey, e.g. "date-of-birth", "name-family", "ext:<name>"
+  bool disputed = 2;            // institutions asserted conflicting values (§5.3.4)
+  repeated EffectiveIdentityValue values = 3;
+}
 message EffectiveIdentityReply {
-  // Human-readable projection for now; a structured reply is a follow-up (see grpc.rs).
+  // Human-readable projection, retained for debugging/CLI.
   string effective_identity_debug = 1;
+  // Structured per-field projection (§5.2.4 / §5.3) — the read behind the Bridge's effective
+  // identity surface; the client renders effective demographics + per-field confidence/disagreement.
+  repeated EffectiveIdentityField fields = 2;
 }
 
 message MatchRequest { repeated string tokens = 1; }

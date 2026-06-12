@@ -1,18 +1,19 @@
-// Clinician read rewiring (handoff item 1). The clinician worklist/detail are seeded by the
-// static fixtures for presentation parity, but the identity-critical surfaces — the provenance
-// DAG and the DOB-conflict challenge — are rewired here to a REAL subgraph (the bridge's
-// `$creda-provenance` read, mapped to CredaProvenance[] at the transport boundary).
+// Clinician read rewiring. The worklist/detail are seeded by static fixtures for presentation
+// parity, but the identity-critical surfaces are rewired to REAL data: the provenance DAG comes
+// from the bridge's `$creda-provenance` read, and the DOB field + conflict challenge come from
+// Core's EFFECTIVE IDENTITY (`$creda-effective-identity`, §5.2.4/§5.3) — the confidence-weighted,
+// attestation-amplified, disagreement-flagged projection. Identity reasoning lives in Core, not
+// here (§8.3.2): the client renders Core's numbers and never recomputes which DOB "wins".
 //
-// `enrichWithSubgraph` overlays a fixture patient with live data: it replaces the DAG with the
-// real events and rebuilds any DOB-conflict challenge so its Amend/Attest/Contest options carry
-// REAL Core event ids. A resolution written from those options therefore lands on the actual
-// Assert/Link in the patient's subgraph and persists across `make -C testbed reset` (the
-// tok:demo:* anchors are stable). Link/stale challenges and presentation fields are left to the
-// fixture — those are not in scope for this item and are not modeled by the seed dataset.
+// Resolving the DOB challenge Attests the chosen value's supporting Assert, which raises that
+// value's confidence on re-projection — a real, persisted effect (the Attest survives refresh;
+// `make -C testbed reset` restores the baseline conflict). Link/stale challenges and the other
+// presentation fields are left to the fixture (not modeled by the seed dataset).
 
 import type { EventType } from '@shared/components/EventDag';
+import type { EffectiveField } from '@shared/fhir/client';
 import type { CredaProvenance } from '@shared/fhir/types';
-import type { Challenge, ChallengeOption, PatientField, PatientProjection, ProjectedEvent } from './fixtures';
+import type { Challenge, ChallengeOption, PatientProjection, ProjectedEvent } from './fixtures';
 
 /** Demo tokens embed their display form (`tok:demo:1971-08-04`). Strip the namespace prefix. */
 export function detokenize(token: string | undefined): string | undefined {
@@ -92,50 +93,38 @@ export function projectEvents(subgraph: CredaProvenance[]): ProjectedEvent[] {
     .sort((a, b) => a.x - b.x || a.y - b.y);
 }
 
-interface AssertDob {
-  id: string;
-  inst: string;
-  vm?: string;
-  /** Detokenized DOB for display. */
-  dob: string;
-  /** Raw DOB token as asserted, carried onto an Amend so it round-trips like the seed. */
-  dobToken: string;
+/** Core's effective date-of-birth field, if the projection carries one. */
+function dobField(identity: EffectiveField[]): EffectiveField | undefined {
+  return identity.find((f) => f.key === 'date-of-birth');
 }
 
-function conflictingAssertDobs(subgraph: CredaProvenance[]): AssertDob[] {
-  const dobs: AssertDob[] = [];
-  for (const a of subgraph) {
-    if (a.eventType !== 'Assert') continue;
-    const dob = detokenize(a.dateOfBirth);
-    if (!dob || !a.dateOfBirth) continue;
-    dobs.push({ id: a.id, inst: a.institution, vm: a.verificationMethod, dob, dobToken: a.dateOfBirth });
-  }
-  const distinct = new Set(dobs.map((d) => d.dob));
-  return distinct.size > 1 ? dobs : [];
-}
+const confPct = (bp: number): number => Math.round(bp / 100);
 
 /**
- * Build a DOB-conflict challenge whose options reference REAL events: affirming the photo-ID DOB
- * is an Attest on that Assert; affirming the other value is an Amend to the conflicting Assert;
- * "neither" contests the Link. Returns null when the subgraph has no DOB disagreement.
+ * Build the DOB-conflict challenge from Core's effective identity (§5.2.4/§5.3) — never from
+ * client-side reasoning (§8.3.2). Each option affirms one asserted value by Attesting its
+ * supporting Assert (which raises that value's confidence on re-projection); "neither" contests
+ * the Link. Returns null unless Core reports the date-of-birth field disputed.
  */
-export function projectDobChallenge(subgraph: CredaProvenance[]): Challenge | null {
-  const dobs = conflictingAssertDobs(subgraph);
-  if (dobs.length === 0) return null;
-  const govId = dobs.find((d) => (d.vm ?? '').toLowerCase().includes('photo'));
+export function projectDobChallenge(identity: EffectiveField[], subgraph: CredaProvenance[]): Challenge | null {
+  const field = dobField(identity);
+  if (!field || !field.disputed || field.values.length < 2) return null;
+
   const link = subgraph.find((e) => e.eventType === 'Link');
-  const options: ChallengeOption[] = dobs.map((d) => {
-    const isGov = govId && d.id === govId.id;
-    return {
-      label: `${d.dob} is correct`,
-      eventType: isGov ? 'Attest' : 'Amend',
-      note: isGov
-        ? `Records a treatment-purpose attestation affirming ${d.dob} (${d.vm}).`
-        : `Amends the record so the effective DOB reflects ${d.dob}.`,
-      targetEventId: d.id,
-      amendDob: d.dobToken,
-    };
-  });
+  const asserts = new Map(subgraph.filter((e) => e.eventType === 'Assert').map((a) => [a.id, a]));
+
+  const options: ChallengeOption[] = field.values
+    .filter((v) => v.supporting.length > 0)
+    .map((v) => {
+      const dob = detokenize(v.value) ?? v.value;
+      const src = asserts.get(v.supporting[0]);
+      return {
+        label: `${dob} is correct`,
+        eventType: 'Attest' as const,
+        note: `Attests reliance on the ${src?.verificationMethod ?? 'asserting institution'}'s record (${dob}, ${confPct(v.confidence)}% confidence). Raises its weight in the effective identity.`,
+        targetEventId: v.supporting[0],
+      };
+    });
   options.push({
     label: 'Neither / unsure',
     eventType: link ? 'Contest' : null,
@@ -144,42 +133,65 @@ export function projectDobChallenge(subgraph: CredaProvenance[]): Challenge | nu
       : 'Routes to the identity team. No event is written.',
     targetEventId: link?.id,
   });
+
   return {
     id: 'dob-conflict',
     kind: 'dob',
     tag: 'Conflicting DOB',
     title: 'Which date of birth matches the patient in front of you?',
-    prompt: `${dobs
-      .map((d) => `${d.inst} has ${d.dob} (${d.vm ?? 'unspecified'})`)
-      .join('; ')}. Confirm against the patient or their ID.`,
+    prompt: `Core reports conflicting DOBs: ${field.values
+      .map((v) => `${detokenize(v.value)} (${confPct(v.confidence)}%)`)
+      .join(' vs ')}. Confirm against the patient or their ID.`,
     options,
   };
 }
 
 /**
- * Overlay a fixture patient with live subgraph data. Replaces the DAG with the real events and,
- * where the subgraph shows a DOB disagreement, rebuilds the patient's DOB challenge + disputed
- * field so the write targets are real Core ids. Everything else (presentation, link/stale
- * challenges, consent) is left to the fixture. An empty subgraph returns the fixture unchanged.
+ * Overlay a fixture patient with live data: the DAG from the real subgraph, and the DOB field +
+ * conflict challenge from Core's effective identity. The displayed DOB is Core's top-confidence
+ * value; the disputed field lists each asserted value with its source + confidence. Everything
+ * else (other presentation fields, link/stale challenges, consent) is left to the fixture. An
+ * empty read returns the fixture unchanged.
  */
-export function enrichWithSubgraph(fixture: PatientProjection, subgraph: CredaProvenance[]): PatientProjection {
-  if (subgraph.length === 0) return fixture;
+export function enrichWithSubgraph(
+  fixture: PatientProjection,
+  subgraph: CredaProvenance[],
+  identity: EffectiveField[],
+): PatientProjection {
+  if (subgraph.length === 0 && identity.length === 0) return { ...fixture, demo: true };
 
   const events = projectEvents(subgraph);
-  const dobChallenge = projectDobChallenge(subgraph);
+  const dobChallenge = projectDobChallenge(identity, subgraph);
 
-  // Swap the fixture's DOB challenge for the real-target one; keep any other challenges as-is.
   const otherChallenges = fixture.challenges.filter((c) => c.kind !== 'dob');
   const challenges = dobChallenge ? [dobChallenge, ...otherChallenges] : otherChallenges;
 
-  // Rebuild the disputed DOB field from the real conflicting Asserts (display only).
-  const dobs = conflictingAssertDobs(subgraph);
-  const fields: PatientField[] = fixture.fields.map((f) => {
-    if (f.key === 'Date of birth' && dobs.length > 0) {
-      return { key: 'Date of birth', disputed: true, options: dobs.map((d) => ({ inst: d.inst, v: d.dob, vm: d.vm ?? 'unspecified' })) };
-    }
-    return f;
-  });
+  // DOB field + header from Core's effective identity (top-confidence value leads).
+  const field = dobField(identity);
+  const asserts = new Map(subgraph.filter((e) => e.eventType === 'Assert').map((a) => [a.id, a]));
+  let dob = fixture.dob;
+  let fields = fixture.fields;
+  if (field && field.values.length > 0) {
+    dob = detokenize(field.values[0].value) ?? fixture.dob;
+    fields = fixture.fields.map((f) => {
+      if (f.key !== 'Date of birth') return f;
+      if (!field.disputed) {
+        return { key: 'Date of birth', value: dob, conf: confPct(field.values[0].confidence) };
+      }
+      return {
+        key: 'Date of birth',
+        disputed: true,
+        options: field.values.map((v) => {
+          const src = asserts.get(v.supporting[0] ?? '');
+          return {
+            inst: src?.institution ?? 'unknown source',
+            v: detokenize(v.value) ?? v.value,
+            vm: src?.verificationMethod ?? `${confPct(v.confidence)}% confidence`,
+          };
+        }),
+      };
+    });
+  }
 
-  return { ...fixture, events, challenges, fields, needsReview: dobChallenge ? true : fixture.needsReview };
+  return { ...fixture, dob, events, challenges, fields, demo: false, needsReview: dobChallenge ? true : fixture.needsReview };
 }

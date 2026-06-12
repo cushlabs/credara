@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@shared/components/Badge';
 import { ConfidenceMeter } from '@shared/components/ConfidenceMeter';
+import { DemoData } from '@shared/components/DemoData';
 import { avatarColor, initials } from '@shared/lib/format';
 import { useClinicianState } from './state';
 import { consentMeta } from './consent';
@@ -55,7 +56,10 @@ function PatientCard({ p, actions }: { p: PatientProjection; actions: number }) 
         {initials(p.name)}
       </div>
       <div>
-        <div className="nm">{p.name}</div>
+        <div className="nm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {p.name}
+          {p.demo && <DemoData detail="This patient isn't in your seeded network — shown from fixtures. Run `make -C testbed reset` to seed the demo patients." />}
+        </div>
         <div className="sub">
           DOB {p.dob} · {p.sex} · {p.mrns.length} MRN{p.mrns.length > 1 ? 's' : ''}
         </div>

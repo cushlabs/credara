@@ -52,6 +52,21 @@ export interface AmendRequest {
   reason: string;
 }
 
+/** One asserted value of a demographic field, with its Core-computed confidence (basis points). */
+export interface EffectiveValue {
+  value: string;
+  confidence: number;
+  /** Assert event ids backing this value — attest one of these to affirm it. */
+  supporting: string[];
+}
+
+/** Core's effective projection of one demographic field (§5.3): values confidence-desc + dispute. */
+export interface EffectiveField {
+  key: string;
+  disputed: boolean;
+  values: EffectiveValue[];
+}
+
 export interface ContestRequest {
   /** The Provenance.id of the Link being contested. */
   linkId: string;
@@ -73,6 +88,12 @@ export interface FhirBridge {
   contest(req: ContestRequest): Promise<CredaProvenance>;
   /** `$creda-amend` — amend a prior Assert's demographics (DOB-resolution flow, §3.4.5). */
   amend(req: AmendRequest): Promise<CredaProvenance>;
+  /**
+   * `$creda-effective-identity` — Core's computed per-field projection (§5.2.4 / §5.3):
+   * confidence-weighted, attestation-amplified, disagreement-flagged. The client renders this;
+   * it does NOT recompute identity (§8.3.2).
+   */
+  effectiveIdentity(patientId: string): Promise<EffectiveField[]>;
   /** `$creda-authorize` — create an AuthorizationGrant. */
   authorize(req: AuthorizeRequest): Promise<CredaAuthorization>;
   /** `$creda-revoke` — revoke a prior Grant. */
@@ -136,9 +157,14 @@ class HttpBridge implements FhirBridge {
   }
 
   async attest(req: AttestRequest): Promise<CredaProvenance> {
+    // Clean, conformant params: a `references` part per target (not a JSON-stringified array),
+    // so the bridge attests the real Assert/Link rather than a stub.
+    const parameter: FhirParam[] = [{ name: 'purpose', valueString: req.purpose }];
+    req.references.forEach((r) => parameter.push({ name: 'references', valueString: r }));
+    if (req.summary) parameter.push({ name: 'summary', valueString: req.summary });
     const res = await this.req<FhirProvenanceResource>(
       `/Patient/${encodeURIComponent(req.patientId)}/$creda-attest`,
-      { method: 'POST', body: JSON.stringify(parametersOf({ ...req })) },
+      { method: 'POST', body: JSON.stringify(fhirParameters(parameter)) },
     );
     return provenanceFromFhir(res);
   }
@@ -239,6 +265,35 @@ class HttpBridge implements FhirBridge {
     }
     const bundle = await this.req<Bundle>(`/Consent?patient=${encodeURIComponent(patientId)}`);
     return (bundle.entry ?? []).map((e) => consentToAuthorization(e.resource));
+  }
+
+  async effectiveIdentity(patientId: string): Promise<EffectiveField[]> {
+    // $creda-effective-identity returns a Parameters resource: one `field` part per field, each
+    // with `key`, `disputed`, and a `value` part (token + confidence) per asserted value.
+    interface Part {
+      name?: string;
+      valueString?: string;
+      valueBoolean?: boolean;
+      valueInteger?: number;
+      part?: Part[];
+    }
+    const res = await this.req<{ parameter?: Part[] }>(
+      `/Patient/${encodeURIComponent(patientId)}/$creda-effective-identity`,
+    );
+    const pick = (parts: Part[] | undefined, name: string) => (parts ?? []).find((p) => p.name === name);
+    return (res.parameter ?? [])
+      .filter((f) => f.name === 'field')
+      .map((f) => ({
+        key: pick(f.part, 'key')?.valueString ?? '',
+        disputed: pick(f.part, 'disputed')?.valueBoolean ?? false,
+        values: (f.part ?? [])
+          .filter((p) => p.name === 'value')
+          .map((v) => ({
+            value: pick(v.part, 'token')?.valueString ?? '',
+            confidence: pick(v.part, 'confidence')?.valueInteger ?? 0,
+            supporting: (v.part ?? []).filter((p) => p.name === 'support').map((p) => p.valueString ?? ''),
+          })),
+      }));
   }
 }
 

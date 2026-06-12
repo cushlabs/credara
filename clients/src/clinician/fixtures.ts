@@ -53,6 +53,13 @@ export interface PatientProjection {
   confidence: number;
   summary: string;
   needsReview?: boolean;
+  /**
+   * True when this projection is NOT backed by a live bridge read — a fixture standing in because
+   * the patient isn't seeded, the token didn't resolve, or the bridge read failed. Drives the
+   * DemoData chip so fixtures never silently impersonate real data (front-end de-fixturing #1).
+   * `enrichWithSubgraph` sets it false when it overlays real events/identity.
+   */
+  demo?: boolean;
   consent: {
     state: 'granted' | 'presumed' | 'restricted' | 'expired';
     purpose?: string;

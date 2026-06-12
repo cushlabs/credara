@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '@shared/components/AppShell';
 import { Badge } from '@shared/components/Badge';
 import { CodeCard } from '@shared/components/CodeCard';
+import { DemoData } from '@shared/components/DemoData';
 import { Section } from '@shared/components/Section';
 import { useToast } from '@shared/components/Toast';
 import { getBridge } from '@shared/fhir/client';
@@ -343,7 +344,12 @@ function DecisionCard({ decision }: { decision: NonNullable<Order['decision']> }
   return (
     <Section
       title="Decision"
-      aside={<span className={`badge ${decision.kind === 'approved' ? 'b-good' : decision.kind === 'denied' ? 'b-warn' : 'b-info'}`}>{decision.title}</span>}
+      aside={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <DemoData what="Demo decision" detail="This authorization decision is fixture data. It is NOT computed by Creda's authorization evaluation ($creda-verify / EvaluateAuthorization)." />
+          <span className={`badge ${decision.kind === 'approved' ? 'b-good' : decision.kind === 'denied' ? 'b-warn' : 'b-info'}`}>{decision.title}</span>
+        </span>
+      }
     >
       <div className="decision">
         <div className={`seal ${decision.kind}`}>{seal}</div>

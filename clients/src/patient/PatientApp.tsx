@@ -67,9 +67,10 @@ function ConsentApp() {
   const bridge = getBridge();
   const [tab, setTab] = useState<Tab>('access');
   const [grants, setGrants] = useState<CredaAuthorization[]>([]);
-  const [activity, setActivity] = useState<ActivityEntry[]>([
-    { ev: 'access', text: 'Apex Research accessed your identity (export receipt)', when: 'Oct 2, 2024' },
-  ]);
+  // Seeded from real grants on load (see refresh); starts empty rather than with a fabricated
+  // "export receipt" entry. The feed reflects grants/revocations, not a real ExportReceipt stream
+  // yet — that's the remaining ⚠️ in the FE audit (HANDOFF), to be read from events later.
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
   const refresh = useCallback(async () => {
     // Real data both ways: the bridge's `Consent?patient={id}` search (§8.2.9 read-back) returns

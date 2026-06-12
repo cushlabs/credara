@@ -6,7 +6,7 @@
 
 use creda_events::{
     CertificateFingerprint, EventId, EventPayload, IdentityEventNode, RedistributionPolicy,
-    SignatureAlgorithm, SigningKey, VerifyingKey,
+    SignatureAlgorithm, SigningKey, TestDataTag, VerifyingKey,
 };
 
 /// Abstracts the institution's signing key (§10.1.4).
@@ -23,6 +23,19 @@ pub trait Signer: Send + Sync {
         logical_clock: u64,
         wall_clock: String,
         redistribution_policy: Option<RedistributionPolicy>,
+    ) -> creda_events::Result<IdentityEventNode>;
+
+    /// Build, validate, and sign a new **synthetic** event carrying `tag` (§11.4). Used by the
+    /// engine's synthetic-only guardrail (docs/PILOT.md) so locally created events are provably
+    /// non-clinical. Wraps [`IdentityEventNode::create_test_data`].
+    fn create_test_event(
+        &self,
+        payload: EventPayload,
+        parent_ids: Vec<EventId>,
+        logical_clock: u64,
+        wall_clock: String,
+        redistribution_policy: Option<RedistributionPolicy>,
+        tag: TestDataTag,
     ) -> creda_events::Result<IdentityEventNode>;
 }
 
@@ -91,6 +104,26 @@ impl Signer for InMemorySigner {
             logical_clock,
             wall_clock,
             redistribution_policy,
+        )
+    }
+
+    fn create_test_event(
+        &self,
+        payload: EventPayload,
+        parent_ids: Vec<EventId>,
+        logical_clock: u64,
+        wall_clock: String,
+        redistribution_policy: Option<RedistributionPolicy>,
+        tag: TestDataTag,
+    ) -> creda_events::Result<IdentityEventNode> {
+        IdentityEventNode::create_test_data(
+            payload,
+            parent_ids,
+            &self.key,
+            logical_clock,
+            wall_clock,
+            redistribution_policy,
+            tag,
         )
     }
 }

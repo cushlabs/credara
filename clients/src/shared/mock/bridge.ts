@@ -19,6 +19,7 @@ import type {
   AttestRequest,
   AuthorizeRequest,
   ContestRequest,
+  EffectiveField,
   FhirBridge,
   RevokeRequest,
 } from '../fhir/client';
@@ -261,6 +262,21 @@ export function mockBridge(): FhirBridge {
     async listAuthorizations(patientId: string) {
       // Mirrors the real bridge's `Consent?patient={id}` search over the in-memory state.
       return delay(authorizations.filter((a) => a.patient.reference === `Patient/${patientId}`));
+    },
+
+    async effectiveIdentity(patientId: string): Promise<EffectiveField[]> {
+      // Mirrors Core's per-field projection over the mock asserts. James (p2) carries the DOB
+      // disagreement (photo-ID 08-04 outweighs self-report 08-14); others resolve cleanly.
+      const dob = (value: string, confidence: number, supporting: string[]) => ({ value, confidence, supporting });
+      const byPatient: Record<string, EffectiveField[]> = {
+        p1: [{ key: 'date-of-birth', disputed: false, values: [dob('tok:demo:1984-03-12', 9800, ['p1-a1', 'p1-a2'])] }],
+        p2: [{
+          key: 'date-of-birth',
+          disputed: true,
+          values: [dob('tok:demo:1971-08-04', 9000, ['p2-a1']), dob('tok:demo:1971-08-14', 6000, ['p2-a2'])],
+        }],
+      };
+      return delay(byPatient[patientId] ?? []);
     },
   };
 }

@@ -28,7 +28,7 @@ use creda_events::{
     canonical, CertificateFingerprint, EventId, EventPayload, GrantPurpose, IdentityEventNode,
     IdentityEventType, UseMode,
 };
-use creda_graph::{AuthorizationQuery, RequesterContext};
+use creda_graph::{AuthorizationQuery, FieldKey, RequesterContext};
 use creda_store::RocksdbStore;
 
 use crate::config::CredaConfig;
@@ -110,6 +110,22 @@ fn map_use_mode(v: i32) -> std::result::Result<UseMode, Status> {
         // `*_UNSPECIFIED` (value 0); see note in `map_purpose`.
         _ => return Err(Status::invalid_argument("use_mode is required (UNSPECIFIED)")),
     })
+}
+
+/// Render a `FieldKey` as the kebab token the bridge/clients key on.
+fn field_key_name(k: &FieldKey) -> String {
+    match k {
+        FieldKey::NameFamily => "name-family".to_string(),
+        FieldKey::NameGiven => "name-given".to_string(),
+        FieldKey::NameMiddle => "name-middle".to_string(),
+        FieldKey::DateOfBirth => "date-of-birth".to_string(),
+        FieldKey::Sex => "sex".to_string(),
+        FieldKey::Address => "address".to_string(),
+        FieldKey::SsnLastFour => "ssn-last-four".to_string(),
+        FieldKey::Mrn => "mrn".to_string(),
+        FieldKey::InsuranceMemberId => "insurance-member-id".to_string(),
+        FieldKey::Extension(s) => format!("ext:{s}"),
+    }
 }
 
 fn parse_event_type(s: &str) -> std::result::Result<IdentityEventType, Status> {
@@ -207,11 +223,28 @@ impl Creda for CredaService {
         let entries = ids_from_bytes(&request.into_inner().ids)?;
         let core = self.core.clone();
         let ei = blocking(move || core.effective_identity(&entries)).await?;
-        // TODO(grpc-structured-identity): return a structured reply once the projection types are
-        // wire-serializable; for now a debug rendering keeps the RPC functional. Tracked separately
-        // from the (now-wired) authorization path.
+        // Structured per-field projection (§5.2.4 / §5.3): value + confidence + supporting ids +
+        // disputed flag, exactly as the engine computed it (attestation amplification included).
+        let fields = ei
+            .fields
+            .iter()
+            .map(|(key, entry)| pb::EffectiveIdentityField {
+                key: field_key_name(key),
+                disputed: entry.disputed,
+                values: entry
+                    .values
+                    .iter()
+                    .map(|v| pb::EffectiveIdentityValue {
+                        value: v.value.clone(),
+                        confidence: u32::from(v.confidence),
+                        supporting: v.supporting.iter().map(|id| id.as_bytes().to_vec()).collect(),
+                    })
+                    .collect(),
+            })
+            .collect();
         Ok(Response::new(EffectiveIdentityReply {
             effective_identity_debug: format!("{ei:#?}"),
+            fields,
         }))
     }
 

@@ -31,6 +31,11 @@ config:
   # production deployments and use `subscribedBuckets` to enumerate the buckets the institution
   # covers.
   subscribeAllBuckets: false
+  # Synthetic-only guardrail (closed-pilot safety, docs/PILOT.md). When true the peer auto-tags
+  # every event it creates as `test_data` and REFUSES any ingested event lacking that tag —
+  # making "synthetic only, no PHI" an enforced network invariant rather than a policy. Set true
+  # for the closed synthetic pilot; leave false for normal operation.
+  syntheticOnly: false
   # Bootstrap peers — multiaddrs of the form `/ip4/.../tcp/.../p2p/<peer-id>` (§6.1.3).
   # Empty for a single-peer or seed deployment; populated when joining an existing network.
   # Rendered into CREDA_BOOTSTRAP_PEERS (comma-separated) by the ConfigMap.

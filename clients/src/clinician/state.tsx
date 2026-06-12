@@ -38,12 +38,19 @@ export function ClinicianStateProvider({ children }: { children: ReactNode }) {
             const family = p.name.split(' ').pop()?.toLowerCase() ?? '';
             const ids = await bridge.searchPatientsByToken([`tok:demo:${family}`]);
             const realId = ids[0];
-            if (!realId) return p;
-            const subgraph = await bridge.readSubgraph(realId);
-            // Keep the fixture's stable id for routing/testids; overlay live events + challenge.
-            return enrichWithSubgraph(p, subgraph);
+            if (!realId) return { ...p, demo: true }; // not seeded — fixture stands in, marked.
+            const [subgraph, identity] = await Promise.all([
+              bridge.readSubgraph(realId),
+              bridge.effectiveIdentity(realId),
+            ]);
+            // Keep the fixture's stable id for routing/testids; overlay the live DAG plus Core's
+            // effective-identity DOB field + conflict challenge. enrichWithSubgraph sets demo=false
+            // when it overlays real data, true when the read came back empty.
+            return enrichWithSubgraph(p, subgraph, identity);
           } catch {
-            return p; // bridge read unavailable — keep the fixture rather than blanking a row.
+            // Bridge read failed — keep the fixture so the row isn't blank, but mark it demo so it
+            // doesn't silently impersonate live data (front-end de-fixturing #1).
+            return { ...p, demo: true };
           }
         }),
       );

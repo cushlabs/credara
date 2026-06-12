@@ -1,6 +1,7 @@
 package health.creda.bridge.grpc
 
 import com.google.protobuf.ByteString
+import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.grpc.AuthReply
 import health.creda.grpc.AuthRequest
 import health.creda.grpc.CreateEventRequest
@@ -13,6 +14,7 @@ import health.creda.grpc.MatchRequest
 import health.creda.grpc.RequesterContext
 import health.creda.grpc.SubgraphEventsRequest
 import health.creda.grpc.UseMode
+import io.grpc.ManagedChannel
 import io.grpc.netty.NettyChannelBuilder
 import io.netty.channel.epoll.EpollDomainSocketChannel
 import io.netty.channel.epoll.EpollEventLoopGroup
@@ -40,30 +42,12 @@ class CredaCoreClient(
     // works on macOS where netty's epoll is unavailable); anything else is a Unix-domain-socket
     // path (the in-pod default, §8.3.1). In TCP mode `0.0.0.0` is Core's *listen* address — from
     // the bridge (same pod) the dial address is loopback.
-    private val eventLoopGroup: EpollEventLoopGroup?
-    private val channel: io.grpc.ManagedChannel
-
-    init {
-        if (socketPath.startsWith("tcp://")) {
-            val target = socketPath.removePrefix("tcp://").replace("0.0.0.0", "127.0.0.1")
-            eventLoopGroup = null
-            channel = NettyChannelBuilder.forTarget(target).usePlaintext().build()
-        } else {
-            eventLoopGroup = EpollEventLoopGroup()
-            channel = NettyChannelBuilder
-                .forAddress(DomainSocketAddress(socketPath))
-                .eventLoopGroup(eventLoopGroup)
-                .channelType(EpollDomainSocketChannel::class.java)
-                // HTTP/2 :authority must be a valid host:port-style authority (RFC 3986); the
-                // default for forAddress(DomainSocketAddress) is the socket path, which contains
-                // slashes and is rejected by Core's tonic server as a PROTOCOL_ERROR (RST_STREAM
-                // closes every stream before the handler runs). Override to a fixed sentinel —
-                // the value is arbitrary, only validity matters; no virtual-hosting on Core.
-                .overrideAuthority("creda-core.local")
-                .usePlaintext() // confidentiality/auth are provided by the pod boundary, not TLS
-                .build()
-        }
-    }
+    // Final, initializer-assigned (no init block) so the properties are unambiguously `val` — the
+    // channel is built by the top-level `buildChannel` below. eventLoopGroup is declared first so
+    // the channel initializer can pass it to the UDS builder; it's null in TCP mode.
+    private val eventLoopGroup: EpollEventLoopGroup? =
+        if (socketPath.startsWith("tcp://")) null else EpollEventLoopGroup()
+    private val channel: ManagedChannel = buildChannel(socketPath, eventLoopGroup)
 
     private val stub = CredaGrpc.newBlockingStub(channel)
 
@@ -101,6 +85,38 @@ class CredaCoreClient(
             .apply { entryPoints.forEach { addIds(ByteString.copyFrom(it)) } }
             .build()
         return stub.getEffectiveIdentity(req).effectiveIdentityDebug
+    }
+
+    /** A demographic field's effective value (§5.3): tokenized value + confidence + supporting ids. */
+    data class EffectiveValue(val value: String, val confidence: Int, val supporting: List<String>)
+
+    /** A demographic field's effective projection: confidence-sorted values + the disputed flag. */
+    data class EffectiveField(val key: String, val disputed: Boolean, val values: List<EffectiveValue>)
+
+    /**
+     * GetEffectiveIdentity structured (§5.2.4 / §5.3): the per-field projection Core computes —
+     * confidence-weighted, attestation-amplified, disagreement-flagged. This is the identity
+     * reasoning the clients must NOT re-implement (§8.3.2).
+     */
+    fun effectiveIdentity(entryPoints: List<ByteArray>): List<EffectiveField> {
+        val req = EntryPoints.newBuilder()
+            .apply { entryPoints.forEach { addIds(ByteString.copyFrom(it)) } }
+            .build()
+        return stub.getEffectiveIdentity(req).fieldsList.map { f ->
+            EffectiveField(
+                key = f.key,
+                disputed = f.disputed,
+                values = f.valuesList.map { v ->
+                    EffectiveValue(
+                        value = v.value,
+                        confidence = v.confidence,
+                        supporting = v.supportingList.map {
+                            EventPayloadCbor.bytesToUuid(it.toByteArray()).toString()
+                        },
+                    )
+                },
+            )
+        }
     }
 
     /** MatchByTokens (§5.2.5): candidate entry-point event UUIDs for the given demographic tokens. */
@@ -148,3 +164,26 @@ class CredaCoreClient(
         eventLoopGroup?.shutdownGracefully()
     }
 }
+
+/**
+ * Build the gRPC channel for the given `creda.core-socket` (mirrors Core's `parse_endpoint`):
+ *   - `tcp://host:port` → TCP (testbed seed/reset Jobs reach Core; also works on macOS where
+ *     netty epoll is unavailable). `0.0.0.0` is Core's listen address; the bridge dials loopback.
+ *   - anything else → Unix domain socket (in-pod default, §8.3.1). The `:authority` is overridden
+ *     to a fixed sentinel because the UDS path contains slashes that Core's tonic server rejects
+ *     as a PROTOCOL_ERROR.
+ * Free function (no `this`) so it can initialize the `channel` property directly — no init block.
+ */
+private fun buildChannel(socketPath: String, group: EpollEventLoopGroup?): ManagedChannel =
+    if (socketPath.startsWith("tcp://")) {
+        val target = socketPath.removePrefix("tcp://").replace("0.0.0.0", "127.0.0.1")
+        NettyChannelBuilder.forTarget(target).usePlaintext().build()
+    } else {
+        NettyChannelBuilder
+            .forAddress(DomainSocketAddress(socketPath))
+            .eventLoopGroup(group)
+            .channelType(EpollDomainSocketChannel::class.java)
+            .overrideAuthority("creda-core.local")
+            .usePlaintext()
+            .build()
+    }

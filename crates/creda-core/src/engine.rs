@@ -11,7 +11,9 @@ use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventNode, VerifyingKey};
+use creda_events::{
+    CertificateFingerprint, EventId, EventPayload, IdentityEventNode, TestDataTag, VerifyingKey,
+};
 use creda_graph::{
     evaluate, project, AuthorizationDecision, AuthorizationQuery, ConfidenceConfig,
     EffectiveIdentity, Subgraph,
@@ -84,9 +86,21 @@ impl CredaCore {
         parent_ids: Vec<EventId>,
     ) -> Result<IdentityEventNode> {
         let clock = self.clock.fetch_add(1, Ordering::SeqCst);
-        let node = self
-            .signer
-            .create_event(payload, parent_ids, clock, now_rfc3339(), None)?;
+        let node = if self.config.synthetic_only {
+            // Synthetic-only guardrail (docs/PILOT.md): auto-tag every locally created event as
+            // test data so this peer can only ever emit provably-synthetic events.
+            self.signer.create_test_event(
+                payload,
+                parent_ids,
+                clock,
+                now_rfc3339(),
+                None,
+                synthetic_pilot_tag(),
+            )?
+        } else {
+            self.signer
+                .create_event(payload, parent_ids, clock, now_rfc3339(), None)?
+        };
         self.store.put_event(&node)?;
         Ok(node)
     }
@@ -140,6 +154,14 @@ impl CredaCore {
         }
         if node.verify_content_hash() == Some(false) {
             return Ok(Ingest::Rejected("content hash does not match payload".into()));
+        }
+        // Synthetic-only guardrail (docs/PILOT.md): on a synthetic-only network, refuse any event
+        // that is not test_data-tagged — so untagged (potentially real) data cannot propagate in,
+        // even from a signed, admitted peer that is misconfigured.
+        if self.config.synthetic_only && !node.is_test_data() {
+            return Ok(Ingest::Rejected(
+                "synthetic-only network: refusing untagged (non-test-data) event".into(),
+            ));
         }
         self.store.put_event(&node)?;
         Ok(Ingest::Accepted)
@@ -214,6 +236,16 @@ fn now_rfc3339() -> String {
     time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+}
+
+/// The `test_data` tag stamped on every locally created event when `synthetic_only` is set
+/// (docs/PILOT.md). `expiration_time: None` — pilot data lives until the network is wiped.
+fn synthetic_pilot_tag() -> TestDataTag {
+    TestDataTag {
+        purpose: "closed-synthetic-pilot".to_string(),
+        originating_test: "synthetic-only-network".to_string(),
+        expiration_time: None,
+    }
 }
 
 fn now_unix_secs() -> i64 {

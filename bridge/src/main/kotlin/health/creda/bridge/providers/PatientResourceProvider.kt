@@ -12,6 +12,7 @@ import ca.uhn.fhir.rest.api.MethodOutcome
 import ca.uhn.fhir.rest.param.TokenAndListParam
 import ca.uhn.fhir.rest.server.IResourceProvider
 import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException
+import ca.uhn.fhir.rest.server.exceptions.NotImplementedOperationException
 import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
 import org.hl7.fhir.r4.model.IdType
@@ -54,17 +55,21 @@ class PatientResourceProvider(
 
     override fun getResourceType(): Class<Patient> = Patient::class.java
 
-    /** read = project the effective identity for this subgraph (§5.2.4). */
+    /**
+     * read = the CredaPatient projection (§8.2.2). NOT IMPLEMENTED — fails loudly rather than
+     * returning a hollow/placeholder Patient that would silently impersonate a real projection.
+     * The real CredaPatient (US Core Patient + subgraph-identifier slice + per-field confidence /
+     * disputed-value extensions) is pending, and cleartext demographics are deliberately NOT
+     * available at the Bridge (privacy by structure, §9.2; they require the cleartext-retrieval
+     * protocol §9.2.4). Use `Patient?_creda-token=` (search), `$creda-provenance`, or
+     * `$creda-effective-identity` for what IS implemented. Tracked: §8.2.2 / docs/STATUS.md.
+     */
     @Read
     fun read(@IdParam id: IdType): Patient {
-        // Project the effective identity from Core. TODO(bridge-verify): build a structured
-        // CredaPatient (US Core Patient + subgraph-identifier slice, per-field confidence +
-        // disputed-value extensions, §8.1.2-§8.1.4) once Core returns a structured projection;
-        // today GetEffectiveIdentity returns a debug rendering (see creda-core/src/grpc.rs).
-        core.effectiveIdentityDebug(listOf(uuidOrPatientPlaceholder(id.idPart)))
-        val patient = Patient()
-        patient.id = id.idPart
-        return patient
+        throw NotImplementedOperationException(
+            "Patient/read (CredaPatient projection) is not implemented yet (§8.2.2). " +
+                "Use Patient?_creda-token= search, \$creda-provenance, or \$creda-effective-identity.",
+        )
     }
 
     /** search by demographic token (§8.2.11): `Patient?_creda-token=...` -> MatchByTokens. */
@@ -116,22 +121,39 @@ class PatientResourceProvider(
     fun attest(@IdParam id: IdType, @ResourceParam params: Parameters): Provenance {
         val purpose = params.parameterFirstRep("purpose")?.lowercase() ?: "treatment"
 
-        // Step 1 — make sure there is a real Core event we can use as a parent.
-        val rootId = rootByPatient.computeIfAbsent(id.idPart) { _ ->
-            val rootCbor = EventPayloadCbor.encodeRootAssertStub()
-            val rootEventBytes = core.createEvent(rootCbor, parentIds = emptyList())
-            EventPayloadCbor.decodeEventNode(rootEventBytes).id
+        // The Attest targets the REAL events named in `references` (the Asserts/Links being
+        // affirmed) — e.g. the clinician DOB-resolution attests the supporting Assert so its
+        // confidence rises in the effective identity. Targets are also the parents, so the Attest
+        // lands INSIDE that patient's subgraph rather than a detached stub. Only when no usable
+        // reference is supplied do we fall back to a per-patient root-Assert stub (static fixtures
+        // that carry no real target). The previous version ALWAYS used the stub and ignored
+        // `references` — which is why DOB attestations never reached the patient's subgraph.
+        val targets = attestReferences(params)
+        val parents: List<UUID> = targets.ifEmpty {
+            listOf(rootByPatient.computeIfAbsent(id.idPart) { _ ->
+                val rootCbor = EventPayloadCbor.encodeRootAssertStub()
+                EventPayloadCbor.decodeEventNode(core.createEvent(rootCbor, parentIds = emptyList())).id
+            })
         }
 
-        // Step 2 — append the Attest, linking it to the root Assert.
-        val attestPayload = EventPayloadCbor.encodeAttest(
-            targetEventIds = listOf(rootId),
-            purpose = purpose,
-        )
-        val parentBytes = EventPayloadCbor.uuidBytes(rootId)
-        val eventCbor = core.createEvent(attestPayload, listOf(parentBytes))
-
+        val attestPayload = EventPayloadCbor.encodeAttest(targetEventIds = parents, purpose = purpose)
+        val eventCbor = core.createEvent(attestPayload, parents.map { EventPayloadCbor.uuidBytes(it) })
         return ProvenanceMapper.fromEventCbor(eventCbor)
+    }
+
+    /**
+     * Extract target event UUIDs from the `references` parameter(s). Tolerant by construction: the
+     * value may arrive as proper repeated params, a `Provenance/<uuid>` reference, or (legacy) a
+     * single JSON-stringified array `["<uuid>", …]` — we regex every UUID out of whatever form
+     * shows up, so the operation is robust to client encoding drift.
+     */
+    private fun attestReferences(params: Parameters): List<UUID> {
+        val uuidRe = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+        return params.parameter
+            .filter { it.name == "references" }
+            .mapNotNull { it.value?.primitiveValue() }
+            .flatMap { raw -> uuidRe.findAll(raw).mapNotNull { runCatching { UUID.fromString(it.value) }.getOrNull() } }
+            .distinct()
     }
 
     // The remaining Patient operations follow the SAME thin pattern — translate Parameters to a
@@ -142,23 +164,6 @@ class PatientResourceProvider(
     //   $match            -> Core MatchByTokens (scored candidates)
     //   $creda-disambiguate / $creda-self-verify -> Core disambiguation RPCs (scaffolded)
     //   $export           -> Core + Bulk Data NDJSON (§8.2.14)
-
-    /**
-     * If the FHIR `Patient/<id>` reference is itself a valid UUID, return its 16-byte form;
-     * otherwise hash the projection id into a stable 16-byte placeholder so the gRPC layer
-     * has something well-formed to send. The placeholder is only used by `read`'s
-     * debug-projection call today.
-     */
-    private fun uuidOrPatientPlaceholder(idPart: String): ByteArray =
-        try {
-            EventPayloadCbor.uuidBytes(UUID.fromString(idPart))
-        } catch (_: IllegalArgumentException) {
-            // Stable placeholder per patient id — NOT a real Core event id.
-            val src = "creda-patient-placeholder:$idPart".toByteArray()
-            val out = ByteArray(16)
-            for ((i, b) in src.withIndex()) out[i % 16] = (out[i % 16].toInt() xor b.toInt()).toByte()
-            out
-        }
 }
 
 /** Helper: first valueString of a named FHIR Parameters parameter, or null. */

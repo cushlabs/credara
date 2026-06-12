@@ -4,6 +4,7 @@ import { Badge } from '@shared/components/Badge';
 import { CodeCard } from '@shared/components/CodeCard';
 import { ConfidenceMeter } from '@shared/components/ConfidenceMeter';
 import { DagLegend, EVENT_TYPE_COLORS, EventDag, TYPE_DESC, type DagNode, type EventType } from '@shared/components/EventDag';
+import { DemoData } from '@shared/components/DemoData';
 import { Modal } from '@shared/components/Modal';
 import { Section } from '@shared/components/Section';
 import { SlideOver } from '@shared/components/SlideOver';
@@ -175,7 +176,14 @@ export function PatientDetailPage() {
           {initials(patient.name)}
         </div>
         <div>
-          <div className="nm">{patient.name}</div>
+          <div className="nm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {patient.name}
+            {patientView.demo ? (
+              <DemoData detail="This patient isn't in your seeded network — shown from fixtures." />
+            ) : (
+              <DemoData what="Name/MRNs demo" detail="DOB and consent are live from Core; name, MRNs and address are fixture (not modeled by the seed dataset yet)." />
+            )}
+          </div>
           <div className="meta">
             DOB <b>{patient.dob}</b> · {patient.sex}
           </div>

@@ -62,7 +62,10 @@ cleanup() {
   echo "==> cleanup"
   $hm uninstall -n "$NS_A" peer 2>/dev/null || true
   $hm uninstall -n "$NS_B" peer 2>/dev/null || true
-  $kc delete namespace "$NS_A" "$NS_B" --wait=false --ignore-not-found 2>/dev/null || true
+  $kc delete namespace "$NS_A" "$NS_B" --ignore-not-found 2>/dev/null || true
+  # Block until the namespaces are FULLY gone, not just Terminating — otherwise the next scenario
+  # (these share namespace names) hits "object is being deleted: namespaces already exists".
+  $kc wait --for=delete "namespace/$NS_A" "namespace/$NS_B" --timeout=120s 2>/dev/null || true
   exit "$rc"
 }
 trap cleanup EXIT

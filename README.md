@@ -42,6 +42,10 @@ authority or vendor lock-in.
 > (`make -C testbed ae-repair`), what success looks like, and how to file what you find. The
 > testbed itself has its own deeper guide under [`testbed/README.md`](testbed/README.md).
 > New-tester friction is the bug we most want to hear about during hardening.
+>
+> **New contributors start here:** [`docs/STATUS.md`](docs/STATUS.md) is the authoritative map of
+> what is real vs. demo vs. not-yet-implemented vs. tracked-open-question — read it before building
+> on any surface. The persona apps under `clients/` are **demonstration code**, not production.
 
 <!-- Build-status badges go here once CI is wired to the remote. -->
 

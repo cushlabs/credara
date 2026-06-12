@@ -2,7 +2,7 @@
 //! RocksDB). Confirms create→get, effective-identity, token match, authorization, and
 //! snapshot round-trip all work end-to-end through `CredaCore`.
 
-use creda_core::{CredaConfig, CredaCore, InMemorySigner, PostureSetting};
+use creda_core::{CredaConfig, CredaCore, Ingest, InMemorySigner, KeyRegistry, PostureSetting};
 use creda_events::{
     AuthorizationScope, CertificateFingerprint, Demographics, EventPayload, GrantAudience,
     GrantPurpose, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
@@ -113,4 +113,61 @@ fn snapshot_round_trips_between_engines() {
     assert!(dest.get_event(&a.id).unwrap().is_some());
     assert!(dest.get_event(&b.id).unwrap().is_some());
     assert_eq!(dest.event_count().unwrap(), 2);
+}
+
+// ---- Synthetic-only guardrail (closed-pilot safety, docs/PILOT.md) -------------------------
+
+fn synthetic_core() -> CredaCore {
+    let config = CredaConfig { synthetic_only: true, ..Default::default() };
+    CredaCore::new(
+        Box::new(MemoryStore::new()),
+        Box::new(InMemorySigner::generate().unwrap()),
+        config,
+    )
+}
+
+#[test]
+fn synthetic_only_auto_tags_local_creates() {
+    // A synthetic-only peer tags everything it creates; a normal peer does not.
+    let ev = synthetic_core().create_event(assert_payload(), vec![]).unwrap();
+    assert!(ev.is_test_data(), "synthetic_only must auto-tag local events as test_data");
+
+    let ev2 = core_with(PostureSetting::TreatmentPresumed)
+        .create_event(assert_payload(), vec![])
+        .unwrap();
+    assert!(!ev2.is_test_data(), "normal peer must NOT tag events");
+}
+
+#[test]
+fn synthetic_only_refuses_untagged_ingest_but_accepts_tagged() {
+    let local = synthetic_core();
+
+    // A validly-signed, admitted, but UNTAGGED event from a normal peer is refused.
+    let remote_signer = InMemorySigner::generate().unwrap();
+    let remote_vk = remote_signer.verifying_key();
+    let remote = CredaCore::new(
+        Box::new(MemoryStore::new()),
+        Box::new(remote_signer),
+        CredaConfig::default(),
+    );
+    let untagged = remote.create_event(assert_payload(), vec![]).unwrap();
+    assert!(!untagged.is_test_data());
+    let reg = KeyRegistry::from_keys([remote_vk]);
+    match local.ingest_event(untagged, &reg).unwrap() {
+        Ingest::Rejected(msg) => assert!(msg.contains("synthetic-only"), "wrong reason: {msg}"),
+        _ => panic!("expected Rejected for an untagged event on a synthetic-only peer"),
+    }
+
+    // A tagged event from a synthetic peer is accepted.
+    let syn_signer = InMemorySigner::generate().unwrap();
+    let syn_vk = syn_signer.verifying_key();
+    let syn_remote = CredaCore::new(
+        Box::new(MemoryStore::new()),
+        Box::new(syn_signer),
+        CredaConfig { synthetic_only: true, ..Default::default() },
+    );
+    let tagged = syn_remote.create_event(assert_payload(), vec![]).unwrap();
+    assert!(tagged.is_test_data());
+    let reg2 = KeyRegistry::from_keys([syn_vk]);
+    assert!(matches!(local.ingest_event(tagged, &reg2).unwrap(), Ingest::Accepted));
 }

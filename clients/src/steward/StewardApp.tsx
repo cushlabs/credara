@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AppShell } from '@shared/components/AppShell';
 import { Badge } from '@shared/components/Badge';
 import { CodeCard } from '@shared/components/CodeCard';
+import { DemoData } from '@shared/components/DemoData';
 import { DagLegend, EVENT_TYPE_COLORS, EventDag, TYPE_DESC, type DagNode, type EventType } from '@shared/components/EventDag';
 import { Modal } from '@shared/components/Modal';
 import { Section } from '@shared/components/Section';
@@ -215,7 +216,10 @@ function Queue({
   return (
     <div className="queue">
       <div className="qhd">
-        <h2>Resolution queue</h2>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          Resolution queue
+          <DemoData detail="The steward queue and link-chain cases are fixture data. Resolve actions target fixture event ids, not real Links in the DAG." />
+        </h2>
         <div className="sub">
           {open} open · {cases.length - open} resolved · operator view
         </div>
