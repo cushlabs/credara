@@ -17,7 +17,7 @@ members = [
 edition = "2021"
 rust-version = "1.78"
 license = "Apache-2.0"
-repository = "https://github.com/cushlabs/creda"
+repository = "https://github.com/cushlabs/credara"
 authors = ["The Creda Authors"]
 
 # Shared dependency versions are declared here as crates are added (M1+),

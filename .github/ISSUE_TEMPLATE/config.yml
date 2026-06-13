@@ -1,12 +1,12 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/cushlabs/creda/security/advisories/new
+    url: https://github.com/cushlabs/credara/security/advisories/new
     about: |
       Report security issues privately via GitHub Security Advisories.
       Do NOT open a public issue. See SECURITY.md.
   - name: Question or discussion
-    url: https://github.com/cushlabs/creda/discussions
+    url: https://github.com/cushlabs/credara/discussions
     about: |
       For open-ended questions, design discussion, or help using Creda,
       please use Discussions rather than filing an issue.
