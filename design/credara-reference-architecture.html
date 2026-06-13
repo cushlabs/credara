@@ -741,7 +741,7 @@ function renderPorts(){
 
       <!-- Arrows (all axis-aligned, no crossings) -->
       ${arrow(620, 90,  620, 180, 'inbound')}     <!-- clinical → bridge (offset right of the pod label) -->
-      ${arrow(240, 210, 300, 230, 'inbound')}     <!-- peers-in → core (top edge of pod) -->
+      ${arrow(240, 250, 300, 393, 'inbound')}     <!-- peers-in → core left edge (libp2p 4001 — Core terminates p2p, never the Bridge) -->
       ${arrow(240, 360, 300, 380, 'trust')}       <!-- coord → core (registry events) -->
       ${arrow(760, 210, 700, 360, 'internal')}    <!-- kubelet → core health (top-right) -->
       ${arrow(700, 395, 760, 340, 'egress')}      <!-- core → outbound libp2p -->
