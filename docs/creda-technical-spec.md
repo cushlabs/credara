@@ -1161,8 +1161,8 @@ When new events expand the root set (e.g., a Link event connects previously-inde
 
 - **Slice: institutional MRN.** One slice per asserting institution, with `system` set to the institution's MRN namespace (typically `urn:oid:[institution-OID]`). Each slice carries the MRN and a reference to the asserting Assert event via the `provenance` extension on the identifier.
 - **Slice: payer member ID.** One slice per payer, with `system` set to the payer's identifier namespace. Carries member IDs from insurance card presentations.
-- **Slice: Creda subgraph identifier.** A single slice with `system` set to `http://creda.health/identifier/subgraph` and `value` set to the deterministic root set hash. This is the global, peer-independent identifier that all Creda-aware peers compute identically from the same subgraph. Creda-aware consumers use this for cross-peer identity resolution and for following the underlying provenance graph.
-- **Slice: historical Creda subgraph identifiers.** Zero or more slices with `system` set to `http://creda.health/identifier/subgraph-historical`, carrying prior subgraph identifier hashes from before Link events expanded the root set. Allows consumers to recognize a patient under their previously-known subgraph identifier even after the subgraph has merged with others.
+- **Slice: Creda subgraph identifier.** A single slice with `system` set to `http://credara.network/identifier/subgraph` and `value` set to the deterministic root set hash. This is the global, peer-independent identifier that all Creda-aware peers compute identically from the same subgraph. Creda-aware consumers use this for cross-peer identity resolution and for following the underlying provenance graph.
+- **Slice: historical Creda subgraph identifiers.** Zero or more slices with `system` set to `http://credara.network/identifier/subgraph-historical`, carrying prior subgraph identifier hashes from before Link events expanded the root set. Allows consumers to recognize a patient under their previously-known subgraph identifier even after the subgraph has merged with others.
 
 Non-Creda consumers see this as a normal Patient with multiple identifiers from multiple systems — the standard FHIR pattern for cross-institutional identifiers. Creda-aware consumers can follow the subgraph identifier into the full provenance graph.
 
@@ -1171,7 +1171,7 @@ Non-Creda consumers see this as a normal Patient with multiple identifiers from 
 Confidence scores from the Section 5.3 model attach to demographic elements via a custom extension:
 
 ```
-http://creda.health/StructureDefinition/field-confidence
+http://credara.network/StructureDefinition/field-confidence
 ```
 
 The extension contains:
@@ -1187,7 +1187,7 @@ The extension can attach to any individual demographic element — `Patient.name
 When demographics conflict across the subgraph (Section 5.3.4), the projected Patient resource includes all asserted values rather than silently picking one. Disagreement is represented two ways:
 
 - **Primary value selection.** The "primary" value for each field is selected per a configurable policy: highest confidence (default), most-recent assertion, most-attested assertion, or institution-specific custom logic. The primary value occupies the standard FHIR element (e.g., `Patient.birthDate`).
-- **Alternate values via extension.** Other asserted values are surfaced via a `http://creda.health/StructureDefinition/disputed-value` extension on the same element. Each alternate carries its own value, confidence score, and reference to the asserting event. A `disputed` flag on the parent element signals to consumers that the field has competing assertions.
+- **Alternate values via extension.** Other asserted values are surfaced via a `http://credara.network/StructureDefinition/disputed-value` extension on the same element. Each alternate carries its own value, confidence score, and reference to the asserting event. A `disputed` flag on the parent element signals to consumers that the field has competing assertions.
 
 Consuming institutions are free to ignore the disagreement and use the primary value, or to surface the dispute to clinicians and registrars for manual resolution. Creda's role is to make the disagreement visible — it does not adjudicate.
 
@@ -1202,7 +1202,7 @@ For deeper inspection, `Patient/[id]/$creda-provenance` (Section 8.2.5) provides
 
 ### 8.2 FHIR Implementation Guide
 
-The Creda FHIR IG is published at `http://creda.health/fhir/ig/v1` and follows standard HL7 IG conventions. It conforms to FHIR R4 (with R5 conformance planned for v1.1 once US Core publishes its R5 baseline).
+The Creda FHIR IG is published at `http://credara.network/fhir/ig/v1` and follows standard HL7 IG conventions. It conforms to FHIR R4 (with R5 conformance planned for v1.1 once US Core publishes its R5 baseline).
 
 #### 8.2.1 US Core Conformance
 
@@ -1231,10 +1231,10 @@ Each Creda identity event maps to a CredaProvenance resource. The mapping is dir
 | Parent UUIDs | `Provenance.entity[].what` (each parent as a derivation entity) |
 | Institution ID (UDAP fingerprint) | `Provenance.agent.who` (Reference to Organization) |
 | Wall-clock timestamp | `Provenance.recorded` |
-| Logical clock | extension `http://creda.health/StructureDefinition/logical-clock` |
-| Signature | extension `http://creda.health/StructureDefinition/event-signature` |
+| Logical clock | extension `http://credara.network/StructureDefinition/logical-clock` |
+| Signature | extension `http://credara.network/StructureDefinition/event-signature` |
 | Verification method (Assert) | `Provenance.signature.type` |
-| Payload (event-specific) | extension `http://creda.health/StructureDefinition/event-payload` |
+| Payload (event-specific) | extension `http://credara.network/StructureDefinition/event-payload` |
 
 A consumer that understands FHIR Provenance but not Creda gets a meaningful audit-style record of identity events. A Creda-aware consumer can additionally inspect the payload extension and follow the entity references to walk the full DAG.
 
@@ -2795,7 +2795,7 @@ Verifying that a new peer is functioning correctly without affecting real patien
 A test patient subgraph is structurally identical to a real patient subgraph but is flagged as synthetic via a special extension on every event:
 
 ```
-http://creda.health/StructureDefinition/test-data
+http://credara.network/StructureDefinition/test-data
 ```
 
 The extension carries:
@@ -2998,7 +2998,7 @@ The license choice is Apache 2.0 (permissive, patent grant, broadly compatible) 
 
 The Creda IG is published through HL7's standard process. The path:
 
-1. **Initial draft** published as a public IG on `http://creda.health/fhir/ig/v1` with full source.
+1. **Initial draft** published as a public IG on `http://credara.network/fhir/ig/v1` with full source.
 2. **HL7 FHIR Foundation IG submission** — the first level of HL7 recognition, providing standards namespace and balloting infrastructure.
 3. **Comment ballot** — formal HL7 review cycle.
 4. **STU (Standard for Trial Use)** — HL7's recognition tier for IGs in production use but not yet final.

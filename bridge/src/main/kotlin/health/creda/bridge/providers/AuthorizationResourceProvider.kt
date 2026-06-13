@@ -339,7 +339,7 @@ internal object ConsentMapper {
 
     private const val SCOPE_SYSTEM = "http://terminology.hl7.org/CodeSystem/consentscope"
     private const val CATEGORY_SYSTEM = "http://loinc.org"
-    private const val PURPOSE_SYSTEM = "http://creda.health/fhir/CodeSystem/grant-purpose"
+    private const val PURPOSE_SYSTEM = "http://credara.network/fhir/CodeSystem/grant-purpose"
 
     fun fromGrantCbor(cbor: ByteArray, patientId: String): Consent {
         val v = EventPayloadCbor.decodeGrantNode(cbor)
@@ -352,7 +352,7 @@ internal object ConsentMapper {
                     addActor(audienceActor(v.audience))
                     // use_mode is recorded as a Creda extension on the provision (F1 formalizes the URL).
                     addExtension(
-                        Extension("http://creda.health/fhir/StructureDefinition/use-mode", CodeType(v.useMode)),
+                        Extension("http://credara.network/fhir/StructureDefinition/use-mode", CodeType(v.useMode)),
                     )
                 }
             }
@@ -364,7 +364,7 @@ internal object ConsentMapper {
             .apply {
                 // Point back at the Grant this revocation supersedes (§4.3.2).
                 addExtension(
-                    Extension("http://creda.health/fhir/StructureDefinition/revokes-grant")
+                    Extension("http://credara.network/fhir/StructureDefinition/revokes-grant")
                         .setValue(Reference("Consent/${v.targetGrantId}")),
                 )
             }
@@ -402,7 +402,7 @@ internal object ConsentMapper {
 
     private fun orgRef(fingerprint: ByteArray): Reference = Reference().setIdentifier(
         Identifier()
-            .setSystem("http://creda.health/fhir/sid/udap-fingerprint")
+            .setSystem("http://credara.network/fhir/sid/udap-fingerprint")
             .setValue(toHex(fingerprint)),
     ).setType("Organization")
 
@@ -443,7 +443,7 @@ internal object AuditEventMapper {
 
     private fun orgRef(fingerprint: ByteArray): Reference = Reference().setIdentifier(
         Identifier()
-            .setSystem("http://creda.health/fhir/sid/udap-fingerprint")
+            .setSystem("http://credara.network/fhir/sid/udap-fingerprint")
             .setValue(fingerprint.joinToString("") { "%02x".format(it) }),
     ).setType("Organization")
 }

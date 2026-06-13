@@ -79,7 +79,7 @@ class CredaRestfulServer(
                 "1 plain provider (authorization ops on Patient); AuditEvent deferred until interceptor lands",
         )
         // TODO(bridge-verify): attach a custom ServerCapabilityStatementProvider that declares
-        // `CapabilityStatement.implementationGuide = http://creda.health/fhir/ig/v1` and the
+        // `CapabilityStatement.implementationGuide = http://credara.network/fhir/ig/v1` and the
         // Creda profiles (CredaPatient/CredaProvenance/CredaAuthorization, §8.2.12).
     }
 }

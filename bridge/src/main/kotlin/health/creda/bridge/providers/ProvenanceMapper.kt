@@ -20,9 +20,9 @@ import java.util.Base64
  * | Parent UUIDs                     | `Provenance.entity[].what` |
  * | Institution fingerprint          | `Provenance.agent.who` |
  * | Wall-clock                       | `Provenance.recorded` |
- * | Logical clock                    | extension `http://creda.health/StructureDefinition/logical-clock` |
- * | Signature                        | extension `http://creda.health/StructureDefinition/event-signature` |
- * | Payload (type-specific fields)   | extension `http://creda.health/StructureDefinition/event-payload` |
+ * | Logical clock                    | extension `http://credara.network/StructureDefinition/logical-clock` |
+ * | Signature                        | extension `http://credara.network/StructureDefinition/event-signature` |
+ * | Payload (type-specific fields)   | extension `http://credara.network/StructureDefinition/event-payload` |
  *
  * The payload extension carries the event-type-specific fields the clinician read path projects
  * from (`$creda-provenance` → PatientDetailPage/WorklistPage): Assert verification method +
@@ -32,10 +32,10 @@ import java.util.Base64
  */
 internal object ProvenanceMapper {
 
-    private const val EVENT_TYPE_SYSTEM = "http://creda.health/CodeSystem/event-type"
-    private const val EXT_LOGICAL_CLOCK = "http://creda.health/StructureDefinition/logical-clock"
-    private const val EXT_SIGNATURE = "http://creda.health/StructureDefinition/event-signature"
-    private const val EXT_PAYLOAD = "http://creda.health/StructureDefinition/event-payload"
+    private const val EVENT_TYPE_SYSTEM = "http://credara.network/CodeSystem/event-type"
+    private const val EXT_LOGICAL_CLOCK = "http://credara.network/StructureDefinition/logical-clock"
+    private const val EXT_SIGNATURE = "http://credara.network/StructureDefinition/event-signature"
+    private const val EXT_PAYLOAD = "http://credara.network/StructureDefinition/event-payload"
 
     fun fromEventCbor(eventCbor: ByteArray): Provenance {
         val node = EventPayloadCbor.decodeEventNode(eventCbor)
