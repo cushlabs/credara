@@ -89,7 +89,7 @@ authorization events are **enforced** (§4.8).
   party's clinical data.
 - **Status.** Mockup built — [`patient-consent-mockup.html`](patient-consent-mockup.html); also
   represented in the federation view of
-  [`reference-architecture.html`](reference-architecture.html).
+  [`credara-reference-architecture.html`](credara-reference-architecture.html).
 
 ---
 
@@ -118,6 +118,6 @@ These gate what any persona's session may see. They are enforced below the UI.
 | [`steward-console-mockup.html`](steward-console-mockup.html) | Identity steward · operator view |
 | [`patient-consent-mockup.html`](patient-consent-mockup.html) | Patient · consent client |
 | [`compliance-audit-mockup.html`](compliance-audit-mockup.html) | Compliance / audit reviewer · read-only |
-| [`reference-architecture.html`](reference-architecture.html) | System map (incl. the patient peer) |
+| [`credara-reference-architecture.html`](credara-reference-architecture.html) | System map (incl. the patient peer) |
 
 All four personas now have a mockup.
