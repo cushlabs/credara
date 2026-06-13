@@ -116,7 +116,7 @@ function Header({ order, orderId, onPick }: { order: Order; orderId: string; onP
         <div style={{ marginTop: 5 }}>
           <span className="verifiedchip">
             <span className="d" />
-            Identity verified · {PATIENT_CTX.confidence}% · via Creda
+            Identity verified · {PATIENT_CTX.confidence}% · via Credara
           </span>
         </div>
       </div>
@@ -346,7 +346,7 @@ function DecisionCard({ decision }: { decision: NonNullable<Order['decision']> }
       title="Decision"
       aside={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <DemoData what="Demo decision" detail="This authorization decision is fixture data. It is NOT computed by Creda's authorization evaluation ($creda-verify / EvaluateAuthorization)." />
+          <DemoData what="Demo decision" detail="This authorization decision is fixture data. It is NOT computed by Credara's authorization evaluation ($creda-verify / EvaluateAuthorization)." />
           <span className={`badge ${decision.kind === 'approved' ? 'b-good' : decision.kind === 'denied' ? 'b-warn' : 'b-info'}`}>{decision.title}</span>
         </span>
       }

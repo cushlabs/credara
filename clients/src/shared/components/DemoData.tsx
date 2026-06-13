@@ -15,7 +15,7 @@ export function DemoData({ what = 'Demo data', detail }: { what?: string; detail
   return (
     <span
       data-testid="demo-data"
-      title={detail ?? 'Not from your Creda network — fixture/demo data, pending real wiring.'}
+      title={detail ?? 'Not from your Credara network — fixture/demo data, pending real wiring.'}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

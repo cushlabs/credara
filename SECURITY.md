@@ -1,6 +1,6 @@
 # Security Policy
 
-Creda is infrastructure for handling cross-institutional patient identity and
+Credara is infrastructure for handling cross-institutional patient identity and
 authorization. Security issues are treated with corresponding seriousness.
 
 ## Reporting a vulnerability
@@ -32,7 +32,7 @@ Please give us a reasonable opportunity to remediate before any public disclosur
 
 ## Scope
 
-In scope: the Creda Core, Export Gate, Verifier, FHIR Bridge, deployment artifacts, and
+In scope: the Credara Core, Export Gate, Verifier, FHIR Bridge, deployment artifacts, and
 the cryptographic, networking, and authorization logic described in the
 [technical specification](docs/creda-technical-spec.md) §9 (Security and Access Control).
 
@@ -46,7 +46,7 @@ these are especially valuable.
 - Issues in upstream dependencies (libp2p, HAPI FHIR, RocksDB, etc.) — please report
   those to the respective projects, though we appreciate a heads-up.
 - Findings that require physical access to a peer operator's infrastructure or a
-  compromised operator credential (these are outside Creda's trust boundary by design;
+  compromised operator credential (these are outside Credara's trust boundary by design;
   see the threat model in spec §9.1).
 
 ## Handling of test data

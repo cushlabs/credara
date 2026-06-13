@@ -45,7 +45,7 @@ export function AppShell({
       <div className="appbar" data-testid="appbar">
         <div className="brand">
           <span className="mark">C</span>
-          Creda <span className="ctx">· {brandContext}</span>
+          Credara <span className="ctx">· {brandContext}</span>
         </div>
         <div className="navlinks" aria-label="Personas">
           <Link to="/">All personas</Link>

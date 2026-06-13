@@ -43,7 +43,7 @@ export function Landing() {
   }, []);
   return (
     <div className="landing">
-      <h1>Creda clients</h1>
+      <h1>Credara clients</h1>
       <p className="lead">
         Five persona-specific UIs, ported from the design mockups onto a typed FHIR bridge client. Mock mode is on
         unless <code>VITE_FHIR_BASE</code> points at a live bridge.

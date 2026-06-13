@@ -1,6 +1,6 @@
-# Creda — Repository Structure
+# Credara — Repository Structure
 
-This document defines the target layout of the Creda repository and which part of
+This document defines the target layout of the Credara repository and which part of
 the technical specification governs each component. It is the map the build follows
 through milestones **M0–M9** (see the milestone table in `README.md`). The
 authoritative source of truth for all technical decisions is
@@ -9,7 +9,7 @@ spec wins.
 
 ## Guiding principle
 
-Creda is **assembled, not reinvented** (spec Appendix C). The Rust crates and the
+Credara is **assembled, not reinvented** (spec Appendix C). The Rust crates and the
 Java bridge below contain only the genuinely-new healthcare-domain layer
 (~8,000–15,000 lines) on top of mature libraries: libp2p, HAPI FHIR, RocksDB/libgit2,
 the `pqcrypto` family, ciborium, blake3, SPIRE, cert-manager, and others. If a

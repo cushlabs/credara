@@ -1,6 +1,6 @@
-# Contributing to Creda
+# Contributing to Credara
 
-Thank you for your interest in Creda. Creda is healthcare infrastructure, and the way we
+Thank you for your interest in Credara. Credara is healthcare infrastructure, and the way we
 build it reflects that: deliberately, from a specification, with tests. Please read this
 guide before opening a pull request.
 
@@ -14,7 +14,7 @@ guide before opening a pull request.
    spec wins.
 
 2. **Assemble, don't reinvent.** Appendix C of the spec is the build-vs-buy contract.
-   Creda is a thin healthcare-domain layer (~8,000–15,000 lines of genuinely new code) on
+   Credara is a thin healthcare-domain layer (~8,000–15,000 lines of genuinely new code) on
    top of mature libraries — libp2p, HAPI FHIR, RocksDB/libgit2, the `pqcrypto` family,
    ciborium, blake3, SPIRE, cert-manager, libpostal, and others. **If you find yourself
    writing a gossip protocol, a DHT, a FHIR server, or a cryptographic primitive from

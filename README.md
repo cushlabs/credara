@@ -1,6 +1,6 @@
-# Creda
+# Credara
 
-**Creda** is a decentralized, peer-to-peer substrate for **cross-institutional patient
+**Credara** is a decentralized, peer-to-peer substrate for **cross-institutional patient
 identity provenance** and **portable authorization** in US healthcare.
 
 Institutions run peers that form a vetted-but-uncoordinated network. A directed acyclic
@@ -11,13 +11,13 @@ via gossip and anti-entropy. **FHIR R4** is the integration surface. There is ad
 control (a vetted trust framework, modeled on DirectTrust) but **no runtime coordinator**:
 once admitted, peers operate directly with one another.
 
-Creda is complementary infrastructure. It does **not** replace institutional Master
+Credara is complementary infrastructure. It does **not** replace institutional Master
 Patient Indexes (MPIs), EHRs, or QHIN-mediated exchange. It fills a gap those systems
 leave open: cross-institutional identity with cryptographic provenance, plus persistent,
 revocable authorization that stays verifiable after data has moved — without a central
 authority or vendor lock-in.
 
-> The name *Creda* derives from the Latin for "to believe / to trust" — fitting for an
+> The name *Credara* shares the Latin *cred-* root ("to believe / to trust") — fitting for an
 > identity-provenance system.
 
 ## Status
@@ -62,7 +62,7 @@ migration.
 
 ## Architectural thesis
 
-- **Verification, not mediation.** Creda verifies identity and authorization claims; it
+- **Verification, not mediation.** Credara verifies identity and authorization claims; it
   does not sit in the data path or broker transactions. There is no central node that
   sees PHI.
 - **Provenance by structure.** Every assertion is a signed event with parent references.
@@ -80,7 +80,7 @@ migration.
 
 ## What peers exchange
 
-Three distinct kinds of exchange flow between Creda peers. They are worth separating because
+Three distinct kinds of exchange flow between Credara peers. They are worth separating because
 they carry different things — and because none of them ever carries cleartext PHI.
 
 **1. Event gossip (the main flow).** When an institution creates an event — a new identity
@@ -196,7 +196,7 @@ The build proceeds in strict dependency order:
 | M2 | Storage (`creda-store`) | §5.2, §7.3, App. C | Implemented · tests green (incl. RocksDB) |
 | M3 | Graph / computation (`creda-graph`) | §5.2.4, §4.6, §5.3, §4.6 step 5.5 | Implemented · tests green (incl. link-chain) |
 | M4 | Networking (`creda-net`) | §6, §7 | Pure logic green; libp2p adapter green under `make libp2p` |
-| M5 | Creda Core (`creda-core`) | §10.1 | Implemented · tests green |
+| M5 | Credara Core (`creda-core`) | §10.1 | Implemented · tests green |
 | M6 | Export Gate + Verifier | §4.5, §10.2, §10.3 | Implemented · tests green |
 | M7 | FHIR Bridge (`bridge/`) | §8, §10.4 | Builds green; FHIR↔CBOR mappers are stubs |
 | M8 | Deployment (`deploy/`) | §10.5, §10.6, §11 | **Verified on kind** · gossip-convergence + AE-repair scenarios green |

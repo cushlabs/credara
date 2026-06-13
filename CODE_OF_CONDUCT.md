@@ -1,6 +1,6 @@
 # Code of Conduct
 
-The Creda project adopts the **Contributor Covenant, version 2.1** as its code of
+The Credara project adopts the **Contributor Covenant, version 2.1** as its code of
 conduct. The full text is published at:
 
 - https://www.contributor-covenant.org/version/2/1/code_of_conduct/
