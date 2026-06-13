@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   scan:
@@ -22,17 +21,21 @@ jobs:
         # Pin to a commit SHA — Dependabot will bump it.
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # Fetch full history so the scan covers the whole repo, not just the
-          # PR diff. gitleaks-action falls back to a PR-only scan when run on
-          # pull_request events; this gives it the data it needs for push/cron.
+          # Full history so the scan covers the whole repo, not just the latest commit.
           fetch-depth: 0
 
+      # Run the gitleaks OSS binary directly instead of gitleaks/gitleaks-action: as of action
+      # v2 the wrapper requires a paid GITLEAKS_LICENSE for ALL organization repos. The tool
+      # itself is MIT-licensed and free — we forgo the action's PR comments / summary but keep
+      # the scan as a hard gate. Bump VERSION by hand (Dependabot can't track a binary download).
+      - name: Install gitleaks
+        run: |
+          VERSION=8.18.4
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No GITLEAKS_LICENSE: required only for orgs >25 users (currently free for us).
-          # GITLEAKS_NOTIFY_USER_LIST: '@cushlabs/security'
-          GITLEAKS_ENABLE_COMMENTS: "true"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
-          GITLEAKS_ENABLE_SUMMARY: "true"
+        # Scans full git history (fetch-depth 0); auto-uses the repo's .gitleaks.toml allowlist.
+        # Exits non-zero on any finding, failing the job.
+        run: gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
