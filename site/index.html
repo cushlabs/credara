@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Credara — Verifiable identity & revocable consent across institutions</title>
-<meta name="description" content="Credara is shared, open-source infrastructure for cross-institutional patient identity provenance and portable, revocable consent in US healthcare. A peer-to-peer graph of signed events. No central node ever sees PHI." />
+<meta name="description" content="Credara is shared, open-source infrastructure for cross-institutional patient identity provenance and portable, revocable consent in US healthcare. A peer-to-peer graph of signed events. No node ever sees cleartext PHI." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2319b3d6'/%3E%3Cstop offset='1' stop-color='%230e6e8e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='9' cy='10' r='2.4' fill='white' stroke='none'/%3E%3Ccircle cx='9' cy='22' r='2.4' fill='white' stroke='none'/%3E%3Ccircle cx='22' cy='16' r='2.4' fill='white' stroke='none'/%3E%3Cpath d='M11 11l9 4M11 21l9-4'/%3E%3C/g%3E%3C/svg%3E" />
 <style>
   :root{
@@ -254,7 +254,7 @@
       <div>
         <span class="eyebrow">Open-source · peer-to-peer · vendor-independent</span>
         <h1>Verifiable identity and <span class="accent">revocable consent</span> across institutions.</h1>
-        <p class="lede">Credara is shared infrastructure for two things US healthcare does badly: knowing that a patient seen at one institution is the same person seen at another, and keeping that patient's consent verifiable and revocable as their records move around. A peer-to-peer graph of signed events — with <b>no central matcher</b> and <b>no node that ever sees PHI</b>.</p>
+        <p class="lede">Credara is shared infrastructure for two things US healthcare does badly: knowing that a patient seen at one institution is the same person seen at another, and keeping that patient's consent verifiable and revocable as their records move around. A peer-to-peer graph of signed events — with <b>no central matcher</b> and <b>no node that ever sees cleartext PHI</b>.</p>
         <div class="cta">
           <a class="btn btn-primary" href="#how">See how it works</a>
           <a class="btn btn-ghost" href="#get-started">Read the spec</a>
@@ -404,6 +404,7 @@
           <p>Lyme disease patients accumulate fragmented records across many providers and state lines over long, frequently disputed disease courses. When identity links break, the cohort fragments. When consent provenance gets murky, so does data governance — and the study's footing erodes year over year.</p>
         </div>
         <div class="b">
+          <span class="lyme" style="color:#7fdcef">The payoff</span>
           <h3>Composed into a single longitudinal record</h3>
           <p>A clinician in a new city sees the cardiology workup from two years ago, the medications from pharmacies across state lines, and the allergy noted by a pediatrician who has since retired. Rare diseases become recognizable patterns, polypharmacy interactions get caught, and care continuity across transitions stops resetting the chart to zero.</p>
         </div>
@@ -544,19 +545,20 @@
       <div class="shead">
         <span class="eyebrow dark">Technology at a glance</span>
         <h2>Standards already in wide use — open to full review.</h2>
-        <p>Credara aligns with the existing trust framework and is assembled from mature components. Only the healthcare-domain layer is new code. The cryptography is algorithm-agile and post-quantum ready.</p>
+        <p>Credara aligns with the existing trust framework and is assembled from mature components. Only the healthcare-domain layer is new code. Its integration surface is <b>HL7&nbsp;FHIR R4</b> — a conformant interface served through HAPI&nbsp;FHIR, HL7's reference implementation — and institutional identity follows the UDAP profile of the <b><a href="https://confluence.hl7.org/spaces/FAST/overview" target="_blank" rel="noopener">HL7&nbsp;FAST</a></b> Security implementation guide, the standard US nationwide exchange adopted in 2026. So Credara speaks the same standards as the EHRs, HIEs, and QHINs it sits alongside. The cryptography is algorithm-agile and post-quantum ready.</p>
       </div>
       <table class="tech">
         <tr><th>Core / Export Gate / Verifier</th><td><b>Rust</b></td></tr>
-        <tr><th>FHIR Bridge</th><td><b>Java / Kotlin</b> — HAPI FHIR, Plain Server mode <span class="sub">(not JPA)</span></td></tr>
-        <tr><th>FHIR version</th><td><b>R4</b> <span class="sub">(R5 deferred)</span></td></tr>
+        <tr><th>FHIR Bridge</th><td><b>Java / Kotlin</b> — HAPI FHIR (HL7's reference server), Plain Server mode <span class="sub">(not JPA)</span></td></tr>
+        <tr><th>FHIR conformance</th><td><b>HL7 FHIR R4</b> <span class="sub">conformant interface, US Core–aligned · R5 deferred</span></td></tr>
         <tr><th>Networking</th><td><b>libp2p</b> — gossipsub, Kademlia DHT, Noise transport</td></tr>
         <tr><th>Storage</th><td><b>RocksDB</b> via a <code>Store</code> trait <span class="sub">· libgit2 scaffolded</span></td></tr>
         <tr><th>Serialization</th><td><b>Canonical CBOR</b> <span class="sub">(ciborium, RFC 8949 deterministic encoding)</span></td></tr>
         <tr><th>Hashing</th><td><b>Blake3</b> <span class="sub">content integrity &amp; Merkle roots</span> · <b>SHA-512</b> <span class="sub">DHT routing key, FIPS-validated</span></td></tr>
+        <tr><th>Demographic tokenization</th><td><b>Salted Blake3</b> <span class="sub">256-bit network salt, rotated annually — deterministic across peers, resistant to rainbow-table attacks. Cleartext demographics never leave the originating institution.</span></td></tr>
         <tr><th>Node IDs</th><td><b>UUIDv7</b></td></tr>
         <tr><th>Signatures</th><td><b>Algorithm-agile</b> — Ed25519 default; ML-DSA-65 (FIPS 204) &amp; SLH-DSA (FIPS 205) for PQC; hybrid mode</td></tr>
-        <tr><th>Identity &amp; trust</th><td><b>UDAP</b> (institutional) + <b>SPIFFE / SPIRE</b> (workload) · admission modeled on <b>DirectTrust</b> · aligns with <b>TEFCA</b></td></tr>
+        <tr><th>Identity &amp; trust</th><td><b><a href="https://confluence.hl7.org/spaces/FAST/overview" target="_blank" rel="noopener">HL7 FAST</a></b> Security IG via <b>UDAP</b> (institutional) + <b>SPIFFE / SPIRE</b> (workload) · admission modeled on <b>DirectTrust</b> · aligns with <b>TEFCA</b></td></tr>
         <tr><th>Deployment</th><td><b>Helm</b> chart primary; <b>Docker Compose</b> for laptop</td></tr>
         <tr><th>License</th><td><b>Apache 2.0</b></td></tr>
       </table>
