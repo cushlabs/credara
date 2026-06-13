@@ -248,6 +248,16 @@ An ExportReceipt records that data was issued from a source system under a speci
 
 ExportReceipts create a non-repudiable chain of custody. The source can prove it released data only under a valid Grant; the recipient's acknowledgment proves they accepted the data under known terms and cannot later claim ignorance of the scope or constraints. This closes a gap the identity model alone does not address: identity events record *who a patient is* and *who relied on that identity*, but not *that data moved, under what authorization, and that the recipient accepted the terms*.
 
+#### 4.3.4 Access requests are deliberately off-chain (hybrid workflow)
+
+A relying institution often wants to *ask* a patient for access before any Grant exists. Creda models this request as **off-chain** — it is **not** a DAG event — while the patient's *answer* is the existing on-chain AuthorizationGrant (Section 4.3.1) and any resulting disclosure is the existing on-chain ExportReceipt (Section 4.3.3). This hybrid split is deliberate:
+
+- An access request is transient *intent*, not constitutive of identity. Admitting it to the append-forward DAG would permanently retain frivolous or spam requests (the graph cannot forget) and would broadcast "institution X is interested in patient Y" to every peer holding the subgraph — precisely the value-privacy leak tracked as a hard gate in Section 13.3. Keeping the request off-chain confines that interest signal to the requester and the patient.
+- The request needs to reach exactly one party (the patient), not be replicated and enforced network-wide. Only the *answer* (the Grant) must be portable and auditable, and it already is.
+- The Grant that answers a request MAY reference the request (e.g. by hash) for audit linkage without putting the request itself on-chain.
+
+In the current implementation the off-chain request is an **ephemeral FHIR `Task`** held in the Bridge (Section 8), not persisted and not gossiped — lost on restart by design. Delivery is single-Bridge for the pilot; **cross-peer off-chain request delivery (an encrypted requester→patient channel) is an open design item for real-PHI deployment**, tracked with the Section 13.3 privacy work. On-chain gossip is the alternative explicitly not chosen for the request leg.
+
 ### 4.4 The Portable Authorization Artifact
 
 The Portable Authorization Artifact is an AuthorizationGrant event in its canonical CBOR serialization (Section 5.1.1), **detachable from the DAG for transport** to relying institutions. It carries the full Grant payload — scope, audience, purpose, expiration, volume constraints, use mode, and non-transferability binding — plus the originating institution's signature.

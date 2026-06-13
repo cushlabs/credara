@@ -39,6 +39,8 @@ priority class of bug here.
 |---|---|---|
 | `$creda-authorize` / `-revoke` / `-export` / `-verify` | ✅ | Patient-typed plain-provider ops; F0 CBOR mappers + golden tests. `-verify` calls Core's `EvaluateAuthorization`. |
 | `Consent?patient=` search | ✅ | Authorization read-back. |
+| `Organization` search | ✅ | Network-wide institution discovery — distinct grant audiences store-wide (Core `ListInstitutions`). Backs the patient share datalist. Name-only (institutions are fingerprints here, not directory entries). |
+| `Task` create/search/`$creda-resolve-request` | ✅ (pilot) | Off-chain access-request inbox (hybrid workflow, §4.3.4). Ephemeral in-Bridge state — not a DAG event, not persisted, single-Bridge delivery. Cross-peer delivery is a real-PHI design item. |
 | `$creda-provenance` | ✅ | Bundle of CredaProvenance over `GetSubgraphEvents`. |
 | `$creda-effective-identity` | ✅ | Per-field projection (value/confidence/supporting/disputed). |
 | `$creda-attest` | ✅ | Attests the real events in `references` (targets = parents); per-patient root-stub only as the no-reference fallback. |
@@ -59,8 +61,8 @@ for live data. Current real-vs-fixture state (drive every row to ✅; see HANDOF
 
 | App | Real against the bridge | Still fixture (chip-marked) |
 |---|---|---|
-| patient | grants list, share, revoke, token resolution | activity feed (not from ExportReceipts) |
-| clinician | consent badge, DAG, DOB field + conflict challenge + Attest/Contest resolution | name/address/MRNs/confidence; worklist membership; link/stale challenges; action log; request-access |
+| patient | grants list, share, revoke, token resolution, activity feed (event-sourced from `$creda-provenance`: grants/revocations/export receipts) | — |
+| clinician | consent badge, DAG, DOB conflict challenge, **link-confirm challenge**, Attest/Contest resolution, legal name, **address**, **per-institution MRNs**, action log (event-sourced), request-access (off-chain Task → on-chain grant, §4.3.4) | headline confidence score; sex; worklist membership; stale challenge (can't be synthesized — needs real elapsed time) |
 | prior-auth | one attest write | orders queue; **decision (should call `$creda-verify`)** |
 | steward | one contest write | queue/cases/link-chain viz |
 | audit | — | entire ledger/KPIs/report |

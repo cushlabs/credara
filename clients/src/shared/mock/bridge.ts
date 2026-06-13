@@ -15,6 +15,7 @@ import type {
   UseMode,
 } from '../fhir/types';
 import type {
+  AccessRequest,
   AmendRequest,
   AttestRequest,
   AuthorizeRequest,
@@ -127,6 +128,8 @@ function auth(
 export function mockBridge(): FhirBridge {
   const provenance: CredaProvenance[] = [...initialProvenance];
   const authorizations: CredaAuthorization[] = [...initialAuth];
+  // Ephemeral access-request inbox (mirrors the bridge's in-memory Task store).
+  const accessRequests: AccessRequest[] = [];
 
   const delay = <T>(v: T): Promise<T> =>
     new Promise((resolve) => {
@@ -262,6 +265,36 @@ export function mockBridge(): FhirBridge {
     async listAuthorizations(patientId: string) {
       // Mirrors the real bridge's `Consent?patient={id}` search over the in-memory state.
       return delay(authorizations.filter((a) => a.patient.reference === `Patient/${patientId}`));
+    },
+
+    async listInstitutions() {
+      // Mirrors the real bridge's `GET /Organization`: distinct institution audiences seen in
+      // grants across the in-memory state.
+      const names = Array.from(
+        new Set(
+          authorizations
+            .filter((a) => a.audienceKind === 'institution')
+            .map((a) => a.audience),
+        ),
+      ).sort();
+      return delay(names);
+    },
+
+    async requestAccess(req) {
+      // Mirrors the bridge's ephemeral Task inbox over in-memory state.
+      const created = { id: nextId('req'), patientId: req.patientId, requester: req.requester, purpose: req.purpose, use: req.use };
+      accessRequests.push(created);
+      return delay(created);
+    },
+
+    async listAccessRequests(patientId: string) {
+      return delay(accessRequests.filter((r) => r.patientId === patientId));
+    },
+
+    async resolveAccessRequest(id: string) {
+      const i = accessRequests.findIndex((r) => r.id === id);
+      if (i >= 0) accessRequests.splice(i, 1);
+      return delay(undefined);
     },
 
     async effectiveIdentity(patientId: string): Promise<EffectiveField[]> {

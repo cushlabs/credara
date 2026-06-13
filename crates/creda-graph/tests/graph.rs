@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use creda_events::payload::ContestReasonCode;
 use creda_events::{
     AttestPurpose, AuthorizationScope, CertificateFingerprint, ContestReason, Demographics,
-    EventId, EventPayload, GrantAudience, GrantPurpose, IdentityEventNode, LinkMethod,
-    RedistributionPolicy, SignatureAlgorithm, SigningKey, StructuredAddress, TokenizedDate,
-    TokenizedString, TombstoneBasis, UseMode, VerificationMethod, VolumeConstraints,
+    EventId, EventPayload, GrantAudience, GrantPurpose, IdentityEventNode, InstitutionalIdentifier,
+    LinkMethod, RedistributionPolicy, SignatureAlgorithm, SigningKey, StructuredAddress,
+    TokenizedDate, TokenizedString, TombstoneBasis, UseMode, VerificationMethod, VolumeConstraints,
 };
 use creda_graph::{
     evaluate, project, responder_may_serve, AuthorizationQuery, ConfidenceConfig, DefaultPosture,
@@ -56,6 +56,16 @@ fn demo_address(line: &str) -> Demographics {
             line1: Some(TokenizedString::from(line)),
             ..Default::default()
         }),
+        ..Default::default()
+    }
+}
+
+fn demo_mrn(institution: &str, value: &str) -> Demographics {
+    Demographics {
+        mrns: vec![InstitutionalIdentifier {
+            institution_id: TokenizedString::from(institution),
+            value: TokenizedString::from(value),
+        }],
         ..Default::default()
     }
 }
@@ -268,6 +278,48 @@ fn conflicting_asserts_are_disputed() {
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(e.disputed);
     assert_eq!(e.values.len(), 2);
+}
+
+#[test]
+fn mrns_project_as_a_non_disputed_identifier_set() {
+    // A patient holds two MRNs from two institutions — a set of valid identifiers, NOT a conflict.
+    let a = assert_ev(&key(), demo_mrn("mercy", "5582019"), VerificationMethod::GovernmentPhotoId, WALL);
+    let b = assert_ev(&key(), demo_mrn("northside", "A-7741"), VerificationMethod::InsuranceCard, WALL);
+    let ei = project_from(&[a.clone(), b.clone()], &[a.id, b.id], secs(WALL));
+    let e = ei.field(&FieldKey::Mrn).unwrap();
+    assert!(!e.disputed, "multiple MRNs are a set of identifiers, never a dispute");
+    assert_eq!(e.values.len(), 2, "both MRNs are reported");
+    // Each value carries the issuing institution unit-separated from the id.
+    assert!(e.values.iter().any(|v| v.value == "mercy\u{1f}5582019"));
+    assert!(e.values.iter().any(|v| v.value == "northside\u{1f}A-7741"));
+}
+
+#[test]
+fn attesting_one_conflicting_value_resolves_dispute() {
+    // Two institutions assert conflicting DOBs (the James Whitfield seed shape): disputed.
+    let a = assert_ev(&key(), demo_dob("dob-1971-08-04"), VerificationMethod::GovernmentPhotoId, WALL);
+    let b = assert_ev(&key(), demo_dob("dob-1971-08-14"), VerificationMethod::SelfReport, WALL);
+    let open = project_from(&[a.clone(), b.clone()], &[a.id, b.id], secs(WALL));
+    let e = open.field(&FieldKey::DateOfBirth).unwrap();
+    assert!(e.disputed, "two conflicting asserts with no attestation must be disputed");
+
+    // A clinician attests reliance on one of the two values → the disagreement is resolved in its
+    // favor, and the attested value sorts first. This is what makes the resolution survive a
+    // refresh (the Attest is persisted; nothing relies on transient client state).
+    let at = attest_ev(&key(), a.id);
+    let resolved = project_from(&[a.clone(), b.clone(), at], &[a.id, b.id], secs(WALL));
+    let e2 = resolved.field(&FieldKey::DateOfBirth).unwrap();
+    assert!(!e2.disputed, "attesting exactly one conflicting value resolves the dispute");
+    assert_eq!(e2.values.len(), 2, "both asserted values are still reported");
+    assert_eq!(e2.values[0].value, "dob-1971-08-04", "the attested value sorts first");
+
+    // Attesting the *other* value too restores the disagreement (two relied-upon values conflict).
+    let at_b = attest_ev(&key(), b.id);
+    let split = project_from(&[a.clone(), b.clone(), attest_ev(&key(), a.id), at_b], &[a.id, b.id], secs(WALL));
+    assert!(
+        split.field(&FieldKey::DateOfBirth).unwrap().disputed,
+        "attestations on two competing values is itself a disagreement"
+    );
 }
 
 #[test]

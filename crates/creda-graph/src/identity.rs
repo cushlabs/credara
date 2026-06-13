@@ -5,7 +5,10 @@
 //! (supersede), contestations (sever the contested Link), and tombstones (no demographics).
 //! Each field reports every asserted value with its confidence; a field with more than one
 //! distinct value is flagged `disputed` — the system surfaces disagreement rather than picking
-//! a winner (§5.3.4).
+//! a winner (§5.3.4) — UNLESS exactly one of the competing values carries an attestation, in
+//! which case that recorded reliance resolves the disagreement in its favor (§5.3.2). This makes
+//! a clinician's resolving attestation a durable, projection-level effect rather than transient
+//! UI state.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
@@ -187,7 +190,18 @@ pub fn project(
     let mut fields: BTreeMap<FieldKey, FieldEntry> = BTreeMap::new();
     for (key, value_map) in groups {
         let class = field_class(&key);
-        let disputed = value_map.len() > 1;
+        // A field with conflicting asserted values is disputed UNLESS exactly one of those values
+        // carries an attestation (§5.3.4 + §5.3.2): an institution recording reliance on a value
+        // is an explicit decision that resolves the disagreement in that value's favor (and the
+        // amplification also lifts its confidence so it sorts first). Zero attestations leaves the
+        // conflict open; attestations on *two or more* competing values is itself a disagreement,
+        // so it stays disputed. This is what lets the clinician's "resolve DOB" attestation stick
+        // across a refresh — the resolution is the persisted Attest, not transient client state.
+        let attested_values = value_map.values().filter(|g| !g.attesters.is_empty()).count();
+        // Identifier bags are sets of valid identifiers, not competing values (§3.4.1) — a patient
+        // legitimately holds several MRNs / member ids at once, so they never count as a dispute.
+        let identifier_set = matches!(&key, FieldKey::Mrn | FieldKey::InsuranceMemberId);
+        let disputed = !identifier_set && value_map.len() > 1 && attested_values != 1;
         let mut values: Vec<FieldValue> = value_map
             .into_iter()
             .map(|(value, group)| FieldValue {
@@ -290,6 +304,19 @@ fn field_values(d: &Demographics) -> Vec<(FieldKey, String)> {
     }
     if let Some(ssn) = &d.ssn_last_four {
         out.push((FieldKey::SsnLastFour, ssn.0.clone()));
+    }
+    // Identifier bags (§3.4.1): each MRN / insurance id is a *valid identifier*, not a competing
+    // value, so they are emitted as distinct values of an identifier-set field that never disputes
+    // (see the disputed computation). The issuing institution / payer is carried in the value, unit-
+    // separated from the identifier, so a reader can show "institution · id" without the signer.
+    for mrn in &d.mrns {
+        out.push((FieldKey::Mrn, format!("{}\u{1f}{}", mrn.institution_id.0, mrn.value.0)));
+    }
+    for ins in &d.insurance_member_ids {
+        out.push((
+            FieldKey::InsuranceMemberId,
+            format!("{}\u{1f}{}", ins.payer_id.0, ins.member_id.0),
+        ));
     }
     for (k, v) in &d.extensions {
         out.push((FieldKey::Extension(k.clone()), v.0.clone()));
