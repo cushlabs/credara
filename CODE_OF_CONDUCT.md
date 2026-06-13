@@ -19,9 +19,7 @@ individual is officially representing the project in public spaces.
 
 ## Enforcement
 
-Concerns may be reported privately to the project maintainers. Reports will be reviewed
-and handled in accordance with the Enforcement Guidelines described in the Contributor
-Covenant.
-
-> _Maintainer note: replace this line with the project's monitored conduct contact
-> address before public launch._
+Concerns may be reported privately to the project maintainers at **security@cushlabs.com**.
+Reports will be reviewed and handled in accordance with the Enforcement Guidelines described
+in the Contributor Covenant. All reports will be handled with discretion, and the reporter's
+identity kept confidential.

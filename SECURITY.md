@@ -12,10 +12,7 @@ Instead, report privately through one of:
 
 - GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
   for this repository (Security → Report a vulnerability), or
-- email to the maintainers' private security address.
-
-> _Maintainer note: replace this line with the project's monitored security contact
-> (e.g. `security@<domain>`) before public launch._
+- email to **security@cushlabs.com**.
 
 Please include: a description of the issue, the component and spec section affected (if
 known), reproduction steps, and the potential impact. If you have a suggested fix, that
