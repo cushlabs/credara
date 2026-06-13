@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check docs presence
         run: |
-          test -f docs/creda-technical-spec.md || { echo "Missing spec markdown"; exit 1; }
+          test -f docs/credara-technical-spec.md || { echo "Missing spec markdown"; exit 1; }
           echo "Spec present."
       - name: Validate internal markdown links
         run: |

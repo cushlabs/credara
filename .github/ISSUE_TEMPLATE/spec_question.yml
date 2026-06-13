@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        The spec is the source of truth (`docs/creda-technical-spec.md`). Use this
+        The spec is the source of truth (`docs/credara-technical-spec.md`). Use this
         template to ask about something ambiguous, propose a clarification, or flag
         a place where the code drifts from the spec.
 

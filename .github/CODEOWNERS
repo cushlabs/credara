@@ -42,7 +42,7 @@
 /CODE_OF_CONDUCT.md                     @cushlabs/maintainers
 
 # ---- Spec (require two approvals via branch protection rule) ----
-/docs/creda-technical-spec.md           @cushlabs/spec-owners @cushlabs/maintainers
+/docs/credara-technical-spec.md          @cushlabs/spec-owners @cushlabs/maintainers
 
 # ---- Security-critical paths (require two approvals via branch protection rule) ----
 /SECURITY.md                            @cushlabs/security
