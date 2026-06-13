@@ -14,7 +14,7 @@ creda-events = { path = "../creda-events" }
 creda-store = { path = "../creda-store", default-features = false }
 # Reuse the authorization evaluation — do NOT reimplement it (build guide M6).
 creda-graph = { path = "../creda-graph" }
-thiserror = "1"
+thiserror = "2"
 # RFC3339 wall-clock for the emitted ExportReceipt.
 time = { version = "0.3", features = ["formatting"] }
 

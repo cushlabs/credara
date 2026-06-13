@@ -695,7 +695,7 @@ dependencies = [
  "creda-store",
  "prost",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "time",
  "tokio",
  "tokio-stream",
@@ -718,7 +718,7 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "uuid",
 ]
 
@@ -729,7 +729,7 @@ dependencies = [
  "creda-events",
  "creda-graph",
  "creda-store",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -739,7 +739,7 @@ version = "0.1.0"
 dependencies = [
  "creda-events",
  "creda-store",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -752,7 +752,7 @@ dependencies = [
  "futures",
  "libp2p",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -764,7 +764,7 @@ dependencies = [
  "git2",
  "rocksdb",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -774,7 +774,7 @@ dependencies = [
  "creda-events",
  "creda-graph",
  "creda-store",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

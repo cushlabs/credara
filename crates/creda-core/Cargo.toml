@@ -27,7 +27,7 @@ creda-events = { path = "../creda-events" }
 creda-store = { path = "../creda-store" }
 creda-graph = { path = "../creda-graph" }
 creda-net = { path = "../creda-net", default-features = false }
-thiserror = "1"
+thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 clap = { version = "4", features = ["derive"] }

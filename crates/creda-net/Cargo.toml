@@ -30,7 +30,7 @@ creda-events = { path = "../creda-events" }
 # Snapshot read/write goes through the Store trait; no RocksDB needed here.
 creda-store = { path = "../creda-store", default-features = false }
 serde = { version = "1", features = ["derive"] }
-thiserror = "1"
+thiserror = "2"
 
 # --- libp2p adapter (feature = "libp2p") --------------------------------------------------------
 # NOTE TO FIRST BUILDER: rust-libp2p's API moves between minor versions; this is the most

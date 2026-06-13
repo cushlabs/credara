@@ -27,7 +27,7 @@ sha2 = "0.10"
 uuid = { version = "1", features = ["v7", "serde"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
-thiserror = "1"
+thiserror = "2"
 
 # --- PQC (feature = "pqc") ----------------------------------------------------------------
 # NOTE TO FIRST BUILDER: these pqcrypto crates wrap C reference implementations; crate

@@ -13,7 +13,7 @@ creda-events = { path = "../creda-events" }
 # Only the Store trait + MemoryStore are needed here, so skip creda-store's default `rocksdb`
 # feature — the graph crate never compiles RocksDB.
 creda-store = { path = "../creda-store", default-features = false }
-thiserror = "1"
+thiserror = "2"
 # RFC3339 parsing for temporal decay (§5.3.3).
 time = { version = "0.3", features = ["parsing"] }
 
