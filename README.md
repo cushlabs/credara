@@ -175,7 +175,7 @@ sequenceDiagram
 | Node IDs | **UUIDv7** |
 | Signatures | **Algorithm-agile** — Ed25519 default; ML-DSA-65 (FIPS 204) and SLH-DSA (FIPS 205) for PQC; hybrid mode |
 | Identity | **UDAP** (institutional) + **SPIFFE/SPIRE** (workload), cert-manager rotation |
-| Deployment | **Helm** chart primary; **Docker Compose** for laptop; Operator deferred |
+| Deployment | **Kubernetes-native** — **Helm** chart is the primary production target; **Ansible** for cluster automation (cert-manager + SPIRE + Helm release); **Podman** or **Docker Compose** for local dev; Operator deferred |
 | License | **Apache 2.0** |
 
 ## Repository layout
@@ -218,8 +218,9 @@ scaffold and land in subsequent passes.
 
 ## Building
 
-The only host prerequisite is **Docker**: every task runs inside the dev container, so no
-one installs a Rust toolchain, protoc, or a JDK by hand (see
+The only host prerequisite is a container engine — **Podman** or **Docker**: every task runs
+inside the dev container, so no one installs a Rust toolchain, protoc, or a JDK by hand. The
+`docker`-invoking targets run unchanged under Podman's Docker-compatible CLI (see
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
 
 ```sh
@@ -228,7 +229,7 @@ make grpc              # build + lint + test the opt-in gRPC server (feature `gr
 make libp2p            # compile + lint the shipped feature set (gRPC + libp2p)
 make bridge            # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
 
-# Multi-peer testbed on kind (Docker + kind + kubectl + helm required; no host Rust):
+# Multi-peer testbed on kind (Podman or Docker + kind + kubectl + helm; no host Rust):
 make -C testbed up        # create kind cluster + build & load all 3 testbed images
 make -C testbed smoke     # gossip-convergence scenario — typically <10 ms end-to-end
 make -C testbed ae-repair # anti-entropy-repair scenario — late-join healed via AE round
@@ -239,7 +240,7 @@ The default build is intentionally free of the heavy, version-volatile dependenc
 (libp2p, tonic/protoc, the JVM bridge): those live behind features and separate targets so
 `anchor creda` stays fast and always green. With a local toolchain the workspace also builds
 the ordinary way (`cargo build --workspace` / `cargo test --workspace`). Local multi-peer
-development uses Docker Compose under `deploy/compose/`. The multi-peer test bed under
+development uses Podman or Docker Compose under `deploy/compose/`. The multi-peer test bed under
 `testbed/` runs entirely in-cluster — the peer-driver is a Rust binary packaged as an image
 and invoked as a Kubernetes Job — so no host Rust toolchain is needed even for the
 end-to-end scenarios.

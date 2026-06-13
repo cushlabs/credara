@@ -559,7 +559,7 @@
         <tr><th>Node IDs</th><td><b>UUIDv7</b></td></tr>
         <tr><th>Signatures</th><td><b>Algorithm-agile</b> — Ed25519 default; ML-DSA-65 (FIPS 204) &amp; SLH-DSA (FIPS 205) for PQC; hybrid mode</td></tr>
         <tr><th>Identity &amp; trust</th><td><b><a href="https://confluence.hl7.org/spaces/FAST/overview" target="_blank" rel="noopener">HL7 FAST</a></b> Security IG via <b>UDAP</b> (institutional) + <b>SPIFFE / SPIRE</b> (workload) · admission modeled on <b>DirectTrust</b> · aligns with <b>TEFCA</b></td></tr>
-        <tr><th>Deployment</th><td><b>Helm</b> chart primary; <b>Docker Compose</b> for laptop</td></tr>
+        <tr><th>Deployment</th><td><b>Kubernetes-native</b> — the <b>Helm</b> chart is the primary production target, with <b>Ansible</b> automating install onto an existing cluster (cert-manager + SPIRE + the Helm release). Local development runs under <b>Podman</b> or <b>Docker Compose</b>.</td></tr>
         <tr><th>License</th><td><b>Apache 2.0</b></td></tr>
       </table>
     </div>
