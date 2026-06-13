@@ -61,7 +61,9 @@ fn mk_grant(
 
 fn mk_revoke(k: &SigningKey, grant_id: EventId) -> IdentityEventNode {
     IdentityEventNode::create(
-        EventPayload::AuthorizationRevocation { target_grant_id: grant_id },
+        EventPayload::AuthorizationRevocation {
+            target_grant_id: grant_id,
+        },
         vec![grant_id],
         k,
         3,
@@ -95,18 +97,31 @@ fn permits_valid_export_and_emits_receipt() {
     let inst = key();
     let requester = CertificateFingerprint::from_public_key_bytes(b"requester");
     let assert = mk_assert(&inst);
-    let grant = mk_grant(&inst, assert.id, GrantAudience::InstitutionId(requester.clone()), None);
+    let grant = mk_grant(
+        &inst,
+        assert.id,
+        GrantAudience::InstitutionId(requester.clone()),
+        None,
+    );
     let store = store_of(&[assert.clone(), grant.clone()]);
 
     let gate = ExportGate::new(inst);
-    let req = ExportRequest { entry_points: vec![assert.id], query: query(requester) };
+    let req = ExportRequest {
+        entry_points: vec![assert.id],
+        query: query(requester),
+    };
     let outcome = gate.authorize_export(&store, &req, NOW, 10).unwrap();
 
-    assert!(outcome.is_permitted(), "valid artifact should permit export");
+    assert!(
+        outcome.is_permitted(),
+        "valid artifact should permit export"
+    );
     let receipt = outcome.receipt().unwrap();
     assert_eq!(receipt.event_type, IdentityEventType::ExportReceipt);
     match &receipt.payload {
-        EventPayload::ExportReceipt { governing_grant_id, .. } => {
+        EventPayload::ExportReceipt {
+            governing_grant_id, ..
+        } => {
             assert_eq!(*governing_grant_id, grant.id)
         }
         _ => panic!("expected ExportReceipt payload"),
@@ -126,8 +141,14 @@ fn refuses_expired_grant() {
     );
     let store = store_of(&[assert.clone(), grant]);
     let gate = ExportGate::new(inst);
-    let req = ExportRequest { entry_points: vec![assert.id], query: query(requester) };
-    assert!(!gate.authorize_export(&store, &req, NOW, 10).unwrap().is_permitted());
+    let req = ExportRequest {
+        entry_points: vec![assert.id],
+        query: query(requester),
+    };
+    assert!(!gate
+        .authorize_export(&store, &req, NOW, 10)
+        .unwrap()
+        .is_permitted());
 }
 
 #[test]
@@ -135,12 +156,23 @@ fn refuses_revoked_grant() {
     let inst = key();
     let requester = CertificateFingerprint::from_public_key_bytes(b"requester");
     let assert = mk_assert(&inst);
-    let grant = mk_grant(&inst, assert.id, GrantAudience::InstitutionId(requester.clone()), None);
+    let grant = mk_grant(
+        &inst,
+        assert.id,
+        GrantAudience::InstitutionId(requester.clone()),
+        None,
+    );
     let revoke = mk_revoke(&inst, grant.id);
     let store = store_of(&[assert.clone(), grant, revoke]);
     let gate = ExportGate::new(inst);
-    let req = ExportRequest { entry_points: vec![assert.id], query: query(requester) };
-    assert!(!gate.authorize_export(&store, &req, NOW, 10).unwrap().is_permitted());
+    let req = ExportRequest {
+        entry_points: vec![assert.id],
+        query: query(requester),
+    };
+    assert!(!gate
+        .authorize_export(&store, &req, NOW, 10)
+        .unwrap()
+        .is_permitted());
 }
 
 #[test]
@@ -153,14 +185,26 @@ fn refuses_audience_mismatch_and_no_grant() {
     let requester = CertificateFingerprint::from_public_key_bytes(b"requester");
     let store = store_of(&[assert.clone(), grant]);
     let gate = ExportGate::new(inst);
-    let req = ExportRequest { entry_points: vec![assert.id], query: query(requester.clone()) };
-    assert!(!gate.authorize_export(&store, &req, NOW, 10).unwrap().is_permitted());
+    let req = ExportRequest {
+        entry_points: vec![assert.id],
+        query: query(requester.clone()),
+    };
+    assert!(!gate
+        .authorize_export(&store, &req, NOW, 10)
+        .unwrap()
+        .is_permitted());
 
     // No grant at all.
     let inst2 = key();
     let assert2 = mk_assert(&inst2);
     let store2 = store_of(std::slice::from_ref(&assert2));
     let gate2 = ExportGate::new(inst2);
-    let req2 = ExportRequest { entry_points: vec![assert2.id], query: query(requester) };
-    assert!(!gate2.authorize_export(&store2, &req2, NOW, 10).unwrap().is_permitted());
+    let req2 = ExportRequest {
+        entry_points: vec![assert2.id],
+        query: query(requester),
+    };
+    assert!(!gate2
+        .authorize_export(&store2, &req2, NOW, 10)
+        .unwrap()
+        .is_permitted());
 }

@@ -6,12 +6,12 @@
 use std::collections::BTreeMap;
 
 use creda_events::ids::new_event_id;
+use creda_events::payload::ContestReasonCode;
 use creda_events::{
     AttestPurpose, AuthorizationScope, CertificateFingerprint, ContestReason, Demographics,
     EventId, EventPayload, GrantAudience, GrantPurpose, IdentityEventNode, LinkMethod,
-    SignatureAlgorithm, SigningKey, TombstoneBasis, TokenizedString, UseMode, VerificationMethod,
+    SignatureAlgorithm, SigningKey, TokenizedString, TombstoneBasis, UseMode, VerificationMethod,
 };
-use creda_events::payload::ContestReasonCode;
 
 pub const WALL_CLOCK: &str = "2026-05-20T12:00:00Z";
 
@@ -28,7 +28,10 @@ pub fn some_id() -> EventId {
 
 pub fn sample_demographics() -> Demographics {
     let mut extensions = BTreeMap::new();
-    extensions.insert("us-va:veteran-id".to_string(), TokenizedString::from("tok-veteran"));
+    extensions.insert(
+        "us-va:veteran-id".to_string(),
+        TokenizedString::from("tok-veteran"),
+    );
     Demographics {
         name_family: Some(vec![TokenizedString::from("tok-family")]),
         name_given: Some(vec![TokenizedString::from("tok-given")]),
@@ -127,7 +130,9 @@ pub fn one_of_each_event(key: &SigningKey) -> Vec<IdentityEventNode> {
             vec![p1],
         ),
         mk(
-            EventPayload::AuthorizationRevocation { target_grant_id: p1 },
+            EventPayload::AuthorizationRevocation {
+                target_grant_id: p1,
+            },
             vec![p1],
         ),
         mk(

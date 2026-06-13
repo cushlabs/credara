@@ -102,7 +102,9 @@ impl ExportGate {
             rfc3339(now_unix_secs)?,
             None,
         )?;
-        Ok(ExportOutcome::Permitted { receipt: Box::new(receipt) })
+        Ok(ExportOutcome::Permitted {
+            receipt: Box::new(receipt),
+        })
     }
 }
 

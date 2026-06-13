@@ -174,14 +174,21 @@ pub fn evaluate_link_chain(
         // If the current node is a Link, check its effective confidence; below floor blocks this
         // path from advancing. Also flag whether this Link grants the path "standing."
         let mut step_has_standing = path_has_standing;
-        if let EventPayload::Link { method, confidence_score, .. } = &node.payload {
+        if let EventPayload::Link {
+            method,
+            confidence_score,
+            ..
+        } = &node.payload
+        {
             let effective = config.effective_confidence(*confidence_score, *method);
             if effective < config.min_link_confidence {
                 // Skip — don't propagate beyond a too-weak Link. Other paths may still reach an
                 // anchor.
                 continue;
             }
-            if config.require_author_standing && link_author_has_standing(subgraph, node, responder_anchors) {
+            if config.require_author_standing
+                && link_author_has_standing(subgraph, node, responder_anchors)
+            {
                 step_has_standing = true;
             }
         }
@@ -195,7 +202,8 @@ pub fn evaluate_link_chain(
     }
 
     LinkChainResult::Deny {
-        reason: "Grant unreachable from a responder-anchored event through Links meeting the floor".into(),
+        reason: "Grant unreachable from a responder-anchored event through Links meeting the floor"
+            .into(),
     }
 }
 
@@ -290,11 +298,7 @@ mod tests {
         CertificateFingerprint::new(signer.verifying_key().fingerprint())
     }
 
-    fn assert_event(
-        signer: &SigningKey,
-        clock: u64,
-        family: &str,
-    ) -> IdentityEventNode {
+    fn assert_event(signer: &SigningKey, clock: u64, family: &str) -> IdentityEventNode {
         IdentityEventNode::create(
             EventPayload::Assert {
                 demographics: Demographics {
@@ -364,11 +368,7 @@ mod tests {
         .expect("valid Grant")
     }
 
-    fn attest_event(
-        signer: &SigningKey,
-        clock: u64,
-        targets: Vec<EventId>,
-    ) -> IdentityEventNode {
+    fn attest_event(signer: &SigningKey, clock: u64, targets: Vec<EventId>) -> IdentityEventNode {
         IdentityEventNode::create(
             EventPayload::Attest {
                 target_event_ids: targets.clone(),
@@ -397,8 +397,14 @@ mod tests {
             LinkMethod::Other,
         ] {
             let c = ceilings.for_method(method);
-            assert!(c > 0, "default ceiling for {method:?} is zero — would silently deny everything");
-            assert!(c <= 10_000, "ceiling exceeds confidence range for {method:?}");
+            assert!(
+                c > 0,
+                "default ceiling for {method:?} is zero — would silently deny everything"
+            );
+            assert!(
+                c <= 10_000,
+                "ceiling exceeds confidence range for {method:?}"
+            );
         }
     }
 
@@ -406,7 +412,10 @@ mod tests {
     fn effective_confidence_caps_at_ceiling() {
         let cfg = LinkChainConfig::default();
         assert_eq!(cfg.effective_confidence(10_000, LinkMethod::Manual), 5000);
-        assert_eq!(cfg.effective_confidence(9800, LinkMethod::InsuranceCrosswalk), 9500);
+        assert_eq!(
+            cfg.effective_confidence(9800, LinkMethod::InsuranceCrosswalk),
+            9500
+        );
         assert_eq!(cfg.effective_confidence(4000, LinkMethod::Manual), 4000);
     }
 
@@ -423,7 +432,10 @@ mod tests {
         anchors.insert(grant.id);
 
         let cfg = LinkChainConfig::default();
-        assert_eq!(evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg), LinkChainResult::Ok);
+        assert_eq!(
+            evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg),
+            LinkChainResult::Ok
+        );
     }
 
     #[test]
@@ -449,7 +461,10 @@ mod tests {
         anchors.insert(assert.id);
 
         let cfg = LinkChainConfig::default();
-        assert_eq!(evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg), LinkChainResult::Ok);
+        assert_eq!(
+            evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg),
+            LinkChainResult::Ok
+        );
     }
 
     #[test]
@@ -470,12 +485,7 @@ mod tests {
             LinkMethod::Manual,
             10_000, // brazen overclaim
         );
-        let rogue_grant = grant_event(
-            &rogue_clinic,
-            3,
-            rogue_assert.id,
-            cert_fp(&rogue_clinic),
-        );
+        let rogue_grant = grant_event(&rogue_clinic, 3, rogue_assert.id, cert_fp(&rogue_clinic));
 
         let subgraph = Subgraph::from_nodes([
             b_assert.clone(),
@@ -517,12 +527,7 @@ mod tests {
             LinkMethod::InsuranceCrosswalk,
             9000,
         );
-        let grant = grant_event(
-            &referrer,
-            3,
-            r_assert.id,
-            cert_fp(&referrer),
-        );
+        let grant = grant_event(&referrer, 3, r_assert.id, cert_fp(&referrer));
 
         let subgraph = Subgraph::from_nodes([
             b_assert.clone(),
@@ -535,7 +540,10 @@ mod tests {
         anchors.insert(b_assert.id);
 
         let cfg = LinkChainConfig::default();
-        assert_eq!(evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg), LinkChainResult::Ok);
+        assert_eq!(
+            evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg),
+            LinkChainResult::Ok
+        );
     }
 
     #[test]
@@ -555,12 +563,7 @@ mod tests {
             LinkMethod::InsuranceCrosswalk,
             9000,
         );
-        let grant = grant_event(
-            &stranger,
-            3,
-            s_assert.id,
-            cert_fp(&stranger),
-        );
+        let grant = grant_event(&stranger, 3, s_assert.id, cert_fp(&stranger));
 
         let subgraph = Subgraph::from_nodes([
             b_assert.clone(),
@@ -605,12 +608,7 @@ mod tests {
             LinkMethod::Referral,
             8500,
         );
-        let grant = grant_event(
-            &partner,
-            4,
-            p_assert.id,
-            cert_fp(&partner),
-        );
+        let grant = grant_event(&partner, 4, p_assert.id, cert_fp(&partner));
 
         let subgraph = Subgraph::from_nodes([
             b_assert.clone(),
@@ -628,6 +626,9 @@ mod tests {
             require_author_standing: true,
             ..Default::default()
         };
-        assert_eq!(evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg), LinkChainResult::Ok);
+        assert_eq!(
+            evaluate_link_chain(&subgraph, grant.id, &anchors, &cfg),
+            LinkChainResult::Ok
+        );
     }
 }

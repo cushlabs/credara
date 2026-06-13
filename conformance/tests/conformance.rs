@@ -14,7 +14,9 @@ use creda_events::{
     Demographics, EventPayload, IdentityEventNode, IdentityEventType, SignatureAlgorithm,
     SigningKey, TestDataTag, VerificationMethod,
 };
-use creda_graph::{evaluate, project, AuthorizationQuery, DefaultPosture, FieldKey, RequesterContext, Subgraph};
+use creda_graph::{
+    evaluate, project, AuthorizationQuery, DefaultPosture, FieldKey, RequesterContext, Subgraph,
+};
 use creda_store::{MemoryStore, Store};
 
 const NOW: i64 = 1_800_000_000;
@@ -69,25 +71,49 @@ fn authorization_then_revocation_is_enforced() {
     // With the grant, the requester is authorized.
     let store = store_of(&events);
     let sg = Subgraph::materialize(&store, &[assert.id]).unwrap();
-    assert!(evaluate(&sg, &query, DefaultPosture::DenyByDefault, NOW, &HashMap::new()).authorized);
+    assert!(
+        evaluate(
+            &sg,
+            &query,
+            DefaultPosture::DenyByDefault,
+            NOW,
+            &HashMap::new()
+        )
+        .authorized
+    );
 
     // A validated revocation of that grant denies it.
     let revoker = SigningKey::generate(SignatureAlgorithm::Ed25519).unwrap();
     let revocation = IdentityEventNode::create_test_data(
-        EventPayload::AuthorizationRevocation { target_grant_id: grant.id },
+        EventPayload::AuthorizationRevocation {
+            target_grant_id: grant.id,
+        },
         vec![grant.id],
         &revoker,
         100,
         "2026-01-01T00:00:00Z",
         None,
-        TestDataTag { purpose: "integration-testing".into(), originating_test: "conformance/auth".into(), expiration_time: None },
+        TestDataTag {
+            purpose: "integration-testing".into(),
+            originating_test: "conformance/auth".into(),
+            expiration_time: None,
+        },
     )
     .unwrap();
     let mut with_revoke = events.clone();
     with_revoke.push(revocation);
     let store2 = store_of(&with_revoke);
     let sg2 = Subgraph::materialize(&store2, &[assert.id]).unwrap();
-    assert!(!evaluate(&sg2, &query, DefaultPosture::DenyByDefault, NOW, &HashMap::new()).authorized);
+    assert!(
+        !evaluate(
+            &sg2,
+            &query,
+            DefaultPosture::DenyByDefault,
+            NOW,
+            &HashMap::new()
+        )
+        .authorized
+    );
 }
 
 #[test]
@@ -97,7 +123,12 @@ fn conflicting_demographics_are_flagged() {
     let entries: Vec<_> = events.iter().map(|e| e.id).collect();
     let store = store_of(&events);
     let sg = Subgraph::materialize(&store, &entries).unwrap();
-    let ei = project(&sg, &entries, &creda_graph::ConfidenceConfig::default(), NOW);
+    let ei = project(
+        &sg,
+        &entries,
+        &creda_graph::ConfidenceConfig::default(),
+        NOW,
+    );
     let dob = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(dob.disputed, "conflicting DOBs should be flagged disputed");
     assert_eq!(dob.values.len(), 2);
@@ -112,7 +143,11 @@ fn data_categories_are_respected() {
     for e in &events {
         let d = demographics_of(e);
         for part in d.name_family.iter().chain(d.name_given.iter()).flatten() {
-            assert!(part.0.starts_with("tok:"), "demographic must be tokenized, got {:?}", part.0);
+            assert!(
+                part.0.starts_with("tok:"),
+                "demographic must be tokenized, got {:?}",
+                part.0
+            );
         }
         assert!(d.date_of_birth.as_ref().unwrap().0.starts_with("tok:"));
     }
@@ -124,7 +159,9 @@ fn data_categories_are_respected() {
     let deceased = IdentityEventNode::create(
         EventPayload::DeceasedDeclaration {
             date_of_death: "2026-02-01".into(),
-            certifier_id: creda_events::CertificateFingerprint::from_public_key_bytes(b"vital-records"),
+            certifier_id: creda_events::CertificateFingerprint::from_public_key_bytes(
+                b"vital-records",
+            ),
             cause_of_death_present: true,
         },
         vec![assert.id],
@@ -135,7 +172,10 @@ fn data_categories_are_respected() {
     )
     .unwrap();
     match &deceased.payload {
-        EventPayload::DeceasedDeclaration { cause_of_death_present, .. } => {
+        EventPayload::DeceasedDeclaration {
+            cause_of_death_present,
+            ..
+        } => {
             // The flag exists; there is structurally no field to carry the actual cause.
             assert!(*cause_of_death_present);
         }
@@ -331,7 +371,12 @@ fn rogue_link_low_confidence_denied() {
     );
     let r_grant = grant_for(&rogue, 3, r_assert.id, cert_fp_of(&rogue), "low-confidence");
 
-    let store = store_of(&[b_assert.clone(), r_assert.clone(), r_link.clone(), r_grant.clone()]);
+    let store = store_of(&[
+        b_assert.clone(),
+        r_assert.clone(),
+        r_link.clone(),
+        r_grant.clone(),
+    ]);
     let sg = Subgraph::materialize(&store, &[b_assert.id]).unwrap();
 
     let mut anchors = BTreeSet::new();
@@ -356,7 +401,10 @@ fn rogue_link_low_confidence_denied() {
         &anchors,
         &cfg,
     );
-    assert!(!decision.authorized, "rogue Manual Link at the ceiling must be denied");
+    assert!(
+        !decision.authorized,
+        "rogue Manual Link at the ceiling must be denied"
+    );
     assert!(
         decision.reason.contains("step 5.5") || decision.reason.contains("Link-chain"),
         "denial reason should surface the §4.6 step 5.5 filter, got: {}",
@@ -382,9 +430,20 @@ fn rogue_link_no_standing_denied() {
         9000,
         "no-standing",
     );
-    let s_grant = grant_for(&stranger, 3, s_assert.id, cert_fp_of(&stranger), "no-standing");
+    let s_grant = grant_for(
+        &stranger,
+        3,
+        s_assert.id,
+        cert_fp_of(&stranger),
+        "no-standing",
+    );
 
-    let store = store_of(&[b_assert.clone(), s_assert.clone(), s_link.clone(), s_grant.clone()]);
+    let store = store_of(&[
+        b_assert.clone(),
+        s_assert.clone(),
+        s_link.clone(),
+        s_grant.clone(),
+    ]);
     let sg = Subgraph::materialize(&store, &[b_assert.id]).unwrap();
 
     let mut anchors = BTreeSet::new();
@@ -412,7 +471,10 @@ fn rogue_link_no_standing_denied() {
         &anchors,
         &cfg,
     );
-    assert!(!decision.authorized, "InsuranceCrosswalk Link from a stranger must be denied under strict posture");
+    assert!(
+        !decision.authorized,
+        "InsuranceCrosswalk Link from a stranger must be denied under strict posture"
+    );
     assert!(
         decision.reason.contains("standing") || decision.reason.contains("Link-chain"),
         "denial reason should surface lack of standing, got: {}",

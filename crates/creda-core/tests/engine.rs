@@ -2,7 +2,7 @@
 //! RocksDB). Confirms create→get, effective-identity, token match, authorization, and
 //! snapshot round-trip all work end-to-end through `CredaCore`.
 
-use creda_core::{CredaConfig, CredaCore, Ingest, InMemorySigner, KeyRegistry, PostureSetting};
+use creda_core::{CredaConfig, CredaCore, InMemorySigner, Ingest, KeyRegistry, PostureSetting};
 use creda_events::{
     AuthorizationScope, CertificateFingerprint, Demographics, EventPayload, GrantAudience,
     GrantPurpose, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
@@ -11,7 +11,10 @@ use creda_graph::{AuthorizationQuery, RequesterContext};
 use creda_store::MemoryStore;
 
 fn core_with(posture: PostureSetting) -> CredaCore {
-    let config = CredaConfig { default_posture: posture, ..Default::default() };
+    let config = CredaConfig {
+        default_posture: posture,
+        ..Default::default()
+    };
     let store = Box::new(MemoryStore::new());
     let signer = Box::new(InMemorySigner::generate().unwrap());
     CredaCore::new(store, signer, config)
@@ -51,7 +54,10 @@ fn effective_identity_and_token_match() {
     // MatchByTokens finds the entry point via a demographic token.
     let hits = core.match_by_tokens(&["tok-smith".to_string()]).unwrap();
     assert!(hits.contains(&event.id));
-    assert!(core.match_by_tokens(&["nope".to_string()]).unwrap().is_empty());
+    assert!(core
+        .match_by_tokens(&["nope".to_string()])
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -118,7 +124,10 @@ fn snapshot_round_trips_between_engines() {
 // ---- Synthetic-only guardrail (closed-pilot safety, docs/PILOT.md) -------------------------
 
 fn synthetic_core() -> CredaCore {
-    let config = CredaConfig { synthetic_only: true, ..Default::default() };
+    let config = CredaConfig {
+        synthetic_only: true,
+        ..Default::default()
+    };
     CredaCore::new(
         Box::new(MemoryStore::new()),
         Box::new(InMemorySigner::generate().unwrap()),
@@ -129,8 +138,13 @@ fn synthetic_core() -> CredaCore {
 #[test]
 fn synthetic_only_auto_tags_local_creates() {
     // A synthetic-only peer tags everything it creates; a normal peer does not.
-    let ev = synthetic_core().create_event(assert_payload(), vec![]).unwrap();
-    assert!(ev.is_test_data(), "synthetic_only must auto-tag local events as test_data");
+    let ev = synthetic_core()
+        .create_event(assert_payload(), vec![])
+        .unwrap();
+    assert!(
+        ev.is_test_data(),
+        "synthetic_only must auto-tag local events as test_data"
+    );
 
     let ev2 = core_with(PostureSetting::TreatmentPresumed)
         .create_event(assert_payload(), vec![])
@@ -164,10 +178,16 @@ fn synthetic_only_refuses_untagged_ingest_but_accepts_tagged() {
     let syn_remote = CredaCore::new(
         Box::new(MemoryStore::new()),
         Box::new(syn_signer),
-        CredaConfig { synthetic_only: true, ..Default::default() },
+        CredaConfig {
+            synthetic_only: true,
+            ..Default::default()
+        },
     );
     let tagged = syn_remote.create_event(assert_payload(), vec![]).unwrap();
     assert!(tagged.is_test_data());
     let reg2 = KeyRegistry::from_keys([syn_vk]);
-    assert!(matches!(local.ingest_event(tagged, &reg2).unwrap(), Ingest::Accepted));
+    assert!(matches!(
+        local.ingest_event(tagged, &reg2).unwrap(),
+        Ingest::Accepted
+    ));
 }

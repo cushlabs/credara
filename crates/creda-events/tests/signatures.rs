@@ -11,7 +11,8 @@ fn ed25519_node_verifies_and_rejects_tamper() {
     let vk = key.verifying_key();
 
     // Honest verification passes.
-    node.verify_signature(&vk).expect("valid signature should verify");
+    node.verify_signature(&vk)
+        .expect("valid signature should verify");
 
     // Tampering with the payload breaks verification (the signed bytes change).
     let mut tampered = node.clone();
@@ -36,7 +37,9 @@ fn signature_survives_canonical_reencode() {
     let node = common::build_assert(&key);
     let bytes = creda_events::canonical::to_vec(&node).unwrap();
     let decoded: IdentityEventNode = creda_events::canonical::from_slice(&bytes).unwrap();
-    decoded.verify_signature(&key.verifying_key()).expect("verify after re-encode");
+    decoded
+        .verify_signature(&key.verifying_key())
+        .expect("verify after re-encode");
 }
 
 #[test]
@@ -44,7 +47,10 @@ fn institution_id_must_match_signing_key() {
     let key = common::ed_key();
     let node = common::build_assert(&key);
     // institution_id is derived from the signing key's fingerprint.
-    assert_eq!(node.institution_id.as_bytes(), key.verifying_key().fingerprint().as_slice());
+    assert_eq!(
+        node.institution_id.as_bytes(),
+        key.verifying_key().fingerprint().as_slice()
+    );
 }
 
 // ---- PQC algorithms (feature = "pqc", on by default) ---------------------------------------

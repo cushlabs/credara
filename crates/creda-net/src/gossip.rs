@@ -26,7 +26,11 @@ pub struct GossipBatch {
 
 impl GossipBatch {
     pub fn new(sender: Vec<u8>, sequence: u64, events: Vec<IdentityEventNode>) -> Self {
-        Self { sender, sequence, events }
+        Self {
+            sender,
+            sequence,
+            events,
+        }
     }
 
     /// Serialize to canonical-CBOR bytes for the wire.

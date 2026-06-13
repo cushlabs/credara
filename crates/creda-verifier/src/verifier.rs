@@ -47,7 +47,9 @@ pub struct Verifier {
 
 impl Verifier {
     pub fn new(staleness_threshold_secs: i64) -> Self {
-        Self { staleness_threshold_secs }
+        Self {
+            staleness_threshold_secs,
+        }
     }
 
     /// Verify a use against the local store. `last_sync_unix_secs` is the time of the most recent
@@ -71,13 +73,17 @@ impl Verifier {
             now_unix_secs,
             &HashMap::new(),
         );
-        let authorized =
-            decision.authorized && decision.covering_grants.contains(&request.governing_grant_id);
+        let authorized = decision.authorized
+            && decision
+                .covering_grants
+                .contains(&request.governing_grant_id);
 
         // 2. Identity continuity — the governing Grant is present and bound to this subgraph
         //    (materialization only reaches it if it is connected to the entry points, §5.2.1).
         let identity_continuity = matches!(
-            subgraph.get(&request.governing_grant_id).map(|n| n.event_type),
+            subgraph
+                .get(&request.governing_grant_id)
+                .map(|n| n.event_type),
             Some(IdentityEventType::AuthorizationGrant)
         );
 

@@ -97,9 +97,17 @@ impl Default for ConfidenceConfig {
             attest_weight: 25,
             saturation_k: 100,
             // Names: full for 2y, linear to 30% by 7y.
-            slow_decay: DecayCurve { full_secs: 2 * YEAR, floor_after_secs: 7 * YEAR, floor_pct: 30 },
+            slow_decay: DecayCurve {
+                full_secs: 2 * YEAR,
+                floor_after_secs: 7 * YEAR,
+                floor_pct: 30,
+            },
             // Address/insurance: full for 0.5y, linear to 10% by 3.5y.
-            fast_decay: DecayCurve { full_secs: YEAR / 2, floor_after_secs: 7 * YEAR / 2, floor_pct: 10 },
+            fast_decay: DecayCurve {
+                full_secs: YEAR / 2,
+                floor_after_secs: 7 * YEAR / 2,
+                floor_pct: 10,
+            },
         }
     }
 }

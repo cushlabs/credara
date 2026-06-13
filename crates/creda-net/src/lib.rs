@@ -48,7 +48,9 @@ mod util;
 pub mod libp2p_adapter;
 
 pub use antientropy::{merkle_root, reconcile, MerkleRoot, Reconciliation};
-pub use bucketing::{bucket_of, topic_for_bucket, topic_for_key, DhtKey, BUCKET_COUNT, TOPIC_PREFIX};
+pub use bucketing::{
+    bucket_of, topic_for_bucket, topic_for_key, DhtKey, BUCKET_COUNT, TOPIC_PREFIX,
+};
 pub use error::{Error, Result};
 pub use gossip::{BatchConfig, GossipBatch, SeenSet};
 pub use snapshot::{Snapshot, SnapshotManifest};

@@ -9,7 +9,7 @@ use creda_events::{
 };
 use creda_graph::{AuthorizationQuery, RequesterContext};
 use creda_store::{MemoryStore, Store};
-use creda_verifier::{VerifyRequest, Verifier};
+use creda_verifier::{Verifier, VerifyRequest};
 
 const NOW: i64 = 1_800_000_000;
 
@@ -35,7 +35,11 @@ fn mk_assert(k: &SigningKey) -> IdentityEventNode {
     .unwrap()
 }
 
-fn mk_grant(k: &SigningKey, parent: EventId, requester: &CertificateFingerprint) -> IdentityEventNode {
+fn mk_grant(
+    k: &SigningKey,
+    parent: EventId,
+    requester: &CertificateFingerprint,
+) -> IdentityEventNode {
     IdentityEventNode::create(
         EventPayload::AuthorizationGrant {
             scope: AuthorizationScope::default(),
@@ -56,7 +60,9 @@ fn mk_grant(k: &SigningKey, parent: EventId, requester: &CertificateFingerprint)
 
 fn mk_revoke(k: &SigningKey, grant_id: EventId) -> IdentityEventNode {
     IdentityEventNode::create(
-        EventPayload::AuthorizationRevocation { target_grant_id: grant_id },
+        EventPayload::AuthorizationRevocation {
+            target_grant_id: grant_id,
+        },
         vec![grant_id],
         k,
         3,
@@ -101,7 +107,11 @@ fn valid_use_verifies() {
     };
     // Fresh sync (last_sync == now).
     let report = verifier.verify(&store, &req, NOW, NOW).unwrap();
-    assert!(report.is_valid(), "valid use should verify: {}", report.reason);
+    assert!(
+        report.is_valid(),
+        "valid use should verify: {}",
+        report.reason
+    );
     assert!(report.authorized && report.identity_continuity && report.provenance_intact);
     assert!(!report.stale);
 }
@@ -157,7 +167,10 @@ fn missing_parent_breaks_provenance() {
         query: query(requester),
     };
     let report = verifier.verify(&store, &req, NOW, NOW).unwrap();
-    assert!(!report.provenance_intact, "a missing parent must break provenance integrity");
+    assert!(
+        !report.provenance_intact,
+        "a missing parent must break provenance integrity"
+    );
     assert!(!report.is_valid());
 }
 

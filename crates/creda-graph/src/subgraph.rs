@@ -48,11 +48,12 @@ impl Subgraph {
                 continue;
             };
 
-            let enqueue = |next: EventId, seen: &mut BTreeSet<EventId>, q: &mut VecDeque<EventId>| {
-                if seen.insert(next) {
-                    q.push_back(next);
-                }
-            };
+            let enqueue =
+                |next: EventId, seen: &mut BTreeSet<EventId>, q: &mut VecDeque<EventId>| {
+                    if seen.insert(next) {
+                        q.push_back(next);
+                    }
+                };
 
             for parent in &node.parent_ids {
                 enqueue(*parent, &mut seen, &mut queue);
@@ -83,7 +84,8 @@ impl Subgraph {
     /// Build a subgraph directly from a set of nodes (used in tests and by callers that have
     /// already gathered events). Equivalent to materializing over those exact nodes.
     pub fn from_nodes(nodes: impl IntoIterator<Item = IdentityEventNode>) -> Self {
-        let nodes: BTreeMap<EventId, IdentityEventNode> = nodes.into_iter().map(|n| (n.id, n)).collect();
+        let nodes: BTreeMap<EventId, IdentityEventNode> =
+            nodes.into_iter().map(|n| (n.id, n)).collect();
         let mut children: BTreeMap<EventId, BTreeSet<EventId>> = BTreeMap::new();
         for node in nodes.values() {
             for parent in &node.parent_ids {
@@ -121,10 +123,7 @@ impl Subgraph {
     }
 
     /// Iterate events of a given type (sorted by id).
-    pub fn nodes_of_type(
-        &self,
-        ty: IdentityEventType,
-    ) -> impl Iterator<Item = &IdentityEventNode> {
+    pub fn nodes_of_type(&self, ty: IdentityEventType) -> impl Iterator<Item = &IdentityEventNode> {
         self.nodes.values().filter(move |n| n.event_type == ty)
     }
 
@@ -165,7 +164,9 @@ pub fn referenced_ids(node: &IdentityEventNode) -> Vec<EventId> {
         EventPayload::Attest {
             target_event_ids, ..
         } => target_event_ids.clone(),
-        EventPayload::Amend { target_event_id, .. } => vec![*target_event_id],
+        EventPayload::Amend {
+            target_event_id, ..
+        } => vec![*target_event_id],
         EventPayload::Tombstone {
             target_event_ids, ..
         } => target_event_ids.clone(),

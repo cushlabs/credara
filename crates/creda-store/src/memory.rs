@@ -30,7 +30,10 @@ impl Inner {
             .or_default()
             .insert(id);
         for parent in &node.parent_ids {
-            self.parent_to_children.entry(*parent).or_default().insert(id);
+            self.parent_to_children
+                .entry(*parent)
+                .or_default()
+                .insert(id);
         }
         for token in demographic_tokens(node) {
             self.token_to_events.entry(token).or_default().insert(id);

@@ -128,7 +128,10 @@ pub fn project(
     // §5.2.4 step 5: tombstoned nodes carry no demographics.
     let mut tombstoned: HashSet<EventId> = HashSet::new();
     for ts in subgraph.nodes_of_type(IdentityEventType::Tombstone) {
-        if let EventPayload::Tombstone { target_event_ids, .. } = &ts.payload {
+        if let EventPayload::Tombstone {
+            target_event_ids, ..
+        } = &ts.payload
+        {
             tombstoned.extend(target_event_ids.iter().copied());
         }
     }
@@ -139,8 +142,14 @@ pub fn project(
         if !reachable.contains(&amend.id) || validation::validate_amend(subgraph, amend).is_err() {
             continue;
         }
-        if let EventPayload::Amend { target_event_id, .. } = &amend.payload {
-            amends_by_target.entry(*target_event_id).or_default().push(amend);
+        if let EventPayload::Amend {
+            target_event_id, ..
+        } = &amend.payload
+        {
+            amends_by_target
+                .entry(*target_event_id)
+                .or_default()
+                .push(amend);
         }
     }
 
@@ -150,7 +159,10 @@ pub fn project(
         if !reachable.contains(&attest.id) {
             continue;
         }
-        if let EventPayload::Attest { target_event_ids, .. } = &attest.payload {
+        if let EventPayload::Attest {
+            target_event_ids, ..
+        } = &attest.payload
+        {
             for tid in target_event_ids {
                 attesters
                     .entry(*tid)
@@ -166,12 +178,17 @@ pub fn project(
         if !reachable.contains(&assert.id) || tombstoned.contains(&assert.id) {
             continue;
         }
-        let EventPayload::Assert { verification_method, .. } = &assert.payload else {
+        let EventPayload::Assert {
+            verification_method,
+            ..
+        } = &assert.payload
+        else {
             continue;
         };
 
         let (demographics, basis) = resolve_amend_chain(assert, &amends_by_target, &tombstoned);
-        let age_secs = now_unix_secs - unix_secs(&basis.wall_clock_timestamp).unwrap_or(now_unix_secs);
+        let age_secs =
+            now_unix_secs - unix_secs(&basis.wall_clock_timestamp).unwrap_or(now_unix_secs);
         let assert_attesters = attesters.get(&assert.id).cloned().unwrap_or_default();
 
         for (key, value) in field_values(demographics) {
@@ -197,7 +214,10 @@ pub fn project(
         // conflict open; attestations on *two or more* competing values is itself a disagreement,
         // so it stays disputed. This is what lets the clinician's "resolve DOB" attestation stick
         // across a refresh — the resolution is the persisted Attest, not transient client state.
-        let attested_values = value_map.values().filter(|g| !g.attesters.is_empty()).count();
+        let attested_values = value_map
+            .values()
+            .filter(|g| !g.attesters.is_empty())
+            .count();
         // Identifier bags are sets of valid identifiers, not competing values (§3.4.1) — a patient
         // legitimately holds several MRNs / member ids at once, so they never count as a dispute.
         let identifier_set = matches!(&key, FieldKey::Mrn | FieldKey::InsuranceMemberId);
@@ -240,7 +260,10 @@ fn resolve_amend_chain<'a>(
     }
     let demographics = match &cur.payload {
         EventPayload::Assert { demographics, .. } => demographics,
-        EventPayload::Amend { updated_demographics, .. } => updated_demographics,
+        EventPayload::Amend {
+            updated_demographics,
+            ..
+        } => updated_demographics,
         // resolve_amend_chain only ever lands on an Assert or an Amend.
         _ => match &assert.payload {
             EventPayload::Assert { demographics, .. } => demographics,
@@ -265,7 +288,9 @@ fn reachable_excluding(
         }
     }
     while let Some(id) = queue.pop_front() {
-        let Some(node) = subgraph.get(&id) else { continue };
+        let Some(node) = subgraph.get(&id) else {
+            continue;
+        };
         let mut neighbors: Vec<EventId> = node.parent_ids.clone();
         neighbors.extend(subgraph.children_of(&id));
         for n in neighbors {
@@ -310,7 +335,10 @@ fn field_values(d: &Demographics) -> Vec<(FieldKey, String)> {
     // (see the disputed computation). The issuing institution / payer is carried in the value, unit-
     // separated from the identifier, so a reader can show "institution · id" without the signer.
     for mrn in &d.mrns {
-        out.push((FieldKey::Mrn, format!("{}\u{1f}{}", mrn.institution_id.0, mrn.value.0)));
+        out.push((
+            FieldKey::Mrn,
+            format!("{}\u{1f}{}", mrn.institution_id.0, mrn.value.0),
+        ));
     }
     for ins in &d.insurance_member_ids {
         out.push((

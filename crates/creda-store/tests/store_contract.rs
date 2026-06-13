@@ -76,9 +76,18 @@ fn contract(store: &dyn Store) {
         .contains(&a1.id));
 
     // Index 1: demographic token -> entry points.
-    assert!(store.entry_points_by_token("tok-smith").unwrap().contains(&a1.id));
-    assert!(store.entry_points_by_token("tok-dob").unwrap().contains(&a1.id));
-    assert!(store.entry_points_by_token("absent-token").unwrap().is_empty());
+    assert!(store
+        .entry_points_by_token("tok-smith")
+        .unwrap()
+        .contains(&a1.id));
+    assert!(store
+        .entry_points_by_token("tok-dob")
+        .unwrap()
+        .contains(&a1.id));
+    assert!(store
+        .entry_points_by_token("absent-token")
+        .unwrap()
+        .is_empty());
 
     // Index 4: parent -> children.
     let child = attest_child(&ka, a1.id);
@@ -93,7 +102,10 @@ fn contract(store: &dyn Store) {
     let a_events = store.events_by_institution(&a1.institution_id).unwrap();
     assert!(a_events.contains(&a1.id) && a_events.contains(&child.id));
     assert!(!a_events.contains(&b1.id));
-    assert_eq!(store.events_by_institution(&b1.institution_id).unwrap(), vec![b1.id]);
+    assert_eq!(
+        store.events_by_institution(&b1.institution_id).unwrap(),
+        vec![b1.id]
+    );
 
     // put_event is idempotent.
     store.put_event(&a1).unwrap();
@@ -104,9 +116,15 @@ fn contract(store: &dyn Store) {
     let children_before = store.children_of(&a1.id).unwrap();
     let inst_before = store.events_by_institution(&a1.institution_id).unwrap();
     store.rebuild_indexes().unwrap();
-    assert_eq!(store.entry_points_by_token("tok-smith").unwrap(), tokens_before);
+    assert_eq!(
+        store.entry_points_by_token("tok-smith").unwrap(),
+        tokens_before
+    );
     assert_eq!(store.children_of(&a1.id).unwrap(), children_before);
-    assert_eq!(store.events_by_institution(&a1.institution_id).unwrap(), inst_before);
+    assert_eq!(
+        store.events_by_institution(&a1.institution_id).unwrap(),
+        inst_before
+    );
 
     // Results are returned in sorted (UUIDv7 creation-time) order.
     let ids = store.all_event_ids().unwrap();
@@ -143,8 +161,14 @@ fn rocksdb_persists_across_reopen() {
 
     let store = creda_store::RocksdbStore::open(dir.path()).unwrap();
     assert!(store.get_event(&id).unwrap().is_some());
-    assert!(store.entry_points_by_token("tok-persist").unwrap().contains(&id));
+    assert!(store
+        .entry_points_by_token("tok-persist")
+        .unwrap()
+        .contains(&id));
     // Indexes rebuilt from the on-disk event store still resolve.
     store.rebuild_indexes().unwrap();
-    assert!(store.entry_points_by_token("tok-persist").unwrap().contains(&id));
+    assert!(store
+        .entry_points_by_token("tok-persist")
+        .unwrap()
+        .contains(&id));
 }

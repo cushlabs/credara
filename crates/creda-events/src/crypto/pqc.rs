@@ -14,9 +14,7 @@
 
 use pqcrypto_mldsa::mldsa65;
 use pqcrypto_sphincsplus::sphincssha2256ssimple as slhdsa;
-use pqcrypto_traits::sign::{
-    DetachedSignature as _, PublicKey as _, SecretKey as _,
-};
+use pqcrypto_traits::sign::{DetachedSignature as _, PublicKey as _, SecretKey as _};
 
 use crate::error::{Error, Result};
 
@@ -62,7 +60,11 @@ pub fn slhdsa256s_sign(secret_bytes: &[u8], message: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Verify a detached SLH-DSA-256s signature.
-pub fn slhdsa256s_verify(public_bytes: &[u8], message: &[u8], signature_bytes: &[u8]) -> Result<()> {
+pub fn slhdsa256s_verify(
+    public_bytes: &[u8],
+    message: &[u8],
+    signature_bytes: &[u8],
+) -> Result<()> {
     let pk = slhdsa::PublicKey::from_bytes(public_bytes)
         .map_err(|e| Error::MalformedKey(format!("slh-dsa-256s public key: {e}")))?;
     let sig = slhdsa::DetachedSignature::from_bytes(signature_bytes)

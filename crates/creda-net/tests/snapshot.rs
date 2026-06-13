@@ -56,12 +56,18 @@ fn tampered_snapshot_fails_verification() {
     let mut snap = Snapshot::build(events, 1).unwrap();
     // Mutate the events without updating the manifest hash/count.
     snap.events.pop();
-    assert!(snap.verify().is_err(), "event-count mismatch must fail verification");
+    assert!(
+        snap.verify().is_err(),
+        "event-count mismatch must fail verification"
+    );
 
     // Hash mismatch with matching count.
     let mut snap2 = Snapshot::build(vec![assert_event("x"), assert_event("y")], 1).unwrap();
     snap2.events[0] = assert_event("z"); // count unchanged, content changed
-    assert!(snap2.verify().is_err(), "content-hash mismatch must fail verification");
+    assert!(
+        snap2.verify().is_err(),
+        "content-hash mismatch must fail verification"
+    );
 }
 
 #[test]
@@ -80,7 +86,11 @@ fn snapshot_moves_events_between_stores() {
     let loaded = snap.load_into_store(&dest).unwrap();
     assert_eq!(loaded, 3);
     for e in &events {
-        assert!(dest.has_event(&e.id).unwrap(), "event {} should be present after load", e.id);
+        assert!(
+            dest.has_event(&e.id).unwrap(),
+            "event {} should be present after load",
+            e.id
+        );
     }
     assert_eq!(dest.all_event_ids().unwrap().len(), 3);
 }

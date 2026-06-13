@@ -144,16 +144,22 @@ impl CredaCore {
             return Ok(Ingest::AlreadyHave);
         }
         let Some(vk) = keys.resolve(&node.institution_id) else {
-            return Ok(Ingest::Rejected("unknown signer (no key for fingerprint)".into()));
+            return Ok(Ingest::Rejected(
+                "unknown signer (no key for fingerprint)".into(),
+            ));
         };
         if node.verify_signature(&vk).is_err() {
             return Ok(Ingest::Rejected("signature verification failed".into()));
         }
         if let Err(e) = node.validate_structure() {
-            return Ok(Ingest::Rejected(format!("structural validation failed: {e}")));
+            return Ok(Ingest::Rejected(format!(
+                "structural validation failed: {e}"
+            )));
         }
         if node.verify_content_hash() == Some(false) {
-            return Ok(Ingest::Rejected("content hash does not match payload".into()));
+            return Ok(Ingest::Rejected(
+                "content hash does not match payload".into(),
+            ));
         }
         // Synthetic-only guardrail (docs/PILOT.md): on a synthetic-only network, refuse any event
         // that is not test_data-tagged — so untagged (potentially real) data cannot propagate in,
@@ -175,7 +181,12 @@ impl CredaCore {
     /// `GetEffectiveIdentity` (§10.1.3 / §5.2.4).
     pub fn effective_identity(&self, entry_points: &[EventId]) -> Result<EffectiveIdentity> {
         let subgraph = self.get_subgraph(entry_points)?;
-        Ok(project(&subgraph, entry_points, &self.confidence, now_unix_secs()))
+        Ok(project(
+            &subgraph,
+            entry_points,
+            &self.confidence,
+            now_unix_secs(),
+        ))
     }
 
     /// `MatchByTokens` (§10.1.3): candidate entry points whose demographics carry any of the
@@ -242,7 +253,8 @@ impl CredaCore {
             if let EventPayload::AuthorizationGrant { audience, .. } = &node.payload {
                 let name = match audience {
                     GrantAudience::InstitutionId(fpr) => {
-                        let hex: String = fpr.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
+                        let hex: String =
+                            fpr.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
                         format!("fpr:{hex}")
                     }
                     GrantAudience::InstitutionClass(name) => name.clone(),

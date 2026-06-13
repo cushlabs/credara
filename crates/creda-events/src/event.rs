@@ -288,7 +288,9 @@ impl IdentityEventNode {
             return None;
         }
         let payload_bytes = canonical::to_vec(&self.payload).ok()?;
-        self.content_hash.as_ref().map(|h| h.matches(&payload_bytes))
+        self.content_hash
+            .as_ref()
+            .map(|h| h.matches(&payload_bytes))
     }
 
     /// Void the content hash, e.g. as part of applying a tombstone to this node (§3.4.6).
@@ -347,17 +349,23 @@ impl IdentityEventNode {
                     ));
                 }
             }
-            EventPayload::Attest { target_event_ids, .. } if target_event_ids.is_empty() => {
+            EventPayload::Attest {
+                target_event_ids, ..
+            } if target_event_ids.is_empty() => {
                 return Err(Error::Validation(
                     "Attest must reference at least one target event".into(),
                 ));
             }
-            EventPayload::Tombstone { target_event_ids, .. } if target_event_ids.is_empty() => {
+            EventPayload::Tombstone {
+                target_event_ids, ..
+            } if target_event_ids.is_empty() => {
                 return Err(Error::Validation(
                     "Tombstone must reference at least one target event".into(),
                 ));
             }
-            EventPayload::Amend { amendment_reason, .. } if amendment_reason.trim().is_empty() => {
+            EventPayload::Amend {
+                amendment_reason, ..
+            } if amendment_reason.trim().is_empty() => {
                 return Err(Error::Validation(
                     "Amend must carry a non-empty amendment_reason".into(),
                 ));

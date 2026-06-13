@@ -32,7 +32,8 @@ pub trait NetworkTransport {
     ) -> impl std::future::Future<Output = Result<()>> + Send;
 
     /// Subscribe to a topic bucket to receive its events (§6.2.4).
-    fn subscribe_bucket(&self, bucket: u64) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn subscribe_bucket(&self, bucket: u64)
+        -> impl std::future::Future<Output = Result<()>> + Send;
 
     /// Unsubscribe from a topic bucket (during periodic subscription rebalancing, §6.2.4).
     fn unsubscribe_bucket(
@@ -69,8 +70,7 @@ pub trait NetworkTransport {
 
     /// The peer ids this peer is currently connected to (as bytes). Used by the daemon to pick
     /// targets for the anti-entropy round. Empty if no connections.
-    fn connected_peers(&self)
-        -> impl std::future::Future<Output = Result<Vec<Vec<u8>>>> + Send;
+    fn connected_peers(&self) -> impl std::future::Future<Output = Result<Vec<Vec<u8>>>> + Send;
 
     /// This peer's own libp2p peer id, as bytes.
     fn local_peer_id(&self) -> Vec<u8>;

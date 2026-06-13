@@ -188,9 +188,9 @@ impl CredaConfig {
             self.default_posture = PostureSetting::parse(&v)?;
         }
         if let Ok(v) = std::env::var("CREDA_SNAPSHOT_INTERVAL_SECS") {
-            self.snapshot_interval_secs = v
-                .parse()
-                .map_err(|_| Error::Config(format!("CREDA_SNAPSHOT_INTERVAL_SECS not a number: {v}")))?;
+            self.snapshot_interval_secs = v.parse().map_err(|_| {
+                Error::Config(format!("CREDA_SNAPSHOT_INTERVAL_SECS not a number: {v}"))
+            })?;
         }
         if let Ok(v) = std::env::var("CREDA_PARTICIPANT_REGISTRY") {
             self.participant_registry = Some(v);
@@ -265,11 +265,13 @@ mod tests {
     #[test]
     fn toml_overrides_defaults() {
         let mut c = CredaConfig::default();
-        c.apply_toml(r#"data_dir = "/data"
+        c.apply_toml(
+            r#"data_dir = "/data"
 snapshot_interval_secs = 900
 default_posture = "deny-by-default"
-"#)
-            .unwrap();
+"#,
+        )
+        .unwrap();
         assert_eq!(c.data_dir, "/data");
         assert_eq!(c.snapshot_interval_secs, 900);
         assert_eq!(c.default_posture, PostureSetting::DenyByDefault);
@@ -279,10 +281,16 @@ default_posture = "deny-by-default"
 
     #[test]
     fn validation_fails_loudly() {
-        let c = CredaConfig { snapshot_interval_secs: 0, ..Default::default() };
+        let c = CredaConfig {
+            snapshot_interval_secs: 0,
+            ..Default::default()
+        };
         assert!(c.validate().is_err());
 
-        let c2 = CredaConfig { subscribed_buckets: vec![1024], ..Default::default() }; // out of range
+        let c2 = CredaConfig {
+            subscribed_buckets: vec![1024],
+            ..Default::default()
+        }; // out of range
         assert!(c2.validate().is_err());
     }
 

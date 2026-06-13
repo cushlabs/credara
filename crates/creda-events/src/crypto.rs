@@ -85,9 +85,15 @@ struct HybridSig {
 pub enum SigningKey {
     Ed25519(Box<ed25519_dalek::SigningKey>),
     #[cfg(feature = "pqc")]
-    MlDsa65 { secret: Vec<u8>, public: Vec<u8> },
+    MlDsa65 {
+        secret: Vec<u8>,
+        public: Vec<u8>,
+    },
     #[cfg(feature = "pqc")]
-    SlhDsa256s { secret: Vec<u8>, public: Vec<u8> },
+    SlhDsa256s {
+        secret: Vec<u8>,
+        public: Vec<u8>,
+    },
     #[cfg(feature = "pqc")]
     Hybrid {
         ed: Box<ed25519_dalek::SigningKey>,
@@ -298,7 +304,10 @@ impl VerifyingKey {
                 let ed = ed25519_dalek::VerifyingKey::from_bytes(&ed_arr).map_err(|e| {
                     Error::MalformedKey(format!("invalid hybrid Ed25519 component: {e}"))
                 })?;
-                Ok(VerifyingKey::Hybrid { ed, mldsa_public: bytes[32..].to_vec() })
+                Ok(VerifyingKey::Hybrid {
+                    ed,
+                    mldsa_public: bytes[32..].to_vec(),
+                })
             }
             #[cfg(not(feature = "pqc"))]
             other => Err(Error::AlgorithmUnavailable(other.to_string())),
@@ -317,10 +326,13 @@ impl VerifyingKey {
         match self {
             VerifyingKey::Ed25519(vk) => {
                 let sig = ed25519_signature_from_bytes(&signature.signature_bytes)?;
-                vk.verify(message, &sig).map_err(|_| Error::SignatureInvalid)
+                vk.verify(message, &sig)
+                    .map_err(|_| Error::SignatureInvalid)
             }
             #[cfg(feature = "pqc")]
-            VerifyingKey::MlDsa65(pk) => pqc::mldsa65_verify(pk, message, &signature.signature_bytes),
+            VerifyingKey::MlDsa65(pk) => {
+                pqc::mldsa65_verify(pk, message, &signature.signature_bytes)
+            }
             #[cfg(feature = "pqc")]
             VerifyingKey::SlhDsa256s(pk) => {
                 pqc::slhdsa256s_verify(pk, message, &signature.signature_bytes)
@@ -340,9 +352,9 @@ impl VerifyingKey {
 }
 
 fn ed25519_signature_from_bytes(bytes: &[u8]) -> Result<ed25519_dalek::Signature> {
-    let arr: [u8; 64] = bytes
-        .try_into()
-        .map_err(|_| Error::MalformedSignature(format!("expected 64 bytes, got {}", bytes.len())))?;
+    let arr: [u8; 64] = bytes.try_into().map_err(|_| {
+        Error::MalformedSignature(format!("expected 64 bytes, got {}", bytes.len()))
+    })?;
     Ok(ed25519_dalek::Signature::from_bytes(&arr))
 }
 
@@ -365,9 +377,11 @@ mod tests {
     fn ed25519_pubkey_round_trips_through_bytes() {
         let sk = SigningKey::generate(SignatureAlgorithm::Ed25519).unwrap();
         let vk = sk.verifying_key();
-        let restored =
-            VerifyingKey::from_public_key_bytes(SignatureAlgorithm::Ed25519, &vk.public_key_bytes())
-                .unwrap();
+        let restored = VerifyingKey::from_public_key_bytes(
+            SignatureAlgorithm::Ed25519,
+            &vk.public_key_bytes(),
+        )
+        .unwrap();
         assert_eq!(restored.fingerprint(), vk.fingerprint());
         // The reconstructed key verifies a real signature.
         let sig = sk.sign(b"creda").unwrap();
@@ -389,7 +403,9 @@ mod tests {
 
     #[test]
     fn from_bytes_rejects_wrong_length() {
-        assert!(VerifyingKey::from_public_key_bytes(SignatureAlgorithm::Ed25519, &[0u8; 16]).is_err());
+        assert!(
+            VerifyingKey::from_public_key_bytes(SignatureAlgorithm::Ed25519, &[0u8; 16]).is_err()
+        );
     }
 
     #[test]

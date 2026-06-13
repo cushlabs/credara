@@ -11,7 +11,7 @@
 //! scenario shape), which is what "reproducible scenario" means here.
 
 use creda_events::{
-    AuthorizationScope, AttestPurpose, CertificateFingerprint, Demographics, EventPayload,
+    AttestPurpose, AuthorizationScope, CertificateFingerprint, Demographics, EventPayload,
     GrantAudience, GrantPurpose, IdentityEventNode, LinkMethod, SignatureAlgorithm, SigningKey,
     StructuredAddress, TestDataTag, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
 };
@@ -21,9 +21,20 @@ const WALL: &str = "2026-01-01T00:00:00Z";
 
 // Small public-domain corpora (common surnames / given names / US places — facts, not
 // copyrightable). Tokens below are synthetic stand-ins for real TEFCA-tokenized values.
-const FAMILY: &[&str] = &["smith", "johnson", "williams", "brown", "jones", "garcia", "miller", "davis"];
-const GIVEN: &[&str] = &["james", "mary", "robert", "patricia", "john", "jennifer", "michael", "linda"];
-const CITY: &[&str] = &["springfield", "franklin", "clinton", "georgetown", "madison", "salem"];
+const FAMILY: &[&str] = &[
+    "smith", "johnson", "williams", "brown", "jones", "garcia", "miller", "davis",
+];
+const GIVEN: &[&str] = &[
+    "james", "mary", "robert", "patricia", "john", "jennifer", "michael", "linda",
+];
+const CITY: &[&str] = &[
+    "springfield",
+    "franklin",
+    "clinton",
+    "georgetown",
+    "madison",
+    "salem",
+];
 const STATE: &[&str] = &["ca", "tx", "ny", "fl", "il", "pa"];
 
 /// A synthetic patient scenario (§11.4.2). Extensible; M9 implements the core set.
@@ -54,7 +65,11 @@ impl Generator {
     /// New generator with a content seed and a test-plan identifier (recorded on every event's
     /// test-data tag).
     pub fn new(seed: u64, test_id: impl Into<String>) -> Self {
-        Self { state: seed, test_id: test_id.into(), clock: 0 }
+        Self {
+            state: seed,
+            test_id: test_id.into(),
+            clock: 0,
+        }
     }
 
     /// splitmix64 — a tiny, dependency-free, deterministic PRNG.
@@ -119,7 +134,10 @@ impl Generator {
     fn assert_event(&mut self, key: &SigningKey, demographics: Demographics) -> IdentityEventNode {
         let clock = self.tick();
         IdentityEventNode::create_test_data(
-            EventPayload::Assert { demographics, verification_method: VerificationMethod::GovernmentPhotoId },
+            EventPayload::Assert {
+                demographics,
+                verification_method: VerificationMethod::GovernmentPhotoId,
+            },
             vec![],
             key,
             clock,
@@ -146,7 +164,10 @@ impl Generator {
                 // Force a conflicting date of birth across the two institutions.
                 a_demo.date_of_birth = Some(TokenizedDate("tok:1980-01-01".into()));
                 b_demo.date_of_birth = Some(TokenizedDate("tok:1990-12-31".into()));
-                vec![self.assert_event(&ka, a_demo), self.assert_event(&kb, b_demo)]
+                vec![
+                    self.assert_event(&ka, a_demo),
+                    self.assert_event(&kb, b_demo),
+                ]
             }
             Scenario::Authorized => {
                 let ka = self.signer();
@@ -196,11 +217,18 @@ impl Generator {
     /// Generate `num_patients` patients under the same scenario. Scale is configurable from a
     /// single patient to millions for load testing (§11.4.2).
     pub fn generate(&mut self, num_patients: usize, scenario: Scenario) -> Vec<IdentityEventNode> {
-        (0..num_patients).flat_map(|_| self.patient(scenario)).collect()
+        (0..num_patients)
+            .flat_map(|_| self.patient(scenario))
+            .collect()
     }
 
     /// Optionally a Link connecting the head events of two patients (for link/contest scenarios).
-    pub fn link(&mut self, signer: &SigningKey, head_a: creda_events::EventId, head_b: creda_events::EventId) -> IdentityEventNode {
+    pub fn link(
+        &mut self,
+        signer: &SigningKey,
+        head_a: creda_events::EventId,
+        head_b: creda_events::EventId,
+    ) -> IdentityEventNode {
         let clock = self.tick();
         IdentityEventNode::create_test_data(
             EventPayload::Link {

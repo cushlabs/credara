@@ -11,8 +11,8 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventType};
 use creda_events::IdentityEventNode;
+use creda_events::{CertificateFingerprint, EventId, EventPayload, IdentityEventType};
 
 use crate::error::{Error, Result};
 use crate::subgraph::Subgraph;
@@ -35,14 +35,22 @@ pub fn contest_is_valid(subgraph: &Subgraph, contest: &IdentityEventNode) -> boo
 /// Enforce the Contest party-of-the-subgraph rule (§3.4.3).
 pub fn validate_contest(subgraph: &Subgraph, contest: &IdentityEventNode) -> Result<()> {
     let EventPayload::Contest { target_link_id, .. } = &contest.payload else {
-        return Err(Error::Invariant("validate_contest called on a non-Contest event".into()));
+        return Err(Error::Invariant(
+            "validate_contest called on a non-Contest event".into(),
+        ));
     };
 
     let link = subgraph.get(target_link_id).ok_or_else(|| {
         Error::Inconsistent("contest target Link is not present in the subgraph".into())
     })?;
-    let EventPayload::Link { target_subgraph_heads, .. } = &link.payload else {
-        return Err(Error::Invariant("contest target is not a Link event".into()));
+    let EventPayload::Link {
+        target_subgraph_heads,
+        ..
+    } = &link.payload
+    else {
+        return Err(Error::Invariant(
+            "contest target is not a Link event".into(),
+        ));
     };
 
     // The party set: the Link's creator, plus every institution that created an
@@ -56,7 +64,9 @@ pub fn validate_contest(subgraph: &Subgraph, contest: &IdentityEventNode) -> Res
             if let Some(n) = subgraph.get(&member) {
                 if matches!(
                     n.event_type,
-                    IdentityEventType::Assert | IdentityEventType::Attest | IdentityEventType::Amend
+                    IdentityEventType::Assert
+                        | IdentityEventType::Attest
+                        | IdentityEventType::Amend
                 ) {
                     party.insert(n.institution_id.clone());
                 }
@@ -75,13 +85,18 @@ pub fn validate_contest(subgraph: &Subgraph, contest: &IdentityEventNode) -> Res
 
 /// Enforce the Amend originating-institution rule (§3.4.5).
 pub fn validate_amend(subgraph: &Subgraph, amend: &IdentityEventNode) -> Result<()> {
-    let EventPayload::Amend { target_event_id, .. } = &amend.payload else {
-        return Err(Error::Invariant("validate_amend called on a non-Amend event".into()));
+    let EventPayload::Amend {
+        target_event_id, ..
+    } = &amend.payload
+    else {
+        return Err(Error::Invariant(
+            "validate_amend called on a non-Amend event".into(),
+        ));
     };
 
-    let target = subgraph.get(target_event_id).ok_or_else(|| {
-        Error::Inconsistent("amend target is not present in the subgraph".into())
-    })?;
+    let target = subgraph
+        .get(target_event_id)
+        .ok_or_else(|| Error::Inconsistent("amend target is not present in the subgraph".into()))?;
 
     // TODO(trust-layer): also accept a successor key with a valid rotation chain (§3.6); key
     // rotation is not modeled until the identity/trust layer, so for now require the same
@@ -112,7 +127,9 @@ fn connected_component(
     queue.push_back(start);
 
     while let Some(id) = queue.pop_front() {
-        let Some(node) = subgraph.get(&id) else { continue };
+        let Some(node) = subgraph.get(&id) else {
+            continue;
+        };
         let mut neighbors: Vec<EventId> = node.parent_ids.clone();
         neighbors.extend(subgraph.children_of(&id));
         for n in neighbors {

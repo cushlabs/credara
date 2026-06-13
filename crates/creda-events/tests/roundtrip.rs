@@ -14,7 +14,11 @@ fn every_event_type_round_trips_through_canonical_cbor() {
     for node in common::one_of_each_event(&key) {
         let bytes = canonical::to_vec(&node).expect("serialize");
         let decoded: IdentityEventNode = canonical::from_slice(&bytes).expect("deserialize");
-        assert_eq!(node, decoded, "round-trip changed the {:?} node", node.event_type);
+        assert_eq!(
+            node, decoded,
+            "round-trip changed the {:?} node",
+            node.event_type
+        );
 
         // Re-serializing the decoded node must yield byte-identical output.
         let bytes2 = canonical::to_vec(&decoded).expect("re-serialize");
@@ -47,5 +51,9 @@ fn content_hash_matches_payload_then_voids() {
     node.void_content_hash();
     assert!(node.content_hash.is_none());
     assert!(node.content_hash_voided);
-    assert_eq!(node.verify_content_hash(), None, "voided hash should report None");
+    assert_eq!(
+        node.verify_content_hash(),
+        None,
+        "voided hash should report None"
+    );
 }

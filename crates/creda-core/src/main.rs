@@ -12,7 +12,11 @@ use creda_core::{CredaConfig, CredaCore, InMemorySigner, Result, Signer};
 use creda_store::RocksdbStore;
 
 #[derive(Parser)]
-#[command(name = "creda", version, about = "Creda peer daemon and CLI (spec §10.1)")]
+#[command(
+    name = "creda",
+    version,
+    about = "Creda peer daemon and CLI (spec §10.1)"
+)]
 struct Cli {
     /// Path to a TOML configuration file (overlays the baked-in defaults; env vars overlay it).
     #[arg(long, global = true)]
@@ -78,7 +82,10 @@ fn cmd_init(config: &CredaConfig) -> Result<()> {
     println!("Initialized Creda peer.");
     println!("  data_dir:        {}", config.data_dir);
     println!("  config:          {}", config_path.display());
-    println!("  institution_id:  {}", hex(signer.institution_id().as_bytes()));
+    println!(
+        "  institution_id:  {}",
+        hex(signer.institution_id().as_bytes())
+    );
     Ok(())
 }
 
@@ -87,7 +94,11 @@ fn cmd_snapshot(config: &CredaConfig, out: Option<PathBuf>) -> Result<()> {
     let bytes = core.snapshot_bytes()?;
     let path = out.unwrap_or_else(|| std::path::Path::new(&config.data_dir).join("snapshot.cbor"));
     std::fs::write(&path, &bytes)?;
-    println!("Wrote snapshot ({} bytes) to {}", bytes.len(), path.display());
+    println!(
+        "Wrote snapshot ({} bytes) to {}",
+        bytes.len(),
+        path.display()
+    );
     Ok(())
 }
 
@@ -124,7 +135,11 @@ fn cmd_serve(config: CredaConfig) -> Result<()> {
 fn open_core(config: &CredaConfig) -> Result<CredaCore> {
     let store = RocksdbStore::open(&config.data_dir)?;
     let signer = InMemorySigner::generate()?;
-    Ok(CredaCore::new(Box::new(store), Box::new(signer), config.clone()))
+    Ok(CredaCore::new(
+        Box::new(store),
+        Box::new(signer),
+        config.clone(),
+    ))
 }
 
 fn hex(bytes: &[u8]) -> String {

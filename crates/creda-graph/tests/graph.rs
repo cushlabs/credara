@@ -70,7 +70,12 @@ fn demo_mrn(institution: &str, value: &str) -> Demographics {
     }
 }
 
-fn assert_ev(s: &SigningKey, d: Demographics, m: VerificationMethod, wall: &str) -> IdentityEventNode {
+fn assert_ev(
+    s: &SigningKey,
+    d: Demographics,
+    m: VerificationMethod,
+    wall: &str,
+) -> IdentityEventNode {
     IdentityEventNode::create(
         EventPayload::Assert {
             demographics: d,
@@ -215,13 +220,21 @@ fn store_with(events: &[IdentityEventNode]) -> MemoryStore {
     store
 }
 
-fn project_from(events: &[IdentityEventNode], entries: &[EventId], now: i64) -> creda_graph::EffectiveIdentity {
+fn project_from(
+    events: &[IdentityEventNode],
+    entries: &[EventId],
+    now: i64,
+) -> creda_graph::EffectiveIdentity {
     let store = store_with(events);
     let sg = Subgraph::materialize(&store, entries).unwrap();
     project(&sg, entries, &ConfidenceConfig::default(), now)
 }
 
-fn query(req: CertificateFingerprint, purpose: GrantPurpose, use_mode: UseMode) -> AuthorizationQuery {
+fn query(
+    req: CertificateFingerprint,
+    purpose: GrantPurpose,
+    use_mode: UseMode,
+) -> AuthorizationQuery {
     AuthorizationQuery {
         requester: RequesterContext::new(req),
         purpose,
@@ -249,7 +262,12 @@ fn decide(
 #[test]
 fn single_assert_projects_field() {
     let k = key();
-    let a = assert_ev(&k, demo_dob("dob-1980"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &k,
+        demo_dob("dob-1980"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let ei = project_from(std::slice::from_ref(&a), &[a.id], secs(WALL));
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(!e.disputed);
@@ -261,7 +279,12 @@ fn single_assert_projects_field() {
 #[test]
 fn amend_supersedes_original() {
     let k = key();
-    let a = assert_ev(&k, demo_dob("dob-1980"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &k,
+        demo_dob("dob-1980"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let am = amend_ev(&k, a.id, demo_dob("dob-1981"), 5);
     let ei = project_from(&[a.clone(), am], &[a.id], secs(WALL));
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
@@ -272,8 +295,18 @@ fn amend_supersedes_original() {
 
 #[test]
 fn conflicting_asserts_are_disputed() {
-    let a = assert_ev(&key(), demo_dob("dob-1980"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&key(), demo_dob("dob-1990"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_dob("dob-1980"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &key(),
+        demo_dob("dob-1990"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let ei = project_from(&[a.clone(), b.clone()], &[a.id, b.id], secs(WALL));
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(e.disputed);
@@ -283,11 +316,24 @@ fn conflicting_asserts_are_disputed() {
 #[test]
 fn mrns_project_as_a_non_disputed_identifier_set() {
     // A patient holds two MRNs from two institutions — a set of valid identifiers, NOT a conflict.
-    let a = assert_ev(&key(), demo_mrn("mercy", "5582019"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&key(), demo_mrn("northside", "A-7741"), VerificationMethod::InsuranceCard, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_mrn("mercy", "5582019"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &key(),
+        demo_mrn("northside", "A-7741"),
+        VerificationMethod::InsuranceCard,
+        WALL,
+    );
     let ei = project_from(&[a.clone(), b.clone()], &[a.id, b.id], secs(WALL));
     let e = ei.field(&FieldKey::Mrn).unwrap();
-    assert!(!e.disputed, "multiple MRNs are a set of identifiers, never a dispute");
+    assert!(
+        !e.disputed,
+        "multiple MRNs are a set of identifiers, never a dispute"
+    );
     assert_eq!(e.values.len(), 2, "both MRNs are reported");
     // Each value carries the issuing institution unit-separated from the id.
     assert!(e.values.iter().any(|v| v.value == "mercy\u{1f}5582019"));
@@ -297,11 +343,24 @@ fn mrns_project_as_a_non_disputed_identifier_set() {
 #[test]
 fn attesting_one_conflicting_value_resolves_dispute() {
     // Two institutions assert conflicting DOBs (the James Whitfield seed shape): disputed.
-    let a = assert_ev(&key(), demo_dob("dob-1971-08-04"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&key(), demo_dob("dob-1971-08-14"), VerificationMethod::SelfReport, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_dob("dob-1971-08-04"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &key(),
+        demo_dob("dob-1971-08-14"),
+        VerificationMethod::SelfReport,
+        WALL,
+    );
     let open = project_from(&[a.clone(), b.clone()], &[a.id, b.id], secs(WALL));
     let e = open.field(&FieldKey::DateOfBirth).unwrap();
-    assert!(e.disputed, "two conflicting asserts with no attestation must be disputed");
+    assert!(
+        e.disputed,
+        "two conflicting asserts with no attestation must be disputed"
+    );
 
     // A clinician attests reliance on one of the two values → the disagreement is resolved in its
     // favor, and the attested value sorts first. This is what makes the resolution survive a
@@ -309,13 +368,27 @@ fn attesting_one_conflicting_value_resolves_dispute() {
     let at = attest_ev(&key(), a.id);
     let resolved = project_from(&[a.clone(), b.clone(), at], &[a.id, b.id], secs(WALL));
     let e2 = resolved.field(&FieldKey::DateOfBirth).unwrap();
-    assert!(!e2.disputed, "attesting exactly one conflicting value resolves the dispute");
-    assert_eq!(e2.values.len(), 2, "both asserted values are still reported");
-    assert_eq!(e2.values[0].value, "dob-1971-08-04", "the attested value sorts first");
+    assert!(
+        !e2.disputed,
+        "attesting exactly one conflicting value resolves the dispute"
+    );
+    assert_eq!(
+        e2.values.len(),
+        2,
+        "both asserted values are still reported"
+    );
+    assert_eq!(
+        e2.values[0].value, "dob-1971-08-04",
+        "the attested value sorts first"
+    );
 
     // Attesting the *other* value too restores the disagreement (two relied-upon values conflict).
     let at_b = attest_ev(&key(), b.id);
-    let split = project_from(&[a.clone(), b.clone(), attest_ev(&key(), a.id), at_b], &[a.id, b.id], secs(WALL));
+    let split = project_from(
+        &[a.clone(), b.clone(), attest_ev(&key(), a.id), at_b],
+        &[a.id, b.id],
+        secs(WALL),
+    );
     assert!(
         split.field(&FieldKey::DateOfBirth).unwrap().disputed,
         "attestations on two competing values is itself a disagreement"
@@ -325,13 +398,32 @@ fn attesting_one_conflicting_value_resolves_dispute() {
 #[test]
 fn independent_agreement_raises_confidence() {
     let dob = "dob-1980";
-    let a = assert_ev(&key(), demo_dob(dob), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_dob(dob),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let single = project_from(std::slice::from_ref(&a), &[a.id], secs(WALL));
     let c_single = single.field(&FieldKey::DateOfBirth).unwrap().values[0].confidence;
 
-    let b = assert_ev(&key(), demo_dob(dob), VerificationMethod::GovernmentPhotoId, WALL);
-    let c = assert_ev(&key(), demo_dob(dob), VerificationMethod::GovernmentPhotoId, WALL);
-    let three = project_from(&[a.clone(), b.clone(), c.clone()], &[a.id, b.id, c.id], secs(WALL));
+    let b = assert_ev(
+        &key(),
+        demo_dob(dob),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let c = assert_ev(
+        &key(),
+        demo_dob(dob),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let three = project_from(
+        &[a.clone(), b.clone(), c.clone()],
+        &[a.id, b.id, c.id],
+        secs(WALL),
+    );
     let e3 = three.field(&FieldKey::DateOfBirth).unwrap();
     assert!(!e3.disputed);
     assert_eq!(e3.values.len(), 1);
@@ -345,7 +437,12 @@ fn independent_agreement_raises_confidence() {
 
 #[test]
 fn government_id_beats_self_report() {
-    let g = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let g = assert_ev(
+        &key(),
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let cg = project_from(std::slice::from_ref(&g), &[g.id], secs(WALL))
         .field(&FieldKey::DateOfBirth)
         .unwrap()
@@ -375,13 +472,23 @@ fn attestation_raises_confidence() {
         .unwrap()
         .values[0]
         .confidence;
-    assert!(amplified > baseline, "attestation should raise confidence: {} vs {}", amplified, baseline);
+    assert!(
+        amplified > baseline,
+        "attestation should raise confidence: {} vs {}",
+        amplified,
+        baseline
+    );
 }
 
 #[test]
 fn tombstone_removes_demographics() {
     let k = key();
-    let a = assert_ev(&k, demo_family("smith"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &k,
+        demo_family("smith"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let t = tombstone_ev(&k, a.id);
     let ei = project_from(&[a.clone(), t], &[a.id], secs(WALL));
     assert!(
@@ -394,8 +501,18 @@ fn tombstone_removes_demographics() {
 fn valid_contest_severs_link() {
     let ka = key();
     let kb = key();
-    let a = assert_ev(&ka, demo_family("smith"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&kb, demo_family("jones"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &ka,
+        demo_family("smith"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &kb,
+        demo_family("jones"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let l = link_ev(&ka, a.id, b.id); // linker ka is a party
 
     // Without a contest: the link merges both sides, so family is disputed.
@@ -415,31 +532,57 @@ fn invalid_contest_does_not_sever_link() {
     let ka = key();
     let kb = key();
     let kc = key(); // unrelated — not a party
-    let a = assert_ev(&ka, demo_family("smith"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&kb, demo_family("jones"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &ka,
+        demo_family("smith"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &kb,
+        demo_family("jones"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let l = link_ev(&ka, a.id, b.id);
     let c = contest_ev(&kc, l.id); // not a party -> invalid
     let ei = project_from(&[a.clone(), b.clone(), l.clone(), c], &[a.id], secs(WALL));
     let fam = ei.field(&FieldKey::NameFamily).unwrap();
-    assert!(fam.disputed && fam.values.len() == 2, "an invalid contest must not sever the link");
+    assert!(
+        fam.disputed && fam.values.len() == 2,
+        "an invalid contest must not sever the link"
+    );
 }
 
 #[test]
 fn amend_by_wrong_institution_is_ignored() {
     let ka = key();
     let kb = key();
-    let a = assert_ev(&ka, demo_dob("dob-1980"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &ka,
+        demo_dob("dob-1980"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let bad = amend_ev(&kb, a.id, demo_dob("dob-1999"), 5); // wrong institution
     let ei = project_from(&[a.clone(), bad], &[a.id], secs(WALL));
     let e = ei.field(&FieldKey::DateOfBirth).unwrap();
     assert!(!e.disputed);
-    assert_eq!(e.values[0].value, "dob-1980", "an invalid amend must be ignored");
+    assert_eq!(
+        e.values[0].value, "dob-1980",
+        "an invalid amend must be ignored"
+    );
 }
 
 #[test]
 fn projection_is_deterministic() {
     let k = key();
-    let a = assert_ev(&k, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &k,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let store = store_with(std::slice::from_ref(&a));
     let sg = Subgraph::materialize(&store, &[a.id]).unwrap();
     let e1 = project(&sg, &[a.id], &ConfidenceConfig::default(), secs(WALL));
@@ -450,7 +593,12 @@ fn projection_is_deterministic() {
 #[test]
 fn fast_field_decays_with_age() {
     let now = secs(WALL);
-    let fresh = assert_ev(&key(), demo_address("addr"), VerificationMethod::GovernmentPhotoId, WALL);
+    let fresh = assert_ev(
+        &key(),
+        demo_address("addr"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let cf = project_from(std::slice::from_ref(&fresh), &[fresh.id], now)
         .field(&FieldKey::Address)
         .unwrap()
@@ -467,28 +615,61 @@ fn fast_field_decays_with_age() {
         .unwrap()
         .values[0]
         .confidence;
-    assert!(cf > co, "an older fast-decaying field should score lower: fresh {} old {}", cf, co);
+    assert!(
+        cf > co,
+        "an older fast-decaying field should score lower: fresh {} old {}",
+        cf,
+        co
+    );
 }
 
 // ---- authorization evaluation --------------------------------------------------------------
 
 #[test]
 fn deny_by_default_without_grant() {
-    let a = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let q = query(fp_of(&key()), GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(std::slice::from_ref(&a), &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
+    let d = decide(
+        std::slice::from_ref(&a),
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &HashMap::new(),
+    );
     assert!(!d.authorized);
 }
 
 #[test]
 fn treatment_presumed_authorizes_tpo_but_not_research() {
-    let a = assert_ev(&key(), demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &key(),
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let treat = query(fp_of(&key()), GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(std::slice::from_ref(&a), &[a.id], &treat, DefaultPosture::TreatmentPresumed, &HashMap::new());
+    let d = decide(
+        std::slice::from_ref(&a),
+        &[a.id],
+        &treat,
+        DefaultPosture::TreatmentPresumed,
+        &HashMap::new(),
+    );
     assert!(d.authorized && d.covering_grants.is_empty());
 
     let research = query(fp_of(&key()), GrantPurpose::Research, UseMode::ReadOnly);
-    let d2 = decide(std::slice::from_ref(&a), &[a.id], &research, DefaultPosture::TreatmentPresumed, &HashMap::new());
+    let d2 = decide(
+        std::slice::from_ref(&a),
+        &[a.id],
+        &research,
+        DefaultPosture::TreatmentPresumed,
+        &HashMap::new(),
+    );
     assert!(!d2.authorized, "research always needs an explicit grant");
 }
 
@@ -496,7 +677,12 @@ fn treatment_presumed_authorizes_tpo_but_not_research() {
 fn covering_grant_authorizes() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -507,7 +693,13 @@ fn covering_grant_authorizes() {
         None,
     );
     let q = query(req, GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone(), g.clone()], &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
+    let d = decide(
+        &[a.clone(), g.clone()],
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &HashMap::new(),
+    );
     assert!(d.authorized);
     assert_eq!(d.covering_grants, vec![g.id]);
 }
@@ -515,7 +707,12 @@ fn covering_grant_authorizes() {
 #[test]
 fn audience_mismatch_denied() {
     let kp = key();
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -526,7 +723,13 @@ fn audience_mismatch_denied() {
         None,
     );
     let q = query(fp_of(&key()), GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone(), g], &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
+    let d = decide(
+        &[a.clone(), g],
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &HashMap::new(),
+    );
     assert!(!d.authorized);
 }
 
@@ -534,7 +737,12 @@ fn audience_mismatch_denied() {
 fn revoked_grant_denied() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -546,15 +754,29 @@ fn revoked_grant_denied() {
     );
     let r = revoke_ev(&kp, g.id);
     let q = query(req, GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone(), g, r], &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
-    assert!(!d.authorized, "a validated revocation must withdraw the grant");
+    let d = decide(
+        &[a.clone(), g, r],
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &HashMap::new(),
+    );
+    assert!(
+        !d.authorized,
+        "a validated revocation must withdraw the grant"
+    );
 }
 
 #[test]
 fn expired_grant_denied() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -565,7 +787,13 @@ fn expired_grant_denied() {
         None,
     );
     let q = query(req, GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone(), g], &[a.id], &q, DefaultPosture::DenyByDefault, &HashMap::new());
+    let d = decide(
+        &[a.clone(), g],
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &HashMap::new(),
+    );
     assert!(!d.authorized);
 }
 
@@ -573,7 +801,12 @@ fn expired_grant_denied() {
 fn volume_exhausted_denied() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -589,7 +822,13 @@ fn volume_exhausted_denied() {
     let mut util = HashMap::new();
     util.insert(g.id, 2u64);
     let q = query(req, GrantPurpose::Treatment, UseMode::ReadOnly);
-    let d = decide(&[a.clone(), g], &[a.id], &q, DefaultPosture::DenyByDefault, &util);
+    let d = decide(
+        &[a.clone(), g],
+        &[a.id],
+        &q,
+        DefaultPosture::DenyByDefault,
+        &util,
+    );
     assert!(!d.authorized, "an exhausted volume limit must deny");
 }
 
@@ -597,24 +836,68 @@ fn volume_exhausted_denied() {
 fn use_mode_must_not_exceed_grant() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
 
     // ReadOnly grant cannot satisfy a ReadAndExport request.
-    let ro = grant_ev(&kp, a.id, GrantAudience::InstitutionId(req.clone()), GrantPurpose::Treatment, UseMode::ReadOnly, None, None);
+    let ro = grant_ev(
+        &kp,
+        a.id,
+        GrantAudience::InstitutionId(req.clone()),
+        GrantPurpose::Treatment,
+        UseMode::ReadOnly,
+        None,
+        None,
+    );
     let q_export = query(req.clone(), GrantPurpose::Treatment, UseMode::ReadAndExport);
-    assert!(!decide(&[a.clone(), ro], &[a.id], &q_export, DefaultPosture::DenyByDefault, &HashMap::new()).authorized);
+    assert!(
+        !decide(
+            &[a.clone(), ro],
+            &[a.id],
+            &q_export,
+            DefaultPosture::DenyByDefault,
+            &HashMap::new()
+        )
+        .authorized
+    );
 
     // ReadAndExport grant satisfies a ReadOnly request.
-    let rx = grant_ev(&kp, a.id, GrantAudience::InstitutionId(req.clone()), GrantPurpose::Treatment, UseMode::ReadAndExport, None, None);
+    let rx = grant_ev(
+        &kp,
+        a.id,
+        GrantAudience::InstitutionId(req.clone()),
+        GrantPurpose::Treatment,
+        UseMode::ReadAndExport,
+        None,
+        None,
+    );
     let q_read = query(req, GrantPurpose::Treatment, UseMode::ReadOnly);
-    assert!(decide(&[a.clone(), rx], &[a.id], &q_read, DefaultPosture::DenyByDefault, &HashMap::new()).authorized);
+    assert!(
+        decide(
+            &[a.clone(), rx],
+            &[a.id],
+            &q_read,
+            DefaultPosture::DenyByDefault,
+            &HashMap::new()
+        )
+        .authorized
+    );
 }
 
 #[test]
 fn institution_class_audience_matches() {
     let kp = key();
     let req = fp_of(&key());
-    let a = assert_ev(&kp, demo_dob("d"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &kp,
+        demo_dob("d"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let g = grant_ev(
         &kp,
         a.id,
@@ -638,8 +921,17 @@ fn institution_class_audience_matches() {
     };
     let store = store_with(&[a.clone(), g]);
     let sg = Subgraph::materialize(&store, &[a.id]).unwrap();
-    let d = evaluate(&sg, &q, DefaultPosture::DenyByDefault, secs(WALL), &HashMap::new());
-    assert!(d.authorized, "requester in the granted class should be authorized");
+    let d = evaluate(
+        &sg,
+        &q,
+        DefaultPosture::DenyByDefault,
+        secs(WALL),
+        &HashMap::new(),
+    );
+    assert!(
+        d.authorized,
+        "requester in the granted class should be authorized"
+    );
 }
 
 #[test]
@@ -660,8 +952,14 @@ fn redistribution_policy_is_honored() {
         Some(RedistributionPolicy::NoRedistribution),
     )
     .unwrap();
-    assert!(responder_may_serve(&no_redist, &originator), "originator may serve its own event");
-    assert!(!responder_may_serve(&no_redist, &other), "a recipient must not redistribute");
+    assert!(
+        responder_may_serve(&no_redist, &originator),
+        "originator may serve its own event"
+    );
+    assert!(
+        !responder_may_serve(&no_redist, &other),
+        "a recipient must not redistribute"
+    );
 
     let open = IdentityEventNode::create(
         EventPayload::Assert {
@@ -675,7 +973,10 @@ fn redistribution_policy_is_honored() {
         Some(RedistributionPolicy::Open),
     )
     .unwrap();
-    assert!(responder_may_serve(&open, &other), "Open policy lets any peer serve");
+    assert!(
+        responder_may_serve(&open, &other),
+        "Open policy lets any peer serve"
+    );
 
     let custom = IdentityEventNode::create(
         EventPayload::Assert {
@@ -689,5 +990,8 @@ fn redistribution_policy_is_honored() {
         Some(RedistributionPolicy::Custom("by-agreement".into())),
     )
     .unwrap();
-    assert!(!responder_may_serve(&custom, &other), "unknown Custom policy is conservatively denied");
+    assert!(
+        !responder_may_serve(&custom, &other),
+        "unknown Custom policy is conservatively denied"
+    );
 }

@@ -52,11 +52,7 @@ impl ReadyFlag {
 /// path on the first line, dispatches to one of `/livez`, `/readyz`, `/metrics`, and writes a
 /// short fixed response. No keep-alive, no chunked encoding, no streaming. Each probe is a
 /// fresh connection (which matches how kubelet's HTTP probes behave anyway).
-pub async fn serve_health(
-    listen: &str,
-    ready: ReadyFlag,
-    core: Arc<CredaCore>,
-) -> Result<()> {
+pub async fn serve_health(listen: &str, ready: ReadyFlag, core: Arc<CredaCore>) -> Result<()> {
     let listener = TcpListener::bind(listen)
         .await
         .map_err(|e| Error::Io(format!("health: bind {listen}: {e}")))?;

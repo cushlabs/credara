@@ -126,11 +126,7 @@ impl<T: NetworkTransport> Replicator<T> {
 
         for node in batch.events {
             // Event-level dedup: ignore a UUID we've recently seen, regardless of batch.
-            let already_seen = self
-                .seen
-                .lock()
-                .expect("dedup mutex")
-                .seen_event(&node.id);
+            let already_seen = self.seen.lock().expect("dedup mutex").seen_event(&node.id);
             if already_seen {
                 summary.duplicates += 1;
                 continue;
@@ -162,7 +158,10 @@ impl<T: NetworkTransport> Replicator<T> {
         if delta.local_missing.is_empty() {
             return Ok(summary);
         }
-        let fetched = self.transport.request_events(peer, &delta.local_missing).await?;
+        let fetched = self
+            .transport
+            .request_events(peer, &delta.local_missing)
+            .await?;
         for node in fetched {
             let outcome = self.core.ingest_event(node, &*self.resolver)?;
             summary.record(outcome);
@@ -193,7 +192,7 @@ mod tests {
 
     use creda_events::{
         AdministrativeGender, CertificateFingerprint, Demographics, SignatureAlgorithm, SigningKey,
-        TokenizedDate, TokenizedString, VerifyingKey, VerificationMethod,
+        TokenizedDate, TokenizedString, VerificationMethod, VerifyingKey,
     };
     use creda_store::MemoryStore;
 
@@ -207,7 +206,10 @@ mod tests {
             self.0.get(fp.as_bytes()).cloned()
         }
     }
-    fn resolver_for(fp: &CertificateFingerprint, vk: &VerifyingKey) -> Arc<dyn VerifyingKeyResolver> {
+    fn resolver_for(
+        fp: &CertificateFingerprint,
+        vk: &VerifyingKey,
+    ) -> Arc<dyn VerifyingKeyResolver> {
         let mut m = HashMap::new();
         m.insert(fp.as_bytes().to_vec(), vk.clone());
         Arc::new(MapResolver(m))
@@ -255,7 +257,10 @@ mod tests {
         async fn dht_provide(&self, _key: creda_net::DhtKey) -> creda_net::Result<()> {
             Ok(())
         }
-        async fn dht_find_providers(&self, _key: creda_net::DhtKey) -> creda_net::Result<Vec<Vec<u8>>> {
+        async fn dht_find_providers(
+            &self,
+            _key: creda_net::DhtKey,
+        ) -> creda_net::Result<Vec<Vec<u8>>> {
             Ok(Vec::new())
         }
         async fn request_events(
@@ -264,7 +269,11 @@ mod tests {
             ids: &[EventId],
         ) -> creda_net::Result<Vec<IdentityEventNode>> {
             let canned = self.canned.lock().unwrap();
-            Ok(canned.iter().filter(|n| ids.contains(&n.id)).cloned().collect())
+            Ok(canned
+                .iter()
+                .filter(|n| ids.contains(&n.id))
+                .cloned()
+                .collect())
         }
         async fn request_manifest(&self, _peer: &[u8]) -> creda_net::Result<Vec<EventId>> {
             let canned = self.canned.lock().unwrap();
@@ -329,7 +338,10 @@ mod tests {
         let tx = MockTransport::new(b"peerA");
         let repl_a = Replicator::new(core_a, tx.clone(), empty_resolver(), 1024);
         let bucket = repl_a.publish_event(&node).await.unwrap();
-        assert!(bucket.is_some(), "an Assert with family+DOB+sex must route to a bucket");
+        assert!(
+            bucket.is_some(),
+            "an Assert with family+DOB+sex must route to a bucket"
+        );
         let pubs = tx.published();
         assert_eq!(pubs.len(), 1);
         assert_eq!(pubs[0].0, bucket.unwrap());
@@ -382,9 +394,16 @@ mod tests {
 
         // An event from an unknown signer (no key) is also refused.
         let core_c = core_with(InMemorySigner::generate().unwrap());
-        let repl_c = Replicator::new(core_c.clone(), MockTransport::new(b"c"), empty_resolver(), 64);
+        let repl_c = Replicator::new(
+            core_c.clone(),
+            MockTransport::new(b"c"),
+            empty_resolver(),
+            64,
+        );
         let good_batch = GossipBatch::new(b"peerA".to_vec(), 0, vec![node.clone()]);
-        let s2 = repl_c.ingest_batch(&good_batch.to_bytes().unwrap()).unwrap();
+        let s2 = repl_c
+            .ingest_batch(&good_batch.to_bytes().unwrap())
+            .unwrap();
         assert_eq!(s2.rejected, 1);
         assert!(core_c.get_event(&node.id).unwrap().is_none());
     }
@@ -406,11 +425,18 @@ mod tests {
 
         // Seed peer B with `a` so the delta is exactly {b}.
         repl_b
-            .ingest_batch(&GossipBatch::new(b"seed".to_vec(), 0, vec![a.clone()]).to_bytes().unwrap())
+            .ingest_batch(
+                &GossipBatch::new(b"seed".to_vec(), 0, vec![a.clone()])
+                    .to_bytes()
+                    .unwrap(),
+            )
             .unwrap();
 
         let summary = repl_b.run_anti_entropy_round(b"peerA").await.unwrap();
-        assert_eq!(summary.accepted, 1, "AE round should fetch and accept the one missing event");
+        assert_eq!(
+            summary.accepted, 1,
+            "AE round should fetch and accept the one missing event"
+        );
         assert!(core_b.get_event(&b.id).unwrap().is_some());
     }
 
@@ -428,11 +454,18 @@ mod tests {
         tx.set_canned(vec![b.clone()]); // the transport will serve `b` on request
         let repl_b = Replicator::new(core_b.clone(), tx, resolver_for(&fp_a, &vk_a), 64);
         repl_b
-            .ingest_batch(&GossipBatch::new(b"seed".to_vec(), 0, vec![a.clone()]).to_bytes().unwrap())
+            .ingest_batch(
+                &GossipBatch::new(b"seed".to_vec(), 0, vec![a.clone()])
+                    .to_bytes()
+                    .unwrap(),
+            )
             .unwrap();
 
         let summary = repl_b.anti_entropy(b"peerA", &[a.id, b.id]).await.unwrap();
-        assert_eq!(summary.accepted, 1, "should fetch and accept the one missing event");
+        assert_eq!(
+            summary.accepted, 1,
+            "should fetch and accept the one missing event"
+        );
         assert!(core_b.get_event(&b.id).unwrap().is_some());
     }
 }

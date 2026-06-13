@@ -65,7 +65,10 @@ impl KeyRegistry {
         let path = path.as_ref();
         let mut reg = Self::new();
         let entries = std::fs::read_dir(path).map_err(|e| {
-            Error::Config(format!("reading participant registry {}: {e}", path.display()))
+            Error::Config(format!(
+                "reading participant registry {}: {e}",
+                path.display()
+            ))
         })?;
         for entry in entries {
             let entry = entry.map_err(|e| Error::Io(e.to_string()))?;
@@ -118,7 +121,9 @@ fn parse_entry(s: &str) -> Result<VerifyingKey> {
 fn decode_hex(s: &str) -> Result<Vec<u8>> {
     let s = s.trim();
     if s.len() % 2 != 0 {
-        return Err(Error::Config("hex public key has an odd number of digits".into()));
+        return Err(Error::Config(
+            "hex public key has an odd number of digits".into(),
+        ));
     }
     (0..s.len())
         .step_by(2)
@@ -184,23 +189,41 @@ mod tests {
         let node = signed_assert(&key);
         // Admitted signer -> accepted.
         let reg = KeyRegistry::from_keys([key.verifying_key()]);
-        assert_eq!(core().ingest_event(node.clone(), &reg).unwrap(), Ingest::Accepted);
+        assert_eq!(
+            core().ingest_event(node.clone(), &reg).unwrap(),
+            Ingest::Accepted
+        );
         // Unknown signer (empty registry) -> rejected.
         let empty = KeyRegistry::new();
-        assert!(matches!(core().ingest_event(node, &empty).unwrap(), Ingest::Rejected(_)));
+        assert!(matches!(
+            core().ingest_event(node, &empty).unwrap(),
+            Ingest::Rejected(_)
+        ));
     }
 
     #[test]
     fn load_dir_round_trips_a_hex_key() {
         let vk = ed25519().verifying_key();
-        let hex: String = vk.public_key_bytes().iter().map(|b| format!("{b:02x}")).collect();
+        let hex: String = vk
+            .public_key_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
         let dir = std::env::temp_dir().join(format!("creda-reg-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("mercy.key"), format!("# Mercy General\ned25519 {hex}\n")).unwrap();
+        std::fs::write(
+            dir.join("mercy.key"),
+            format!("# Mercy General\ned25519 {hex}\n"),
+        )
+        .unwrap();
         std::fs::write(dir.join("note.txt"), "ed25519 not-hex").unwrap(); // malformed -> skipped
 
         let reg = KeyRegistry::load_dir(&dir).unwrap();
-        assert_eq!(reg.len(), 1, "the one valid key loads; the malformed file is skipped");
+        assert_eq!(
+            reg.len(),
+            1,
+            "the one valid key loads; the malformed file is skipped"
+        );
         assert!(reg.resolve(&fp_of(&vk)).is_some());
         let _ = std::fs::remove_dir_all(&dir);
     }

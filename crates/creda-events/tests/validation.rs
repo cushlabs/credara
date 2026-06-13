@@ -5,13 +5,16 @@
 
 mod common;
 
+use creda_events::payload::ContestReasonCode;
 use creda_events::{
     AttestPurpose, ContestReason, EventPayload, IdentityEventNode, IdentityEventType, LinkMethod,
     TombstoneBasis,
 };
-use creda_events::payload::ContestReasonCode;
 
-fn create(payload: EventPayload, parents: Vec<creda_events::EventId>) -> creda_events::Result<IdentityEventNode> {
+fn create(
+    payload: EventPayload,
+    parents: Vec<creda_events::EventId>,
+) -> creda_events::Result<IdentityEventNode> {
     let key = common::ed_key();
     IdentityEventNode::create(payload, parents, &key, 1, common::WALL_CLOCK, None)
 }

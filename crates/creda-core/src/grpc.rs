@@ -65,7 +65,9 @@ pub struct CredaService {
 
 fn ids_from_bytes(raw: &[Vec<u8>]) -> std::result::Result<Vec<EventId>, Status> {
     raw.iter()
-        .map(|b| EventId::from_slice(b).map_err(|e| Status::invalid_argument(format!("bad id: {e}"))))
+        .map(|b| {
+            EventId::from_slice(b).map_err(|e| Status::invalid_argument(format!("bad id: {e}")))
+        })
         .collect()
 }
 
@@ -96,19 +98,28 @@ fn map_purpose(v: i32) -> std::result::Result<GrantPurpose, Status> {
         P::FederalProgram => GrantPurpose::FederalProgram,
         // The `*_UNSPECIFIED` (value 0) variant; matched by wildcard because prost strips the
         // enum-name prefix and renames it to `Unspecified`. Fail loudly (§10.1.6).
-        _ => return Err(Status::invalid_argument("purpose is required (UNSPECIFIED)")),
+        _ => {
+            return Err(Status::invalid_argument(
+                "purpose is required (UNSPECIFIED)",
+            ))
+        }
     })
 }
 
 fn map_use_mode(v: i32) -> std::result::Result<UseMode, Status> {
     use pb::UseMode as U;
-    let u = U::try_from(v).map_err(|_| Status::invalid_argument(format!("unknown use_mode {v}")))?;
+    let u =
+        U::try_from(v).map_err(|_| Status::invalid_argument(format!("unknown use_mode {v}")))?;
     Ok(match u {
         U::ReadOnly => UseMode::ReadOnly,
         U::ReadAndRely => UseMode::ReadAndRely,
         U::ReadAndExport => UseMode::ReadAndExport,
         // `*_UNSPECIFIED` (value 0); see note in `map_purpose`.
-        _ => return Err(Status::invalid_argument("use_mode is required (UNSPECIFIED)")),
+        _ => {
+            return Err(Status::invalid_argument(
+                "use_mode is required (UNSPECIFIED)",
+            ))
+        }
     })
 }
 
@@ -141,7 +152,11 @@ fn parse_event_type(s: &str) -> std::result::Result<IdentityEventType, Status> {
         "AuthorizationGrant" => AuthorizationGrant,
         "AuthorizationRevocation" => AuthorizationRevocation,
         "ExportReceipt" => ExportReceipt,
-        other => return Err(Status::invalid_argument(format!("unknown event type {other:?}"))),
+        other => {
+            return Err(Status::invalid_argument(format!(
+                "unknown event type {other:?}"
+            )))
+        }
     })
 }
 
@@ -163,7 +178,11 @@ impl Creda for CredaService {
             "creda serve: created {:?} {}{}",
             node.event_type,
             node.id,
-            if node.is_test_data() { " test=true" } else { "" },
+            if node.is_test_data() {
+                " test=true"
+            } else {
+                ""
+            },
         );
         // Fire-and-forget outbound publish. The publisher must not block; if absent, this peer
         // does not gossip its locally-created events (anti-entropy still backstops on testbed).
@@ -185,9 +204,15 @@ impl Creda for CredaService {
             Some(node) => {
                 let event_cbor =
                     canonical::to_vec(&node).map_err(|e| Status::internal(e.to_string()))?;
-                Ok(Response::new(GetEventReply { found: true, event_cbor }))
+                Ok(Response::new(GetEventReply {
+                    found: true,
+                    event_cbor,
+                }))
             }
-            None => Ok(Response::new(GetEventReply { found: false, event_cbor: Vec::new() })),
+            None => Ok(Response::new(GetEventReply {
+                found: false,
+                event_cbor: Vec::new(),
+            })),
         }
     }
 
@@ -245,7 +270,11 @@ impl Creda for CredaService {
                     .map(|v| pb::EffectiveIdentityValue {
                         value: v.value.clone(),
                         confidence: u32::from(v.confidence),
-                        supporting: v.supporting.iter().map(|id| id.as_bytes().to_vec()).collect(),
+                        supporting: v
+                            .supporting
+                            .iter()
+                            .map(|id| id.as_bytes().to_vec())
+                            .collect(),
                     })
                     .collect(),
             })
@@ -385,8 +414,7 @@ async fn shutdown_signal() {
     };
     #[cfg(unix)]
     let term = async {
-        if let Ok(mut s) =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
         {
             s.recv().await;
         }
@@ -423,11 +451,12 @@ where
                 .map_err(|e| Error::Io(format!("gRPC TCP serve failed: {e}")))?;
         }
         Endpoint::Uds(path) => {
-            let listener = bind_uds(&path).map_err(|e| {
-                Error::Io(format!("binding gRPC socket {}: {e}", path.display()))
-            })?;
+            let listener = bind_uds(&path)
+                .map_err(|e| Error::Io(format!("binding gRPC socket {}: {e}", path.display())))?;
             let incoming = tokio_stream::wrappers::UnixListenerStream::new(listener);
-            let result = router.serve_with_incoming_shutdown(incoming, shutdown).await;
+            let result = router
+                .serve_with_incoming_shutdown(incoming, shutdown)
+                .await;
             // Best-effort cleanup so the next start does not trip over a stale socket.
             let _ = std::fs::remove_file(&path);
             result.map_err(|e| Error::Io(format!("gRPC UDS serve failed: {e}")))?;
@@ -670,10 +699,7 @@ struct CoreEventSource {
 
 #[cfg(feature = "libp2p")]
 impl creda_net::EventSource for CoreEventSource {
-    fn get_events(
-        &self,
-        ids: &[creda_events::EventId],
-    ) -> Vec<creda_events::IdentityEventNode> {
+    fn get_events(&self, ids: &[creda_events::EventId]) -> Vec<creda_events::IdentityEventNode> {
         self.core.get_events(ids).unwrap_or_default()
     }
     fn all_event_ids(&self) -> Vec<creda_events::EventId> {
@@ -699,7 +725,6 @@ impl EventPublisher for ChannelPublisher {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -744,7 +769,10 @@ mod tests {
         );
         assert!(map_use_mode(0).is_err()); // 0 == *_UNSPECIFIED
         assert!(map_purpose(999).is_err()); // out-of-range enum value
-        assert_eq!(parse_event_type("Assert").unwrap(), IdentityEventType::Assert);
+        assert_eq!(
+            parse_event_type("Assert").unwrap(),
+            IdentityEventType::Assert
+        );
         assert!(parse_event_type("Nope").is_err());
     }
 
@@ -767,7 +795,10 @@ mod tests {
         ));
         let counter: Arc<CountingPublisher> = Arc::new(CountingPublisher::default());
         let publisher: Arc<dyn EventPublisher> = counter.clone();
-        let service = CredaService { core, publisher: Some(publisher) };
+        let service = CredaService {
+            core,
+            publisher: Some(publisher),
+        };
 
         let payload = creda_events::EventPayload::Assert {
             demographics: creda_events::Demographics::default(),
@@ -794,7 +825,10 @@ mod tests {
             Box::new(InMemorySigner::generate().unwrap()),
             CredaConfig::default(),
         ));
-        let service = CredaService { core, publisher: None };
+        let service = CredaService {
+            core,
+            publisher: None,
+        };
 
         // An entry-point id with no stored node — exactly the demo-patient shape.
         let entry = creda_events::EventId::from_u128(0x00010203_0405_0607_0809_0a0b0c0d0e0f);
@@ -822,7 +856,11 @@ mod tests {
             .unwrap()
             .into_inner();
 
-        assert_eq!(reply.event_cbor.len(), 1, "grant under an absent entry point must be found");
+        assert_eq!(
+            reply.event_cbor.len(),
+            1,
+            "grant under an absent entry point must be found"
+        );
         let node: IdentityEventNode = canonical::from_slice(&reply.event_cbor[0]).unwrap();
         assert_eq!(node.event_type, IdentityEventType::AuthorizationGrant);
         assert_eq!(node.parent_ids, vec![entry]);

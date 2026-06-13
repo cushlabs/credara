@@ -64,8 +64,11 @@ impl RocksdbStore {
         let id = node.id.as_bytes();
 
         let inst_cf = self.cf(CF_IDX_INSTITUTION)?;
-        self.db
-            .put_cf(inst_cf, prefixed_key(&hash32(node.institution_id.as_bytes()), id), b"")?;
+        self.db.put_cf(
+            inst_cf,
+            prefixed_key(&hash32(node.institution_id.as_bytes()), id),
+            b"",
+        )?;
 
         let parent_cf = self.cf(CF_IDX_PARENT)?;
         for parent in &node.parent_ids {

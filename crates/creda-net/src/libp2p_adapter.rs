@@ -102,19 +102,47 @@ type PendingQueries = HashMap<QueryId, (ProviderReply, HashSet<PeerId>)>;
 /// Swarm in one task (it is `!Sync`) and talking to it over a channel is the idiomatic way to
 /// expose an ergonomic async API.
 enum Command {
-    PublishBatch { bucket: u64, bytes: Vec<u8>, reply: oneshot::Sender<Result<()>> },
-    Subscribe { bucket: u64, reply: oneshot::Sender<Result<()>> },
-    Unsubscribe { bucket: u64, reply: oneshot::Sender<Result<()>> },
-    DhtProvide { key: DhtKey, reply: oneshot::Sender<Result<()>> },
-    DhtFindProviders { key: DhtKey, reply: oneshot::Sender<Result<Vec<Vec<u8>>>> },
-    RequestEvents { peer: Vec<u8>, ids: Vec<EventId>, reply: oneshot::Sender<Result<PeerResponse>> },
+    PublishBatch {
+        bucket: u64,
+        bytes: Vec<u8>,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    Subscribe {
+        bucket: u64,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    Unsubscribe {
+        bucket: u64,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    DhtProvide {
+        key: DhtKey,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    DhtFindProviders {
+        key: DhtKey,
+        reply: oneshot::Sender<Result<Vec<Vec<u8>>>>,
+    },
+    RequestEvents {
+        peer: Vec<u8>,
+        ids: Vec<EventId>,
+        reply: oneshot::Sender<Result<PeerResponse>>,
+    },
     /// Anti-entropy manifest fetch (§6.1.8): "give me your UUID set so I can reconcile."
-    RequestManifest { peer: Vec<u8>, reply: oneshot::Sender<Result<PeerResponse>> },
+    RequestManifest {
+        peer: Vec<u8>,
+        reply: oneshot::Sender<Result<PeerResponse>>,
+    },
     /// Self-command emitted by the inbound-request task to send a response back through the
     /// swarm (where `&mut Swarm` is available).
-    RespondPeer { channel: ResponseChannel<PeerResponse>, response: PeerResponse },
+    RespondPeer {
+        channel: ResponseChannel<PeerResponse>,
+        response: PeerResponse,
+    },
     /// Snapshot of currently connected peer ids — for the daemon's anti-entropy round.
-    ConnectedPeers { reply: oneshot::Sender<Result<Vec<Vec<u8>>>> },
+    ConnectedPeers {
+        reply: oneshot::Sender<Result<Vec<Vec<u8>>>>,
+    },
 }
 
 /// Handle to a running Creda libp2p peer. Cloneable; all clones drive the same Swarm task.
@@ -192,7 +220,9 @@ impl Libp2pTransport {
         let (cmd_tx, cmd_rx) = mpsc::channel(256);
         let (self_tx, self_rx) = mpsc::channel(64);
         let (inbound_tx, inbound_rx) = mpsc::channel(1024);
-        tokio::spawn(run_swarm(swarm, cmd_rx, self_tx, self_rx, inbound_tx, source));
+        tokio::spawn(run_swarm(
+            swarm, cmd_rx, self_tx, self_rx, inbound_tx, source,
+        ));
 
         Ok((
             Self {
@@ -241,15 +271,22 @@ impl Libp2pTransport {
 impl NetworkTransport for Libp2pTransport {
     async fn publish_batch(&self, bucket: u64, batch: &GossipBatch) -> Result<()> {
         let bytes = batch.to_bytes()?;
-        self.send(|reply| Command::PublishBatch { bucket, bytes, reply }).await
+        self.send(|reply| Command::PublishBatch {
+            bucket,
+            bytes,
+            reply,
+        })
+        .await
     }
 
     async fn subscribe_bucket(&self, bucket: u64) -> Result<()> {
-        self.send(|reply| Command::Subscribe { bucket, reply }).await
+        self.send(|reply| Command::Subscribe { bucket, reply })
+            .await
     }
 
     async fn unsubscribe_bucket(&self, bucket: u64) -> Result<()> {
-        self.send(|reply| Command::Unsubscribe { bucket, reply }).await
+        self.send(|reply| Command::Unsubscribe { bucket, reply })
+            .await
     }
 
     async fn dht_provide(&self, key: DhtKey) -> Result<()> {
@@ -257,13 +294,17 @@ impl NetworkTransport for Libp2pTransport {
     }
 
     async fn dht_find_providers(&self, key: DhtKey) -> Result<Vec<Vec<u8>>> {
-        self.send(|reply| Command::DhtFindProviders { key, reply }).await
+        self.send(|reply| Command::DhtFindProviders { key, reply })
+            .await
     }
 
     async fn request_events(&self, peer: &[u8], ids: &[EventId]) -> Result<Vec<IdentityEventNode>> {
         let peer = peer.to_vec();
         let ids = ids.to_vec();
-        match self.send(|reply| Command::RequestEvents { peer, ids, reply }).await? {
+        match self
+            .send(|reply| Command::RequestEvents { peer, ids, reply })
+            .await?
+        {
             PeerResponse::Events { events } => Ok(events),
             PeerResponse::Manifest { .. } => Err(Error::Transport(
                 "peer returned a manifest in response to an events request".into(),
@@ -273,7 +314,10 @@ impl NetworkTransport for Libp2pTransport {
 
     async fn request_manifest(&self, peer: &[u8]) -> Result<Vec<EventId>> {
         let peer = peer.to_vec();
-        match self.send(|reply| Command::RequestManifest { peer, reply }).await? {
+        match self
+            .send(|reply| Command::RequestManifest { peer, reply })
+            .await?
+        {
             PeerResponse::Manifest { ids } => Ok(ids),
             PeerResponse::Events { .. } => Err(Error::Transport(
                 "peer returned events in response to a manifest request".into(),
@@ -314,10 +358,7 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
         request_response::Config::default(),
     );
 
-    let identify = identify::Behaviour::new(identify::Config::new(
-        "/creda/1".into(),
-        key.public(),
-    ));
+    let identify = identify::Behaviour::new(identify::Config::new("/creda/1".into(), key.public()));
 
     CredaBehaviour {
         gossipsub,
@@ -515,7 +556,11 @@ fn handle_command(
             let _ = swarm.behaviour_mut().gossipsub.unsubscribe(&topic);
             let _ = reply.send(Ok(()));
         }
-        Command::PublishBatch { bucket, bytes, reply } => {
+        Command::PublishBatch {
+            bucket,
+            bytes,
+            reply,
+        } => {
             let topic = gossipsub::IdentTopic::new(topic_for_bucket(bucket));
             let res = swarm
                 .behaviour_mut()
@@ -545,34 +590,30 @@ fn handle_command(
                 .get_providers(kad::RecordKey::new(&key));
             pending_queries.insert(query_id, (reply, HashSet::new()));
         }
-        Command::RequestEvents { peer, ids, reply } => {
-            match peer_id_from_bytes(&peer) {
-                Ok(peer_id) => {
-                    let request_id = swarm
-                        .behaviour_mut()
-                        .request_response
-                        .send_request(&peer_id, PeerRequest::Events { ids });
-                    pending_outbound.insert(request_id, reply);
-                }
-                Err(e) => {
-                    let _ = reply.send(Err(e));
-                }
+        Command::RequestEvents { peer, ids, reply } => match peer_id_from_bytes(&peer) {
+            Ok(peer_id) => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .request_response
+                    .send_request(&peer_id, PeerRequest::Events { ids });
+                pending_outbound.insert(request_id, reply);
             }
-        }
-        Command::RequestManifest { peer, reply } => {
-            match peer_id_from_bytes(&peer) {
-                Ok(peer_id) => {
-                    let request_id = swarm
-                        .behaviour_mut()
-                        .request_response
-                        .send_request(&peer_id, PeerRequest::Manifest);
-                    pending_outbound.insert(request_id, reply);
-                }
-                Err(e) => {
-                    let _ = reply.send(Err(e));
-                }
+            Err(e) => {
+                let _ = reply.send(Err(e));
             }
-        }
+        },
+        Command::RequestManifest { peer, reply } => match peer_id_from_bytes(&peer) {
+            Ok(peer_id) => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .request_response
+                    .send_request(&peer_id, PeerRequest::Manifest);
+                pending_outbound.insert(request_id, reply);
+            }
+            Err(e) => {
+                let _ = reply.send(Err(e));
+            }
+        },
         Command::RespondPeer { channel, response } => {
             // send_response returns the response back if the channel is closed (peer gone); drop.
             let _ = swarm
@@ -581,10 +622,7 @@ fn handle_command(
                 .send_response(channel, response);
         }
         Command::ConnectedPeers { reply } => {
-            let peers: Vec<Vec<u8>> = swarm
-                .connected_peers()
-                .map(|p| p.to_bytes())
-                .collect();
+            let peers: Vec<Vec<u8>> = swarm.connected_peers().map(|p| p.to_bytes()).collect();
             let _ = reply.send(Ok(peers));
         }
     }
@@ -623,8 +661,10 @@ fn parse_one_bootstrap(s: &str) -> std::result::Result<(PeerId, Multiaddr), Stri
             dial.push(proto);
         }
     }
-    let peer_id = peer_id
-        .ok_or_else(|| "missing /p2p/<peer-id> suffix; expected e.g. /ip4/1.2.3.4/tcp/4001/p2p/12D3KooW...".to_string())?;
+    let peer_id = peer_id.ok_or_else(|| {
+        "missing /p2p/<peer-id> suffix; expected e.g. /ip4/1.2.3.4/tcp/4001/p2p/12D3KooW..."
+            .to_string()
+    })?;
     Ok((peer_id, dial))
 }
 
@@ -637,7 +677,10 @@ mod bootstrap_tests {
         // A real peer-id-shaped string from libp2p's docs.
         let s = "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp";
         let (pid, dial) = parse_one_bootstrap(s).unwrap();
-        assert_eq!(pid.to_string(), "12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp");
+        assert_eq!(
+            pid.to_string(),
+            "12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp"
+        );
         assert_eq!(dial.to_string(), "/ip4/127.0.0.1/tcp/4001");
     }
 
@@ -656,7 +699,8 @@ mod bootstrap_tests {
     #[test]
     fn parse_bootstrap_skips_bad_entries() {
         let inputs = vec![
-            "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp".into(),
+            "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGjJpdU4F3VC8AxQ7gZP4mTpRf6FY2gAaXSjB3HfGm3kp"
+                .into(),
             "not-a-multiaddr".into(),
             "/ip4/10.0.0.5/tcp/4001".into(), // missing /p2p
         ];

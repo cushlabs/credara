@@ -60,7 +60,9 @@ fn canonicalize(value: Value) -> Result<Value> {
             }
             // RFC 8949 §4.2.1: sort by bytewise lexicographic order of the encoded keys.
             canon.sort_by(|a, b| a.0.cmp(&b.0));
-            Ok(Value::Map(canon.into_iter().map(|(_, k, v)| (k, v)).collect()))
+            Ok(Value::Map(
+                canon.into_iter().map(|(_, k, v)| (k, v)).collect(),
+            ))
         }
         Value::Array(items) => {
             // Arrays are positional: preserve order, canonicalize elements.
