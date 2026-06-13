@@ -45,7 +45,7 @@ tokio-stream = { version = "0.1", optional = true, features = ["net"] }
 [build-dependencies]
 # Used only when the `grpc` feature is enabled (build.rs guards on CARGO_FEATURE_GRPC); compiles
 # without protoc, and protoc is invoked only during a `--features grpc` build.
-tonic-build = "0.12"
+tonic-build = "0.14"
 
 [dev-dependencies]
 creda-events = { path = "../creda-events" }
