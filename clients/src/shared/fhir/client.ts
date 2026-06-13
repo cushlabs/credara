@@ -43,22 +43,6 @@ export interface RevokeRequest {
   grantId: string;
 }
 
-/** An off-chain access request a provider has made (FHIR Task, ephemeral bridge state). */
-export interface AccessRequest {
-  id: string;
-  patientId: string;
-  requester: string;
-  purpose: GrantPurpose;
-  use: UseMode;
-}
-
-export interface RequestAccessArgs {
-  patientId: string;
-  requester: string;
-  purpose: GrantPurpose;
-  use: UseMode;
-}
-
 export interface AmendRequest {
   patientId: string;
   /** The Assert event being amended (must be a real event UUID). */
@@ -128,20 +112,6 @@ export interface FhirBridge {
    * revocation references come back with status `revoked`.
    */
   listAuthorizations(patientId: string): Promise<CredaAuthorization[]>;
-  /**
-   * Institutions known to the network — `GET /Organization`, the distinct audience names seen in
-   * AuthorizationGrants store-wide (Core's ListInstitutions). A discovery surface for "share with
-   * an institution that already exists" rather than a full directory.
-   */
-  listInstitutions(): Promise<string[]>;
-  /**
-   * Hybrid access-request workflow (§4.3 design note) — the OFF-CHAIN half. A provider requests
-   * access by creating an ephemeral FHIR Task; the patient lists pending requests and answers with
-   * an on-chain `authorize`, then resolves the Task. Not a DAG event; not persisted.
-   */
-  requestAccess(req: RequestAccessArgs): Promise<AccessRequest>;
-  listAccessRequests(patientId: string): Promise<AccessRequest[]>;
-  resolveAccessRequest(id: string): Promise<void>;
 }
 
 class HttpBridge implements FhirBridge {
@@ -295,43 +265,6 @@ class HttpBridge implements FhirBridge {
     }
     const bundle = await this.req<Bundle>(`/Consent?patient=${encodeURIComponent(patientId)}`);
     return (bundle.entry ?? []).map((e) => consentToAuthorization(e.resource));
-  }
-
-  async listInstitutions(): Promise<string[]> {
-    interface Bundle {
-      entry?: { resource: { name?: string } }[];
-    }
-    const bundle = await this.req<Bundle>(`/Organization`);
-    return (bundle.entry ?? []).map((e) => e.resource.name ?? '').filter(Boolean);
-  }
-
-  async requestAccess(req: RequestAccessArgs): Promise<AccessRequest> {
-    const task = {
-      resourceType: 'Task',
-      status: 'requested',
-      intent: 'order',
-      for: { reference: `Patient/${req.patientId}` },
-      requester: { display: req.requester },
-      // The bridge stores `purpose|useMode`; the patient client splits it to pre-fill the grant.
-      description: `${req.purpose}|${req.use}`,
-    };
-    const res = await this.req<FhirTaskResource>(`/Task`, { method: 'POST', body: JSON.stringify(task) });
-    return taskToAccessRequest(res);
-  }
-
-  async listAccessRequests(patientId: string): Promise<AccessRequest[]> {
-    interface Bundle {
-      entry?: { resource: FhirTaskResource }[];
-    }
-    const bundle = await this.req<Bundle>(`/Task?patient=${encodeURIComponent(patientId)}`);
-    return (bundle.entry ?? []).map((e) => taskToAccessRequest(e.resource));
-  }
-
-  async resolveAccessRequest(id: string): Promise<void> {
-    await this.req(`/Task/${encodeURIComponent(id)}/$creda-resolve-request`, {
-      method: 'POST',
-      body: JSON.stringify({ resourceType: 'Parameters' }),
-    });
   }
 
   async effectiveIdentity(patientId: string): Promise<EffectiveField[]> {
@@ -501,28 +434,6 @@ function provenanceFromFhir(res: FhirProvenanceResource): CredaProvenance {
     nameGiven: sub('nameGiven')?.valueString,
     summary: sub('amendmentReason')?.valueString ?? sub('contestReason')?.valueString,
     signature: sigExt ? { algorithm, verified: true } : undefined,
-  };
-}
-
-/** The slice of a FHIR R4 Task (the bridge's ephemeral access-request) the UI reads. */
-interface FhirTaskResource {
-  resourceType: 'Task';
-  id?: string;
-  for?: { reference?: string };
-  requester?: { display?: string };
-  /** `purpose|useMode` display labels, as the bridge stored them. */
-  description?: string;
-}
-
-/** Translate the bridge's FHIR Task into the UI's AccessRequest shape (transport owns the mapping). */
-function taskToAccessRequest(res: FhirTaskResource): AccessRequest {
-  const [purpose, use] = (res.description ?? 'Treatment|Read & rely').split('|');
-  return {
-    id: res.id ?? '',
-    patientId: (res.for?.reference ?? '').replace('Patient/', ''),
-    requester: res.requester?.display ?? 'Unknown requester',
-    purpose: (CODE_TO_PURPOSE[purpose] ?? (purpose as GrantPurpose)) || 'Treatment',
-    use: (CODE_TO_USE[use] ?? (use as UseMode)) || 'Read & rely',
   };
 }
 

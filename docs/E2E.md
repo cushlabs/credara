@@ -39,10 +39,7 @@ not just reflected optimistically in the UI.
       and the Core log shows a new signed `AuthorizationGrant`.
 - [ ] Revoke it → moves to "stopped"; **refresh → still stopped**; Core log shows a signed
       `AuthorizationRevocation`.
-- [ ] Activity feed → now event-sourced from `$creda-provenance` (the real DAG): each grant,
-      revocation, and export receipt is its own entry and **survives a page reload**. Share then
-      revoke an institution → the feed shows *both* the grant and the revocation, not just the
-      revoke. (Export-receipt "access" rows appear only once real `$creda-export` events exist.)
+- [ ] ⚠️ Activity feed — not read from real ExportReceipts (gap; don't trust it as a test).
 
 ### Clinician (`/clinician`)
 - [ ] Open the seeded patient (James) → DAG renders from the real subgraph; DOB field + conflict
@@ -51,17 +48,8 @@ not just reflected optimistically in the UI.
       supporting Assert; **re-open the patient → that value's confidence is higher** (real
       re-projection, persists across refresh; `reset` restores the conflict).
 - [ ] Consent badge reflects the patient app's grant/revoke (both read the same DAG).
-- [ ] Legal name → from Core's effective identity (title-cased). Action log → event-sourced from
-      the DAG (Attest/Contest/Amend), survives refresh.
-- [ ] Request access → sends an off-chain FHIR Task (§4.3.4); it appears in the **patient app's**
-      "requests for access," and Approve there writes a real on-chain grant the clinician then sees.
-- [ ] Address + per-institution MRNs → live from Core's effective identity (MRNs are a non-disputed
-      identifier set; the issuing institution travels in the MRN payload).
-- [ ] Link-confirm challenge → derived from a real uncontested, un-attested Link (James). Confirm
-      writes a real Attest on the Link; "wrongly merged" writes a real Contest.
-- [ ] ❌ Still fixture (coverage gaps): headline confidence score, sex, worklist membership. The
-      stale-assert challenge is intentionally absent in real mode — a time-decayed assert can't be
-      seeded (Core stamps wall-clock at creation), so it's not faked.
+- [ ] ❌ Chips present: name/MRNs (fixture), worklist membership, link/stale challenges, action
+      log, request-access — **coverage gaps**, not valid tests yet.
 
 ### Prior-auth (`/prior-auth`)
 - [ ] Submit a bundle → Core log shows a signed `Attest`.

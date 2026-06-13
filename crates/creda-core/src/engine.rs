@@ -227,35 +227,6 @@ impl CredaCore {
     }
 
     /// Number of events in the local store (`GetMetrics`, §10.1.3).
-    /// Distinct institution audience display names appearing in AuthorizationGrants across the
-    /// whole local store (not a single subgraph) — the network-wide "institutions seen here" list
-    /// behind the Bridge's `GET /Organization` search. `InstitutionId` audiences (raw fingerprints)
-    /// render as `fpr:<hex>`; class / wildcard audiences are their literal names. Synthetic-pilot
-    /// scale: a full store scan is acceptable; revisit with a by-type index if the store grows.
-    pub fn list_institutions(&self) -> Result<Vec<String>> {
-        use creda_events::GrantAudience;
-        let mut names: BTreeSet<String> = BTreeSet::new();
-        for id in self.store.all_event_ids()? {
-            let Some(node) = self.store.get_event(&id)? else {
-                continue;
-            };
-            if let EventPayload::AuthorizationGrant { audience, .. } = &node.payload {
-                let name = match audience {
-                    GrantAudience::InstitutionId(fpr) => {
-                        let hex: String = fpr.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
-                        format!("fpr:{hex}")
-                    }
-                    GrantAudience::InstitutionClass(name) => name.clone(),
-                    GrantAudience::ConstrainedWildcard(pattern) => pattern.clone(),
-                };
-                if !name.is_empty() {
-                    names.insert(name);
-                }
-            }
-        }
-        Ok(names.into_iter().collect())
-    }
-
     pub fn event_count(&self) -> Result<usize> {
         Ok(self.store.all_event_ids()?.len())
     }

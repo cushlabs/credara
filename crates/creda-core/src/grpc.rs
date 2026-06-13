@@ -44,8 +44,8 @@ pub mod pb {
 use pb::creda_server::{Creda, CredaServer};
 use pb::{
     AuthReply, AuthRequest, CreateEventRequest, EffectiveIdentityReply, Empty, EntryPoints,
-    EventReply, GetEventReply, GetEventRequest, InstitutionsReply, MatchReply, MatchRequest,
-    Metrics, SubgraphEventsReply, SubgraphEventsRequest,
+    EventReply, GetEventReply, GetEventRequest, MatchReply, MatchRequest, Metrics,
+    SubgraphEventsReply, SubgraphEventsRequest,
 };
 
 /// Fire-and-forget hook the gRPC service invokes after a locally created event has been signed
@@ -157,14 +157,6 @@ impl Creda for CredaService {
         let parents = ids_from_bytes(&req.parent_ids)?;
         let core = self.core.clone();
         let node = blocking(move || core.create_event(payload, parents)).await?;
-        // Real-time activity line so `kubectl logs -f` shows events as they happen (not just
-        // startup). `test=…` flags synthetic events (§11.4).
-        eprintln!(
-            "creda serve: created {:?} {}{}",
-            node.event_type,
-            node.id,
-            if node.is_test_data() { " test=true" } else { "" },
-        );
         // Fire-and-forget outbound publish. The publisher must not block; if absent, this peer
         // does not gossip its locally-created events (anti-entropy still backstops on testbed).
         if let Some(publisher) = &self.publisher {
@@ -319,15 +311,6 @@ impl Creda for CredaService {
         let core = self.core.clone();
         let event_count = blocking(move || core.event_count()).await? as u64;
         Ok(Response::new(Metrics { event_count }))
-    }
-
-    async fn list_institutions(
-        &self,
-        _request: Request<Empty>,
-    ) -> std::result::Result<Response<InstitutionsReply>, Status> {
-        let core = self.core.clone();
-        let names = blocking(move || core.list_institutions()).await?;
-        Ok(Response::new(InstitutionsReply { names }))
     }
 }
 
@@ -554,18 +537,8 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             let repl = replicator.clone();
             tokio::spawn(async move {
                 while let Some(bytes) = inbound.recv().await {
-                    match repl.ingest_batch(&bytes) {
-                        // Real-time activity line: surface inbound events as they arrive over
-                        // gossip (quiet when a batch is all duplicates).
-                        Ok(summary) => {
-                            if summary.accepted > 0 || summary.rejected > 0 {
-                                eprintln!(
-                                    "creda serve: gossip ingest accepted={} duplicates={} rejected={}",
-                                    summary.accepted, summary.duplicates, summary.rejected,
-                                );
-                            }
-                        }
-                        Err(e) => eprintln!("creda serve: gossip ingest error: {e}"),
+                    if let Err(e) = repl.ingest_batch(&bytes) {
+                        eprintln!("creda serve: gossip ingest error: {e}");
                     }
                 }
             });
@@ -577,26 +550,12 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                 tokio::sync::mpsc::channel::<IdentityEventNode>(1024);
             let repl_out = replicator.clone();
             tokio::spawn(async move {
-                // "No peers subscribed" is normal for a lone peer (nothing to gossip to yet) —
-                // the event is stored locally and anti-entropy backfills once a peer joins. Log it
-                // ONCE rather than per event so a single-peer testbed log isn't drowned in it.
-                let mut warned_no_peers = false;
                 while let Some(node) = pub_rx.recv().await {
                     match repl_out.publish_event(&node).await {
                         Ok(Some(_bucket)) => {}
                         Ok(None) => eprintln!(
                             "creda serve: publish skipped — event has no routable bucket yet"
                         ),
-                        Err(e) if e.to_string().contains("NoPeersSubscribedToTopic") => {
-                            if !warned_no_peers {
-                                warned_no_peers = true;
-                                eprintln!(
-                                    "creda serve: no peers subscribed to gossip yet — events are \
-                                     stored locally and will sync via anti-entropy when a peer \
-                                     joins (normal for a single-peer deployment; silencing repeats)"
-                                );
-                            }
-                        }
                         Err(e) => eprintln!("creda serve: publish error: {e}"),
                     }
                 }

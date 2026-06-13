@@ -33,9 +33,6 @@ export function PatientDetailPage() {
   // revocation made in the patient app shows here because both views read the same DAG. The
   // real patient is resolved by demographic token (stable across `make -C testbed reset`).
   const [liveConsent, setLiveConsent] = useState<PatientProjection['consent'] | null>(null);
-  // The patient's real subgraph entry-point id (resolved by demographic token), so an access
-  // request targets the same id the patient app reads — not the fixture id.
-  const [realPatientId, setRealPatientId] = useState<string | null>(null);
   useEffect(() => {
     if (!patient) return;
     let cancelled = false;
@@ -43,7 +40,6 @@ export function PatientDetailPage() {
       try {
         const family = patient.name.split(' ').pop()?.toLowerCase() ?? '';
         const ids = await bridge.searchPatientsByToken([`tok:demo:${family}`]);
-        if (!cancelled && ids[0]) setRealPatientId(ids[0]);
         const grants = await bridge.listAuthorizations(ids[0] ?? patient.id);
         if (cancelled || grants.length === 0) return;
         const active = grants.find((g) => g.status === 'active');
@@ -74,23 +70,7 @@ export function PatientDetailPage() {
     };
   }, [bridge, patient]);
 
-  // Just-written-this-session actions (optimistic; not yet re-read into the DAG). These are the
-  // only ones rendered as "fresh" extra DAG nodes — they become real graph nodes on next refresh.
-  const sessionLog = actionLog[patientId] ?? [];
-  // Identity actions on this record, EVENT-SOURCED from the real DAG (Attest/Contest/Amend), so the
-  // log survives a refresh instead of being session-only memory. Combined with the session writes
-  // above for instant feedback before the next read.
-  const derivedActions: ActionLogEntry[] = patient
-    ? patient.events
-        .filter((e) => e.type === 'Attest' || e.type === 'Contest' || e.type === 'Amend')
-        .map((e) => ({
-          eventType: e.type as ActionLogEntry['eventType'],
-          summary: e.summary,
-          when: `${e.when} · ${e.inst}`,
-          receipt: null,
-        }))
-    : [];
-  const logEntries = [...derivedActions, ...sessionLog];
+  const logEntries = actionLog[patientId] ?? [];
 
   /** Combined DAG: projection events + freshly-recorded actions from this session. */
   const dagNodes: DagNode[] = useMemo(() => {
@@ -105,7 +85,7 @@ export function PatientDetailPage() {
       parents: e.parents,
     }));
     const rightmost = base.length ? Math.max(...base.map((n) => n.x)) : 120;
-    const extras: DagNode[] = sessionLog.map((entry, i) => ({
+    const extras: DagNode[] = logEntries.map((entry, i) => ({
       id: `x-${i}`,
       type: entry.eventType as EventType,
       inst: 'Mercy General (you)',
@@ -116,7 +96,7 @@ export function PatientDetailPage() {
       fresh: true,
     }));
     return [...base, ...extras];
-  }, [patient, sessionLog]);
+  }, [patient, logEntries]);
 
   if (!patient) {
     return (
@@ -201,7 +181,7 @@ export function PatientDetailPage() {
             {patientView.demo ? (
               <DemoData detail="This patient isn't in your seeded network — shown from fixtures." />
             ) : (
-              <DemoData what="Confidence/sex demo" detail="Identity is live from Core (legal name, DOB, address, MRNs, consent, links); the headline confidence score and sex are still fixture." />
+              <DemoData what="Name/MRNs demo" detail="DOB and consent are live from Core; name, MRNs and address are fixture (not modeled by the seed dataset yet)." />
             )}
           </div>
           <div className="meta">
@@ -229,29 +209,18 @@ export function PatientDetailPage() {
           <ConsentCard
             patient={patientView}
             requested={accessRequestedFlag}
-            onRequestAccess={async () => {
-              try {
-                // Off-chain request (FHIR Task) — the patient answers it with an on-chain grant.
-                await bridge.requestAccess({
-                  patientId: realPatientId ?? patient.id,
-                  requester: 'Mercy General',
-                  purpose: 'Treatment',
-                  use: 'Read & rely',
-                });
-                requestAccess(patient.id); // local button-state flag
-                toast.show('Access request sent to the patient');
-              } catch (err) {
-                toast.show(`Bridge error: ${(err as Error).message}`);
-              }
+            onRequestAccess={() => {
+              requestAccess(patient.id);
+              toast.show('Access request sent to the patient');
             }}
           />
           <Section title="Effective identity" aside={<span className="muted" style={{ fontSize: 12 }}>projected from the DAG · §5.2.4</span>}>
             {cm.ok ? patient.fields.map((f, i) => <FieldRow key={i} f={f} />) : <LockedIdentity />}
           </Section>
-          <Section title="Identity actions on this record" aside={<span className="muted" style={{ fontSize: 12 }}>from the DAG · Attest / Contest / Amend</span>}>
+          <Section title="Actions taken this visit">
             <div className="log">
               {logEntries.length === 0 ? (
-                <div className="empty">No identity actions on this record yet.</div>
+                <div className="empty">No actions recorded yet this visit.</div>
               ) : (
                 logEntries.map((r, i) => (
                   <div className="row" key={i}>
@@ -309,7 +278,7 @@ export function PatientDetailPage() {
         onClose={() => setSelectedEvent(null)}
         header={<SlideOverHeader patient={patient} eventId={selectedEvent} />}
       >
-        {selectedEvent && <EventDetail patient={patient} eventId={selectedEvent} logEntries={sessionLog} />}
+        {selectedEvent && <EventDetail patient={patient} eventId={selectedEvent} logEntries={logEntries} />}
       </SlideOver>
 
       <Modal

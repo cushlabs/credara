@@ -100,61 +100,6 @@ function dobField(identity: EffectiveField[]): EffectiveField | undefined {
 
 const confPct = (bp: number): number => Math.round(bp / 100);
 
-/** Title-case a detokenized name part (demo tokens are lowercase, e.g. `tok:demo:whitfield`). */
-function titleCase(s: string): string {
-  return s.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** Core's top-confidence value for a name field, title-cased, or undefined if absent. */
-function namePart(identity: EffectiveField[], key: 'name-given' | 'name-middle' | 'name-family'): { value: string; conf: number } | undefined {
-  const f = identity.find((x) => x.key === key);
-  if (!f || f.values.length === 0) return undefined;
-  const v = detokenize(f.values[0].value);
-  if (!v) return undefined;
-  return { value: titleCase(v), conf: confPct(f.values[0].confidence) };
-}
-
-/**
- * Per-institution MRNs from Core's effective identity. Each `mrn` value is `institution\u{1f}id`
- * (the issuing institution travels in the identifier payload), rendered as "Institution · MRN id".
- */
-function mrnList(identity: EffectiveField[]): string[] {
-  const f = identity.find((x) => x.key === 'mrn');
-  if (!f) return [];
-  return f.values.map((v) => {
-    const [inst, id] = v.value.split('\u{1f}');
-    return `${titleCase(detokenize(inst) ?? inst)} · MRN ${detokenize(id) ?? id}`;
-  });
-}
-
-/** Address from Core's effective identity — unit-separated tokenized components, detokenized + joined. */
-function addressValue(identity: EffectiveField[]): { value: string; conf: number } | undefined {
-  const f = identity.find((x) => x.key === 'address');
-  if (!f || f.values.length === 0) return undefined;
-  const parts = f.values[0].value
-    .split('\u{1f}')
-    .map((p) => detokenize(p) ?? '')
-    .filter(Boolean);
-  if (parts.length === 0) return undefined;
-  return { value: parts.join(', '), conf: confPct(f.values[0].confidence) };
-}
-
-/**
- * Build the legal-name PatientField from Core's effective identity (given + middle + family),
- * title-cased from the demo tokens. Confidence is the lowest across the present parts (a name is
- * only as trustworthy as its weakest component). Returns undefined when Core carries no name.
- */
-function legalNameField(identity: EffectiveField[]): { value: string; conf: number } | undefined {
-  const parts = (['name-given', 'name-middle', 'name-family'] as const)
-    .map((k) => namePart(identity, k))
-    .filter((p): p is { value: string; conf: number } => !!p);
-  if (parts.length === 0) return undefined;
-  return {
-    value: parts.map((p) => p.value).join(' '),
-    conf: Math.min(...parts.map((p) => p.conf)),
-  };
-}
-
 /**
  * Build the DOB-conflict challenge from Core's effective identity (§5.2.4/§5.3) — never from
  * client-side reasoning (§8.3.2). Each option affirms one asserted value by Attesting its
@@ -202,50 +147,6 @@ export function projectDobChallenge(identity: EffectiveField[], subgraph: CredaP
 }
 
 /**
- * Build a link-confirmation challenge from a real, uncontested, not-yet-attested Link in the
- * subgraph (§3.4 / §4): a clinician confirms two records are the same person (Attest the Link) or
- * flags them as wrongly merged (Contest the Link). Returns null when there's no such Link — a Link
- * that's already attested (someone relied on it) or already contested is considered resolved, so we
- * don't re-prompt. Derived from real DAG edges, not a fixture.
- */
-export function projectLinkChallenge(subgraph: CredaProvenance[]): Challenge | null {
-  const contested = new Set(
-    subgraph.filter((e) => e.eventType === 'Contest').flatMap((c) => c.parents),
-  );
-  const attested = new Set(
-    subgraph.filter((e) => e.eventType === 'Attest').flatMap((a) => a.parents),
-  );
-  const link = subgraph.find(
-    (e) => e.eventType === 'Link' && !contested.has(e.id) && !attested.has(e.id),
-  );
-  if (!link) return null;
-
-  return {
-    id: 'link-confirm',
-    kind: 'link',
-    tag: 'Unconfirmed link',
-    title: 'Are these two records the same patient?',
-    prompt: `Core linked records from ${link.institution || 'two institutions'}${
-      link.matchScore ? ` at ${link.matchScore} match` : ''
-    }, but no one has confirmed it. Confirm against the patient in front of you.`,
-    options: [
-      {
-        label: 'Yes — same person',
-        eventType: 'Attest' as const,
-        note: 'Attests reliance on the link; downstream confidence rises and the link is treated as confirmed.',
-        targetEventId: link.id,
-      },
-      {
-        label: 'No — wrongly merged',
-        eventType: 'Contest' as const,
-        note: 'Contests the link, severing the merge in the effective identity (§5.2.4 step 4).',
-        targetEventId: link.id,
-      },
-    ],
-  };
-}
-
-/**
  * Overlay a fixture patient with live data: the DAG from the real subgraph, and the DOB field +
  * conflict challenge from Core's effective identity. The displayed DOB is Core's top-confidence
  * value; the disputed field lists each asserted value with its source + confidence. Everything
@@ -261,42 +162,15 @@ export function enrichWithSubgraph(
 
   const events = projectEvents(subgraph);
   const dobChallenge = projectDobChallenge(identity, subgraph);
-  const linkChallenge = projectLinkChallenge(subgraph);
 
-  // In real mode the DOB and link challenges are derived from live data; drop the fixture
-  // equivalents (dob/link) so we never mix fabricated challenges with real ones. The fixture
-  // 'stale' challenge is also dropped: a stale (time-decayed) assert can't be synthesized in the
-  // testbed (Core stamps wall-clock at creation, so seeded events are never old) — staleness needs
-  // real elapsed time, tracked as a testbed limitation rather than faked.
-  const otherChallenges = fixture.challenges.filter(
-    (c) => c.kind !== 'dob' && c.kind !== 'link' && c.kind !== 'stale',
-  );
-  const challenges = [dobChallenge, linkChallenge, ...otherChallenges].filter(
-    (c): c is Challenge => c !== null,
-  );
+  const otherChallenges = fixture.challenges.filter((c) => c.kind !== 'dob');
+  const challenges = dobChallenge ? [dobChallenge, ...otherChallenges] : otherChallenges;
 
   // DOB field + header from Core's effective identity (top-confidence value leads).
   const field = dobField(identity);
   const asserts = new Map(subgraph.filter((e) => e.eventType === 'Assert').map((a) => [a.id, a]));
   let dob = fixture.dob;
   let fields = fixture.fields;
-
-  // Legal name from Core's effective identity (real, title-cased from demo tokens), replacing the
-  // fixture value. Sources stay from the fixture for now (institution display names aren't on the
-  // name projection); MRNs/address remain fixture until Core projects them.
-  const name = legalNameField(identity);
-  if (name) {
-    fields = fields.map((f) => (f.key === 'Legal name' ? { ...f, value: name.value, conf: name.conf } : f));
-  }
-
-  // Address from Core's effective identity, replacing the fixture value when present.
-  const address = addressValue(identity);
-  if (address) {
-    fields = fields.map((f) => (f.key === 'Address' ? { ...f, value: address.value, conf: address.conf } : f));
-  }
-
-  // Per-institution MRNs from Core, replacing the fixture badges when present.
-  const mrns = mrnList(identity);
   if (field && field.values.length > 0) {
     dob = detokenize(field.values[0].value) ?? fixture.dob;
     fields = fixture.fields.map((f) => {
@@ -319,14 +193,5 @@ export function enrichWithSubgraph(
     });
   }
 
-  return {
-    ...fixture,
-    dob,
-    events,
-    challenges,
-    fields,
-    mrns: mrns.length > 0 ? mrns : fixture.mrns,
-    demo: false,
-    needsReview: dobChallenge || linkChallenge ? true : fixture.needsReview,
-  };
+  return { ...fixture, dob, events, challenges, fields, demo: false, needsReview: dobChallenge ? true : fixture.needsReview };
 }

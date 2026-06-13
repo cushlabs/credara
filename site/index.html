@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Credara — Verifiable identity & revocable consent across institutions</title>
+<meta name="description" content="Credara is shared, open-source infrastructure for cross-institutional patient identity provenance and portable, revocable consent in US healthcare. A peer-to-peer graph of signed events. No central node ever sees PHI." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2319b3d6'/%3E%3Cstop offset='1' stop-color='%230e6e8e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='9' cy='10' r='2.4' fill='white' stroke='none'/%3E%3Ccircle cx='9' cy='22' r='2.4' fill='white' stroke='none'/%3E%3Ccircle cx='22' cy='16' r='2.4' fill='white' stroke='none'/%3E%3Cpath d='M11 11l9 4M11 21l9-4'/%3E%3C/g%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#0b1422; --bg-2:#0f1b2d; --surface:#ffffff; --surface-2:#f7f9fc; --surface-3:#eef2f6;
+    --ink:#0f1b2d; --ink-2:#475569; --ink-3:#7c8aa0; --line:#dde4ee;
+    --primary:#0e6e8e; --bright:#19b3d6; --grad:linear-gradient(135deg,#19b3d6,#0e6e8e);
+    --auth:#6d28d9; --ok:#15803d; --warn:#b45309;
+    --radius:14px; --shadow:0 1px 2px rgba(15,27,45,.06),0 12px 34px rgba(15,27,45,.08);
+    --maxw:1140px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--surface);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  a{color:var(--primary);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}
+  h1,h2,h3{line-height:1.15;letter-spacing:-.02em;margin:0}
+  .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--bright)}
+  .eyebrow.dark{color:var(--primary)}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:650;font-size:15px;border-radius:10px;
+    padding:11px 18px;border:1px solid transparent;cursor:pointer;transition:transform .08s ease,box-shadow .12s ease,background .12s}
+  .btn:hover{text-decoration:none;transform:translateY(-1px)}
+  .btn-primary{background:var(--grad);color:#fff;box-shadow:0 6px 18px rgba(14,110,142,.35)}
+  .btn-ghost{background:rgba(255,255,255,.06);color:#eaf4fa;border-color:rgba(255,255,255,.18)}
+  .btn-ghost:hover{background:rgba(255,255,255,.12)}
+  .btn-dark{background:var(--ink);color:#fff}
+  .btn-outline{background:#fff;color:var(--ink);border-color:var(--line)}
+
+  header.nav{position:sticky;top:0;z-index:50;background:rgba(11,20,34,.72);backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,.08)}
+  .nav .row{display:flex;align-items:center;gap:26px;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:750;color:#fff;font-size:18px;letter-spacing:-.01em}
+  .brand:hover{text-decoration:none}
+  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;
+    box-shadow:0 4px 12px rgba(25,179,214,.4)}
+  .navlinks{display:flex;gap:22px;margin-left:8px}
+  .navlinks a{color:#b9c6d8;font-size:14.5px;font-weight:550}
+  .navlinks a:hover{color:#fff;text-decoration:none}
+  .nav .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .nav .right a{color:#b9c6d8;font-size:14.5px;font-weight:550}
+  .nav .right a:hover{color:#fff;text-decoration:none}
+
+  .hero{position:relative;background:radial-gradient(1200px 600px at 78% -8%,rgba(25,179,214,.18),transparent 60%),
+        radial-gradient(900px 500px at 8% 110%,rgba(109,40,217,.12),transparent 55%),
+        linear-gradient(180deg,#0b1422,#0f1b2d 60%,#0d1828);color:#eaf2f9;overflow:hidden}
+  .hero .wrap{display:grid;grid-template-columns:1.02fr .98fr;gap:40px;align-items:center;
+    padding-top:70px;padding-bottom:80px}
+  .hero h1{font-size:clamp(33px,4.2vw,53px);color:#fff;font-weight:780;margin:18px 0 0}
+  .hero h1 .accent{background:linear-gradient(120deg,#9ee7f6,#19b3d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lede{font-size:18px;color:#bdcadd;max-width:560px;margin:20px 0 0}
+  .hero .cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .hero .meta{margin-top:26px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:#8ea3bd}
+  .hero .meta b{color:#cfe0ee;font-weight:650}
+  .hero .meta .dot{color:#19b3d6}
+  .stage{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:18px;
+    background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 60px rgba(0,0,0,.35);overflow:hidden}
+  .stage svg{display:block;width:100%;height:auto}
+  .stage .cap{position:absolute;left:14px;bottom:12px;right:14px;font-size:11.5px;color:#8aa0bd;letter-spacing:.01em;
+    background:rgba(8,15,26,.5);border:1px solid rgba(255,255,255,.08);padding:6px 11px;border-radius:8px}
+  .stage .legend{position:absolute;right:14px;top:12px;display:flex;gap:12px;font-size:11px;color:#9fb3cd}
+  .stage .legend span{display:flex;align-items:center;gap:6px}
+  .stage .legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  .trustbar{background:#08111d;border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07)}
+  .trustbar .wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:16px 24px;color:#9fb3cd;font-size:13.5px}
+  .trustbar b{color:#dce8f4}
+  .trustbar .pill{display:inline-flex;align-items:center;gap:8px}
+
+  section.band{padding:82px 0}
+  section.band.alt{background:var(--surface-2)}
+  section.band.deep{background:linear-gradient(180deg,#0f1b2d,#0b1422);color:#eaf2f9}
+  .shead{max-width:760px}
+  .shead h2{font-size:clamp(26px,3vw,38px);font-weight:760;margin-top:12px}
+  .shead p{color:var(--ink-2);font-size:17px;margin-top:14px}
+  .deep .shead p{color:#bdcadd}
+  .deep .shead h2{color:#fff}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:42px}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:42px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+  .card .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--surface-3);margin-bottom:14px}
+  .card h3{font-size:18px;font-weight:700}
+  .card p{color:var(--ink-2);font-size:14.6px;margin-top:8px}
+  .card .tag{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary)}
+
+  .legal{margin-top:34px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px 26px;box-shadow:var(--shadow)}
+  .legal h3{font-size:17px}
+  .legal p{color:var(--ink-2);font-size:15px;margin-top:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chips span{font-size:12.5px;font-weight:600;color:var(--ink-2);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+
+  .spotlight{margin-top:42px;display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;overflow:hidden}
+  .spotlight .a{padding:30px 32px;background:rgba(255,255,255,.03)}
+  .spotlight .b{padding:30px 32px;background:linear-gradient(135deg,rgba(109,40,217,.16),rgba(14,110,142,.16));
+    border-left:1px solid rgba(255,255,255,.1)}
+  .spotlight h3{color:#fff;font-size:19px}
+  .spotlight p{color:#bdcadd;font-size:14.6px;margin-top:12px}
+  .spotlight .lyme{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#c4a7f5}
+
+  .exchange{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:44px;border:1px solid rgba(255,255,255,.1);
+    border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02)}
+  .exchange .col{padding:26px;border-right:1px solid rgba(255,255,255,.08)}
+  .exchange .col:last-child{border-right:0}
+  .exchange .n{font-size:12px;font-weight:800;color:#19b3d6;letter-spacing:.1em}
+  .exchange h3{color:#fff;font-size:18px;margin-top:10px}
+  .exchange p{color:#aebfd4;font-size:14.4px;margin-top:10px}
+  .exchange .kv{margin-top:14px;font-size:12.6px;color:#8ea3bd}
+  .exchange .kv code{color:#9ee7f6}
+
+  .mesh{margin-top:26px;border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0))}
+  .mesh svg{display:block;width:100%;height:auto}
+
+  .never{margin-top:26px;display:flex;gap:16px;align-items:flex-start;background:rgba(21,128,61,.10);
+    border:1px solid rgba(21,128,61,.35);border-radius:14px;padding:20px 22px}
+  .never .ic{flex:none;width:38px;height:38px;border-radius:10px;background:rgba(21,128,61,.2);display:grid;place-items:center}
+  .never h3{color:#d6f5e1;font-size:16px}
+  .never p{color:#a9c9b6;font-size:14.3px;margin-top:6px}
+
+  .peers-line{margin-top:18px;color:#aebfd4;font-size:14.6px}
+  .peers-line b{color:#dfeaf6}
+
+  table.tech{width:100%;border-collapse:collapse;margin-top:40px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  table.tech th,table.tech td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line);font-size:14.5px;vertical-align:top}
+  table.tech th{background:var(--surface-2);font-weight:700;color:var(--ink);width:230px}
+  table.tech tr:last-child td,table.tech tr:last-child th{border-bottom:0}
+  table.tech td b{color:var(--ink)}
+  table.tech td .sub{color:var(--ink-3);font-size:12.5px}
+
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:42px}
+  .stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px}
+  .stat .big{font-size:30px;font-weight:780;color:#fff;letter-spacing:-.02em}
+  .stat .lab{color:#9fb3cd;font-size:13px;margin-top:6px}
+  .stat .big .u{font-size:16px;color:#19b3d6;font-weight:650}
+  .milestones{margin-top:36px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .ms{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;padding:11px 14px;font-size:13.6px;color:#cfe0ee}
+  .ms .k{font-weight:800;color:#19b3d6;width:34px;flex:none}
+  .ms .s{margin-left:auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    color:#7fe3a6;background:rgba(21,128,61,.18);padding:3px 8px;border-radius:6px}
+  .ms .s.prog{color:#f3c178;background:rgba(180,83,9,.2)}
+  .note{margin-top:30px;background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.4);border-radius:12px;
+    padding:16px 20px;color:#f0d0a6;font-size:13.8px}
+  .note b{color:#ffd9a8}
+
+  .cta-final{background:var(--grad);color:#fff;border-radius:22px;padding:54px;margin:0 auto;max-width:var(--maxw);
+    display:grid;grid-template-columns:1.2fr 1fr;gap:36px;align-items:center;box-shadow:0 30px 70px rgba(14,110,142,.4)}
+  .cta-final h2{font-size:32px;color:#fff;font-weight:780}
+  .cta-final p{color:#e6f6fb;margin-top:14px;font-size:16.5px}
+  .cta-final .paths{display:grid;gap:12px}
+  .cta-final .path{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:16px 18px}
+  .cta-final .path b{display:block;font-size:15px}
+  .cta-final .path span{font-size:13px;color:#e2f4f9}
+  .cta-final .path code{background:rgba(0,0,0,.25);padding:2px 7px;border-radius:6px;color:#dffaff}
+
+  footer{background:#08111d;color:#90a4bf;padding:54px 0 40px;border-top:1px solid rgba(255,255,255,.08)}
+  footer .cols{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:30px}
+  footer h4{color:#cfe0ee;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;margin:0 0 14px}
+  footer a{color:#90a4bf;display:block;font-size:14px;margin-bottom:9px}
+  footer a:hover{color:#fff}
+  footer .fbrand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700;font-size:17px}
+  footer .fbrand .mark{width:28px;height:28px;border-radius:8px;background:var(--grad)}
+  footer .foot-legal{margin-top:36px;padding-top:22px;border-top:1px solid rgba(255,255,255,.08);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12.5px;color:#6f86a3}
+
+  /* ---------- SVG animation primitives (no JS) ---------- */
+  .node{opacity:0;animation:pop .55s cubic-bezier(.2,.9,.3,1.2) forwards;transform-box:fill-box;transform-origin:center}
+  @keyframes pop{0%{opacity:0;transform:scale(0)}70%{opacity:1;transform:scale(1.18)}100%{opacity:1;transform:scale(1)}}
+  .glow{opacity:0;animation:glowin .6s ease forwards,breathe 3.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+  @keyframes glowin{to{opacity:.55}}
+  @keyframes breathe{0%,100%{opacity:.30}50%{opacity:.65}}
+  .edge{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .7s ease forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  /* directed-DAG specific: event blocks, arrowed edges, forward-flow marching */
+  .dedge{opacity:0;animation:efade .5s ease forwards}
+  @keyframes efade{to{opacity:1}}
+  .flow{opacity:0;stroke-dasharray:3 9;stroke-linecap:round;
+    animation:ffade .4s ease 2s forwards, march 1.1s linear 2s infinite}
+  @keyframes ffade{to{opacity:.9}}
+  @keyframes march{to{stroke-dashoffset:-24}}
+  @media (prefers-reduced-motion: reduce){
+    .node,.glow,.edge,.dedge,.flow{animation:none;opacity:1;stroke-dashoffset:0}
+  }
+
+  @media (max-width:920px){
+    .hero .wrap{grid-template-columns:1fr;padding-top:46px;padding-bottom:54px}
+    .stage{order:-1}
+    .grid3,.statgrid{grid-template-columns:1fr 1fr}
+    .exchange,.milestones,.grid2,.spotlight{grid-template-columns:1fr}
+    .exchange .col{border-right:0;border-bottom:1px solid rgba(255,255,255,.08)}
+    .spotlight .b{border-left:0;border-top:1px solid rgba(255,255,255,.1)}
+    .cta-final{grid-template-columns:1fr;padding:36px}
+    .navlinks{display:none}
+    footer .cols{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:560px){
+    .grid3,.statgrid{grid-template-columns:1fr}
+    table.tech th{width:130px}
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap row">
+    <a class="brand" href="#top">
+      <span class="mark">
+        <svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+            <circle cx="9" cy="9" r="2.6" fill="#fff" stroke="none"/>
+            <circle cx="9" cy="23" r="2.6" fill="#fff" stroke="none"/>
+            <circle cx="23" cy="16" r="2.6" fill="#fff" stroke="none"/>
+            <path d="M11 10l10 5M11 22l10-5"/>
+          </g>
+        </svg>
+      </span>
+      Credara
+    </a>
+    <nav class="navlinks">
+      <a href="#problem">The problem</a>
+      <a href="#research">Why it exists</a>
+      <a href="#how">How it works</a>
+      <a href="#buys">What it buys you</a>
+      <a href="#tech">Technology</a>
+      <a href="#status">Status</a>
+    </nav>
+    <div class="right">
+      <a href="#" data-link="spec">Spec</a>
+      <a href="#" data-link="repo">GitHub</a>
+      <a class="btn btn-primary" href="#get-started">Become a tester</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">Open-source · peer-to-peer · vendor-independent</span>
+        <h1>Verifiable identity and <span class="accent">revocable consent</span> across institutions.</h1>
+        <p class="lede">Credara is shared infrastructure for two things US healthcare does badly: knowing that a patient seen at one institution is the same person seen at another, and keeping that patient's consent verifiable and revocable as their records move around. A peer-to-peer graph of signed events — with <b>no central matcher</b> and <b>no node that ever sees PHI</b>.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#how">See how it works</a>
+          <a class="btn btn-ghost" href="#get-started">Read the spec</a>
+        </div>
+        <div class="meta">
+          <span><span class="dot">●</span> <b>FHIR R4</b> integration surface</span>
+          <span><span class="dot">●</span> Built for <b>longitudinal research</b></span>
+          <span><span class="dot">●</span> <b>Apache&nbsp;2.0</b> licensed</span>
+        </div>
+      </div>
+
+      <!-- HERO DAG (pure SVG/CSS animation) -->
+      <div class="stage">
+        <div class="legend">
+          <span><i style="background:#19b3d6"></i> identity event</span>
+          <span><i style="background:#8b5cf6"></i> authorization</span>
+          <span><i style="background:#f59e0b"></i> erasure</span>
+        </div>
+        <svg viewBox="0 0 640 430" role="img" aria-label="Animated directed acyclic graph: signed event blocks linked left-to-right by directional arrows">
+          <defs>
+            <marker id="arw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#9fb3cd"/>
+            </marker>
+          </defs>
+
+          <!-- DIRECTED EDGES (parent -> child), arrowheads point forward -->
+          <g fill="none" stroke="#7c8aa0" stroke-opacity=".55" stroke-width="1.5" marker-end="url(#arw)">
+            <path class="dedge" style="animation-delay:.45s" d="M115,110 L203,72"/>
+            <path class="dedge" style="animation-delay:.45s" d="M115,110 L203,198"/>
+            <path class="dedge" style="animation-delay:.5s"  d="M115,300 L203,202"/>
+            <path class="dedge" style="animation-delay:.5s"  d="M115,300 L203,328"/>
+            <path class="dedge" style="animation-delay:.95s" d="M285,70 L373,118"/>
+            <path class="dedge" style="animation-delay:.95s" d="M285,200 L373,122"/>
+            <path class="dedge" style="animation-delay:1.0s" d="M285,200 L373,250"/>
+            <path class="dedge" style="animation-delay:1.0s" d="M285,330 L373,252"/>
+            <path class="dedge" style="animation-delay:1.05s" d="M285,330 L373,358"/>
+            <path class="dedge" style="animation-delay:1.45s" d="M455,120 L533,148"/>
+            <path class="dedge" style="animation-delay:1.45s" d="M455,250 L533,152"/>
+            <path class="dedge" style="animation-delay:1.5s"  d="M455,250 L533,298"/>
+            <path class="dedge" style="animation-delay:1.5s"  d="M455,360 L533,302"/>
+          </g>
+
+          <!-- FORWARD-FLOW marching dashes (direction of reference / time) -->
+          <g fill="none" stroke="#9ee7f6" stroke-width="1.6">
+            <path class="flow" d="M115,110 L203,72"/>
+            <path class="flow" d="M115,110 L203,198"/>
+            <path class="flow" d="M115,300 L203,202"/>
+            <path class="flow" d="M285,200 L373,118"/>
+            <path class="flow" d="M285,330 L373,252"/>
+            <path class="flow" d="M455,120 L533,148"/>
+            <path class="flow" d="M455,250 L533,152"/>
+            <path class="flow" d="M455,250 L533,298"/>
+          </g>
+
+          <!-- EVENT BLOCKS (rounded rects + type label), appear left-to-right -->
+          <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10.5" font-weight="600" text-anchor="middle">
+            <!-- layer A -->
+            <g class="node" style="animation-delay:.05s"><rect x="35" y="95" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="75" y="114" fill="#cfeefc">Assert</text></g>
+            <g class="node" style="animation-delay:.15s"><rect x="35" y="285" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="75" y="304" fill="#cfeefc">Assert</text></g>
+            <!-- layer B -->
+            <g class="node" style="animation-delay:.55s"><rect x="205" y="55" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="245" y="74" fill="#cfeefc">Link</text></g>
+            <g class="node" style="animation-delay:.65s"><rect x="205" y="185" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="245" y="204" fill="#cfeefc">Link</text></g>
+            <g class="node" style="animation-delay:.75s"><rect x="205" y="315" width="80" height="30" rx="8" fill="rgba(139,92,246,.18)" stroke="#8b5cf6" stroke-width="1.4"/><text x="245" y="334" fill="#e3d6fb">Grant</text></g>
+            <!-- layer C -->
+            <g class="node" style="animation-delay:1.05s"><rect x="375" y="105" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="415" y="124" fill="#cfeefc">Link</text></g>
+            <g class="node" style="animation-delay:1.15s"><rect x="375" y="235" width="80" height="30" rx="8" fill="rgba(139,92,246,.18)" stroke="#8b5cf6" stroke-width="1.4"/><text x="415" y="254" fill="#e3d6fb">Revoke</text></g>
+            <g class="node" style="animation-delay:1.25s"><rect x="375" y="345" width="80" height="30" rx="8" fill="rgba(25,179,214,.16)" stroke="#19b3d6" stroke-width="1.4"/><text x="415" y="364" fill="#cfeefc">Link</text></g>
+            <!-- layer D -->
+            <g class="node" style="animation-delay:1.55s"><rect x="535" y="135" width="80" height="30" rx="8" fill="rgba(139,92,246,.18)" stroke="#8b5cf6" stroke-width="1.4"/><text x="575" y="154" fill="#e3d6fb">Grant</text></g>
+            <g class="node" style="animation-delay:1.65s"><rect x="535" y="285" width="80" height="30" rx="8" fill="rgba(245,158,11,.16)" stroke="#f59e0b" stroke-width="1.4"/><text x="575" y="304" fill="#fae3bd">Tombstone</text></g>
+          </g>
+
+          <!-- generation / time axis -->
+          <g fill="#6f86a3" font-family="ui-monospace,Menlo,monospace" font-size="9.5" text-anchor="middle">
+            <text class="node" x="75" y="400" style="animation-delay:.3s">earliest</text>
+            <text class="node" x="575" y="400" style="animation-delay:1.8s">latest</text>
+            <line x1="40" y1="410" x2="600" y2="410" stroke="#3a4a60" stroke-width="1" marker-end="url(#arw)"/>
+          </g>
+        </svg>
+        <div class="cap">Each event points back to its parents — a directed, acyclic chain that only grows forward. The DAG <i>is</i> the audit trail, tamper-evident by construction.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST BAR -->
+  <div class="trustbar">
+    <div class="wrap">
+      <span class="pill">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#19b3d6" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>
+        <b>Verification, not mediation.</b>
+      </span>
+      <span>Credara verifies identity and authorization claims — it does not sit in the data path or broker transactions.</span>
+      <span style="margin-left:auto;color:#6f86a3">Complementary to MPIs, EHRs, and TEFCA exchange — not a replacement.</span>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <section class="band alt" id="problem">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow dark">The problem</span>
+        <h2>Two things US healthcare does badly.</h2>
+        <p>US healthcare runs on patient records fragmented across institutions and on consent that is practically impossible to revoke. The rights to fix both already exist on paper — the infrastructure to enforce them does not.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="ic">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e6e8e" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5S14 16 14.5 19M14 14.6c2.3.2 4 1.7 4.5 4.4"/></svg>
+          </div>
+          <div class="tag">Identity</div>
+          <h3>Is this the same person?</h3>
+          <p>Identity matching depends on probabilistic vendor algorithms run against opaque databases. The miss rates show up as duplicate care, missed allergies, contraindicated prescriptions, and avoidable readmissions.</p>
+        </div>
+        <div class="card">
+          <div class="ic">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e6e8e" stroke-width="2"><path d="M7 11V8a5 5 0 0110 0v3"/><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M3 3l18 18" stroke-opacity=".6"/></svg>
+          </div>
+          <div class="tag">Consent</div>
+          <h3>Can the patient take it back?</h3>
+          <p>A consent granted at one institution lives in that institution's database. When the patient revokes it, the revocation stays put — while copies of the records keep flowing elsewhere.</p>
+        </div>
+      </div>
+
+      <div class="legal">
+        <h3>The legal regime assumes infrastructure that doesn't exist.</h3>
+        <p>HIPAA grants patients the right to access records, restrict disclosure, receive an accounting of disclosures, and revoke authorization. The 21st Century Cures Act information-blocking rule attaches seven-figure penalties to anyone who impedes electronic health information flow. State and cross-border law assume the same. The rights exist; in practice, a patient who wants to enforce them makes phone calls and hopes.</p>
+        <div class="chips">
+          <span>HIPAA</span><span>21st Century Cures Act</span><span>California CMIA</span>
+          <span>WA My Health My Data Act</span><span>42 CFR Part 2</span><span>GDPR Article 17</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY IT EXISTS / LONGITUDINAL RESEARCH -->
+  <section class="band deep" id="research">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow">Why it exists</span>
+        <h2>Built for research that runs for years.</h2>
+        <p>Credara is built for longitudinal research, where both problems compound over the years a study runs. A study lives or dies on identity holding over the full course of care — confirming a participant seen at one institution this year is the same person seen at another five years later, and keeping their authorization verifiable and revocable the whole way through.</p>
+      </div>
+      <div class="spotlight">
+        <div class="a">
+          <span class="lyme">The Lyme cohort</span>
+          <h3>A clear example of where it breaks today.</h3>
+          <p>Lyme disease patients accumulate fragmented records across many providers and state lines over long, frequently disputed disease courses. When identity links break, the cohort fragments. When consent provenance gets murky, so does data governance — and the study's footing erodes year over year.</p>
+        </div>
+        <div class="b">
+          <h3>Composed into a single longitudinal record</h3>
+          <p>A clinician in a new city sees the cardiology workup from two years ago, the medications from pharmacies across state lines, and the allergy noted by a pediatrician who has since retired. Rare diseases become recognizable patterns, polypharmacy interactions get caught, and care continuity across transitions stops resetting the chart to zero.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="band deep" id="how" style="padding-top:0">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow">How it works</span>
+        <h2>Peers contribute signed events to a shared graph.</h2>
+        <p>Each participating institution — hospitals, health systems, QHINs, HIEs, payers — runs a peer that contributes signed, immutable identity and authorization events to a shared distributed graph. No central matcher, no leader nodes, no privileged intermediaries. Patients are identified by the chain of provenance behind every assertion, not a master patient index; authorization is itself a signed event any institution can issue, verify, or revoke.</p>
+      </div>
+
+      <!-- PEER MESH (pure SVG/CSS+SMIL) -->
+      <div class="mesh">
+        <svg viewBox="0 0 1080 340" role="img" aria-label="Animated peer-to-peer network of institutions gossiping signed events">
+          <defs>
+            <radialGradient id="peerg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#9ee7f6"/><stop offset="100%" stop-color="#0e6e8e"/>
+            </radialGradient>
+          </defs>
+          <!-- links -->
+          <g fill="none" stroke="#7c8aa0" stroke-opacity=".28" stroke-width="1.2">
+            <path d="M120,90 L300,170"/><path d="M120,250 L300,170"/><path d="M300,170 L470,70"/>
+            <path d="M300,170 L470,250"/><path d="M470,70 L620,160"/><path d="M470,250 L620,160"/>
+            <path d="M470,70 L470,250"/><path d="M470,250 L560,300"/><path d="M620,160 L780,90"/>
+            <path d="M620,160 L780,260"/><path d="M780,90 L940,150"/><path d="M780,260 L940,150"/>
+            <path d="M560,300 L780,260"/>
+          </g>
+          <!-- gossip packets radiating from peer at (300,170): staggered to read as log(N) spread -->
+          <g fill="#9ee7f6">
+            <circle r="3.2"><animateMotion dur="1.4s" begin="0.2s;3.6s" repeatCount="indefinite" path="M300,170 L120,90"/></circle>
+            <circle r="3.2"><animateMotion dur="1.4s" begin="0.2s;3.6s" repeatCount="indefinite" path="M300,170 L120,250"/></circle>
+            <circle r="3.2"><animateMotion dur="1.4s" begin="0.2s;3.6s" repeatCount="indefinite" path="M300,170 L470,70"/></circle>
+            <circle r="3.2"><animateMotion dur="1.4s" begin="0.2s;3.6s" repeatCount="indefinite" path="M300,170 L470,250"/></circle>
+            <circle r="3"><animateMotion dur="1.5s" begin="1.1s;4.5s" repeatCount="indefinite" path="M470,70 L620,160"/></circle>
+            <circle r="3"><animateMotion dur="1.5s" begin="1.1s;4.5s" repeatCount="indefinite" path="M470,250 L560,300"/></circle>
+            <circle r="3"><animateMotion dur="1.5s" begin="1.3s;4.7s" repeatCount="indefinite" path="M470,250 L620,160"/></circle>
+            <circle r="2.8"><animateMotion dur="1.6s" begin="2.0s;5.4s" repeatCount="indefinite" path="M620,160 L780,90"/></circle>
+            <circle r="2.8"><animateMotion dur="1.6s" begin="2.0s;5.4s" repeatCount="indefinite" path="M620,160 L780,260"/></circle>
+            <circle r="2.8"><animateMotion dur="1.6s" begin="2.6s;6.0s" repeatCount="indefinite" path="M780,90 L940,150"/></circle>
+            <circle r="2.8"><animateMotion dur="1.6s" begin="2.8s;6.2s" repeatCount="indefinite" path="M780,260 L940,150"/></circle>
+          </g>
+          <!-- peers -->
+          <g stroke="#eaf2f9" stroke-opacity=".35" stroke-width="1.6">
+            <circle class="glow" cx="300" cy="170" r="18" fill="url(#peerg)" style="animation-delay:.1s"/>
+            <circle class="node" cx="120" cy="90"  r="8" fill="url(#peerg)" style="animation-delay:.3s"/>
+            <circle class="node" cx="120" cy="250" r="8" fill="url(#peerg)" style="animation-delay:.4s"/>
+            <circle class="node" cx="300" cy="170" r="10" fill="url(#peerg)" style="animation-delay:.1s"/>
+            <circle class="node" cx="470" cy="70"  r="8" fill="url(#peerg)" style="animation-delay:.5s"/>
+            <circle class="node" cx="470" cy="250" r="8" fill="url(#peerg)" style="animation-delay:.5s"/>
+            <circle class="node" cx="620" cy="160" r="9" fill="url(#peerg)" style="animation-delay:.9s"/>
+            <circle class="node" cx="560" cy="300" r="8" fill="url(#peerg)" style="animation-delay:1.0s"/>
+            <circle class="node" cx="780" cy="90"  r="8" fill="url(#peerg)" style="animation-delay:1.3s"/>
+            <circle class="node" cx="780" cy="260" r="8" fill="url(#peerg)" style="animation-delay:1.3s"/>
+            <circle class="node" cx="940" cy="150" r="8" fill="url(#peerg)" style="animation-delay:1.7s"/>
+          </g>
+          <g fill="#7f95b1" font-family="ui-monospace,Menlo,monospace" font-size="10.5">
+            <text class="node" x="285" y="150" style="animation-delay:.6s">origin peer</text>
+            <text class="node" x="958" y="154" style="animation-delay:2.2s">~1–2 s network-wide</text>
+          </g>
+        </svg>
+      </div>
+      <p class="peers-line">When an institution creates an event, its peer pushes it to a handful of neighbors, who push it onward — the network converges in roughly <b>log(N) rounds</b>, about <b>1–2 seconds</b>. Three distinct kinds of exchange flow between peers, and none of them ever carries cleartext PHI.</p>
+
+      <div class="exchange">
+        <div class="col">
+          <div class="n">01 — THE MAIN FLOW</div>
+          <h3>Event gossip</h3>
+          <p>A new identity assertion, link, grant, revocation, or tombstone is gossiped peer-to-peer as a batch of signed CBOR event nodes inside an encrypted Noise channel.</p>
+          <div class="kv">Batches flush every <b>100&nbsp;ms</b> or at <b>64 events</b> — cutting message count 10–50×. Receivers verify the signature, store, dedup by <code>UUID</code>, and re-gossip.</div>
+        </div>
+        <div class="col">
+          <div class="n">02 — THE BACKSTOP</div>
+          <h3>Anti-entropy</h3>
+          <p>Peers periodically reconcile by exchanging a <b>Merkle root</b> over their sorted set of event UUIDs. Roots match → in sync. Roots differ → swap UUID sets and transfer only the missing nodes.</p>
+          <div class="kv">Computed over <b>UUIDs, not contents</b> — so tombstoning (scrubbing PII) never makes two peers with the same event set diverge.</div>
+        </div>
+        <div class="col">
+          <div class="n">03 — DISCOVERY</div>
+          <h3>DHT routing &amp; pulls</h3>
+          <p>A Kademlia DHT maps a <b>tokenized</b> subgraph key to the peer IDs that hold it; a peer then makes a targeted point-to-point request for the actual event nodes.</p>
+          <div class="kv">A <b>Portable Authorization Artifact</b> — a signed <code>AuthorizationGrant</code> in CBOR — can travel this way too, handed to a relying party to verify locally.</div>
+        </div>
+      </div>
+
+      <div class="never">
+        <div class="ic">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7fe3a6" stroke-width="2"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3>What never crosses the wire: cleartext PHI.</h3>
+          <p>Only tokenized demographics and signed events move between peers. Demographics are tokenized before anything is gossiped, the DHT only ever sees tokenized keys, and clinical payloads never enter the trust graph — all inside encrypted, mutually-authenticated Noise channels.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT IT BUYS YOU -->
+  <section class="band" id="buys">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow dark">What it buys you</span>
+        <h2>Obligations enforced structurally, not by policy.</h2>
+        <p>Because every assertion is a signed event in a shared graph, the rights that exist on paper become operations the network performs.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="tag">Identity</div>
+          <h3>Verifiable, not probabilistic</h3>
+          <p>Every assertion carries a chain back to the institution that observed it. Matching stops being a vendor's black box — confidence emerges from consensus across peers.</p>
+        </div>
+        <div class="card">
+          <div class="tag">Consent</div>
+          <h3>Consent that actually moves</h3>
+          <p>A grant propagates network-wide within seconds; a revocation takes effect at every peer with bounded latency; an erasure request lands as a signed event the whole network must honor — under the patient's own key.</p>
+        </div>
+        <div class="card">
+          <div class="tag">Audit</div>
+          <h3>Accounting of disclosures by query</h3>
+          <p>What is reconstructed today by hand from scattered audit logs becomes a single query against the patient's own provenance chain.</p>
+        </div>
+        <div class="card">
+          <div class="tag">Durability</div>
+          <h3>Beyond any one organization</h3>
+          <p>Durability stops depending on any single institution. The right to access records does not expire when a clinic closes or merges.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECHNOLOGY -->
+  <section class="band alt" id="tech">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow dark">Technology at a glance</span>
+        <h2>Standards already in wide use — open to full review.</h2>
+        <p>Credara aligns with the existing trust framework and is assembled from mature components. Only the healthcare-domain layer is new code. The cryptography is algorithm-agile and post-quantum ready.</p>
+      </div>
+      <table class="tech">
+        <tr><th>Core / Export Gate / Verifier</th><td><b>Rust</b></td></tr>
+        <tr><th>FHIR Bridge</th><td><b>Java / Kotlin</b> — HAPI FHIR, Plain Server mode <span class="sub">(not JPA)</span></td></tr>
+        <tr><th>FHIR version</th><td><b>R4</b> <span class="sub">(R5 deferred)</span></td></tr>
+        <tr><th>Networking</th><td><b>libp2p</b> — gossipsub, Kademlia DHT, Noise transport</td></tr>
+        <tr><th>Storage</th><td><b>RocksDB</b> via a <code>Store</code> trait <span class="sub">· libgit2 scaffolded</span></td></tr>
+        <tr><th>Serialization</th><td><b>Canonical CBOR</b> <span class="sub">(ciborium, RFC 8949 deterministic encoding)</span></td></tr>
+        <tr><th>Hashing</th><td><b>Blake3</b> <span class="sub">content integrity &amp; Merkle roots</span> · <b>SHA-512</b> <span class="sub">DHT routing key, FIPS-validated</span></td></tr>
+        <tr><th>Node IDs</th><td><b>UUIDv7</b></td></tr>
+        <tr><th>Signatures</th><td><b>Algorithm-agile</b> — Ed25519 default; ML-DSA-65 (FIPS 204) &amp; SLH-DSA (FIPS 205) for PQC; hybrid mode</td></tr>
+        <tr><th>Identity &amp; trust</th><td><b>UDAP</b> (institutional) + <b>SPIFFE / SPIRE</b> (workload) · admission modeled on <b>DirectTrust</b> · aligns with <b>TEFCA</b></td></tr>
+        <tr><th>Deployment</th><td><b>Helm</b> chart primary; <b>Docker Compose</b> for laptop</td></tr>
+        <tr><th>License</th><td><b>Apache 2.0</b></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section class="band deep" id="status">
+    <div class="wrap">
+      <div class="shead">
+        <span class="eyebrow">Project status</span>
+        <h2>Pre-launch. All milestones implemented. Open for testers.</h2>
+        <p>The technical specification (Sections 1–13 + appendices, ~90 pages) is complete and authoritative. All ten build milestones are implemented and verified; the multi-peer testbed under kind passes its gossip-convergence and anti-entropy-repair scenarios end-to-end.</p>
+      </div>
+      <div class="statgrid">
+        <div class="stat"><div class="big">M0–M9</div><div class="lab">All build milestones implemented &amp; verified</div></div>
+        <div class="stat"><div class="big">2<span class="u">&nbsp;ms</span></div><div class="lab">First end-to-end gossip propagation, peer-a → peer-b</div></div>
+        <div class="stat"><div class="big">&lt;10<span class="u">&nbsp;ms</span></div><div class="lab">Typical convergence on a developer laptop</div></div>
+        <div class="stat"><div class="big">~90<span class="u">&nbsp;pp</span></div><div class="lab">Complete, authoritative technical specification</div></div>
+      </div>
+      <div class="milestones">
+        <div class="ms"><span class="k">M1</span> Event model — <span class="mono">credara-events</span> <span class="s">green</span></div>
+        <div class="ms"><span class="k">M2</span> Storage (RocksDB) <span class="s">green</span></div>
+        <div class="ms"><span class="k">M3</span> Graph / computation — link-chain defense <span class="s">green</span></div>
+        <div class="ms"><span class="k">M4</span> Networking — libp2p adapter <span class="s">green</span></div>
+        <div class="ms"><span class="k">M5</span> Core <span class="s">green</span></div>
+        <div class="ms"><span class="k">M6</span> Export Gate + Verifier <span class="s">green</span></div>
+        <div class="ms"><span class="k">M7</span> FHIR Bridge <span class="s">builds</span></div>
+        <div class="ms"><span class="k">M8</span> Deployment — verified on kind <span class="s">green</span></div>
+        <div class="ms"><span class="k">M9</span> Conformance + synthetic data <span class="s">green</span></div>
+        <div class="ms"><span class="k">DQ</span> Multi-peer testbed — more scenarios <span class="s prog">in progress</span></div>
+      </div>
+      <div class="note">
+        <b>Pre-launch software.</b> Not yet deployed to a real network and not yet independently security-reviewed. <b>Do not use it with real PHI.</b> All testing uses the synthetic-data generator with <span class="mono">test-data</span> tagging, provably invisible to clinical FHIR queries.
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="band" id="get-started" style="padding-bottom:40px">
+    <div class="cta-final">
+      <div>
+        <h2>Open source. Vendor independent. Open for testers.</h2>
+        <p>Credara is Apache 2.0, so it can be reviewed in full rather than trusted as a black box — no central coordinator, no lock-in. Bring a laptop with Docker and stand up a real two-peer network in minutes.</p>
+        <div class="cta" style="margin-top:26px">
+          <a class="btn btn-dark" href="#" data-link="repo">View on GitHub</a>
+          <a class="btn btn-outline" href="#" data-link="spec">Read the spec</a>
+        </div>
+      </div>
+      <div class="paths">
+        <div class="path">
+          <b>New testers</b>
+          <span>Prerequisites, the conformance suite, and the multi-peer testbed. <code>make -C testbed up &amp;&amp; make -C testbed smoke</code></span>
+        </div>
+        <div class="path">
+          <b>New contributors</b>
+          <span>Read <code>docs/STATUS.md</code> — the authoritative map of what's real vs. demo — before building on any surface.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="fbrand"><span class="mark"></span> Credara</div>
+        <p style="margin-top:14px;max-width:300px;font-size:14px">Shared, open-source infrastructure for cross-institutional patient identity provenance and portable, revocable consent in US healthcare.</p>
+        <p style="font-size:12.5px;color:#6f86a3;margin-top:14px">Rooted in the Latin <i>credere</i> — “to believe, to trust.”</p>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="#problem">The problem</a>
+        <a href="#research">Why it exists</a>
+        <a href="#how">How it works</a>
+        <a href="#buys">What it buys you</a>
+      </div>
+      <div>
+        <h4>Build</h4>
+        <a href="#" data-link="repo">GitHub repository</a>
+        <a href="#" data-link="spec">Technical specification</a>
+        <a href="#get-started">How to test</a>
+        <a href="#tech">Technology</a>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="#" data-link="repo">Contributing</a>
+        <a href="#" data-link="repo">Code of conduct</a>
+        <a href="#" data-link="repo">Report a vulnerability</a>
+      </div>
+    </div>
+    <div class="foot-legal">
+      <span>credara.network · Licensed under Apache&nbsp;2.0</span>
+      <span>Complementary infrastructure — not a replacement for MPIs, EHRs, or TEFCA exchange.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* The only JS on the page: neutralize placeholder links until repo/spec URLs are wired.
+   All animation is pure SVG/CSS/SMIL and runs without JavaScript. */
+document.querySelectorAll('[data-link]').forEach(function(a){
+  a.addEventListener('click', function(e){ e.preventDefault(); });
+});
+</script>
+</body>
+</html>

@@ -5,9 +5,7 @@ import ca.uhn.fhir.rest.server.RestfulServer
 import health.creda.bridge.providers.AuditEventResourceProvider
 import health.creda.bridge.providers.AuthorizationResourceProvider
 import health.creda.bridge.providers.ConsentResourceProvider
-import health.creda.bridge.providers.OrganizationResourceProvider
 import health.creda.bridge.providers.PatientResourceProvider
-import health.creda.bridge.providers.TaskResourceProvider
 import health.creda.bridge.providers.ProvenanceResourceProvider
 import org.springframework.boot.web.servlet.ServletRegistrationBean
 import org.springframework.context.annotation.Bean
@@ -37,8 +35,6 @@ class CredaRestfulServer(
     private val patient: PatientResourceProvider,
     private val provenance: ProvenanceResourceProvider,
     private val consent: ConsentResourceProvider,
-    private val organization: OrganizationResourceProvider,
-    private val task: TaskResourceProvider,
     private val authorization: AuthorizationResourceProvider,
     // AuditEventResourceProvider intentionally NOT injected — see initialize() for why.
 ) : RestfulServer(FhirContext.forR4()) {
@@ -67,7 +63,7 @@ class CredaRestfulServer(
         // auditing interceptor that would populate it is an M-?? follow-up). When the
         // interceptor lands and the provider gains real @Read / @Search methods, add it
         // back to this call.
-        setResourceProviders(patient, provenance, consent, organization, task)
+        setResourceProviders(patient, provenance, consent)
         // AuthorizationResourceProvider is a *plain* provider, not a resource provider: its
         // operations are Patient-typed (@Operation typeName="Patient") but it cannot be a second
         // Patient IResourceProvider (PatientResourceProvider already is — HAPI forbids two for one
@@ -75,7 +71,7 @@ class CredaRestfulServer(
         // existing resource type; without this the ops 404/400 as "No methods exist for resource".
         registerProvider(authorization)
         log.info(
-            "Creda RestfulServer initialized — 5 resource providers (Patient, Provenance, Consent, Organization, Task) + " +
+            "Creda RestfulServer initialized — 3 resource providers (Patient, Provenance, Consent) + " +
                 "1 plain provider (authorization ops on Patient); AuditEvent deferred until interceptor lands",
         )
         // TODO(bridge-verify): attach a custom ServerCapabilityStatementProvider that declares

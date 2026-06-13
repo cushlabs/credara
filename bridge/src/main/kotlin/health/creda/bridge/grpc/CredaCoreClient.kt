@@ -158,14 +158,6 @@ class CredaCoreClient(
     /** GetMetrics (§10.1.3): local event count. */
     fun eventCount(): Long = stub.getMetrics(Empty.getDefaultInstance()).eventCount
 
-    /**
-     * ListInstitutions: the distinct institution audience names appearing in AuthorizationGrants
-     * across the local store — the read behind `GET /Organization`. A discovery surface, not a
-     * directory: Creda models institutions as identities/fingerprints, not full Organization records.
-     */
-    fun listInstitutions(): List<String> =
-        stub.listInstitutions(Empty.getDefaultInstance()).namesList
-
     @PreDestroy
     fun shutdown() {
         channel.shutdownNow()
