@@ -22,6 +22,13 @@ jobs:
           else
             echo "empty=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Install system build deps
+        if: steps.members.outputs.empty == 'false'
+        # libclang: RocksDB's bindgen FFI (librocksdb-sys) needs it on EVERY workspace build, not
+        # just the gRPC feature — without it the build fails with "Unable to find libclang".
+        # protobuf-compiler: the gRPC-feature clippy/test steps below. Installing both here makes
+        # the Rust build hermetic instead of relying on whatever the runner image happens to ship.
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev protobuf-compiler
       - name: Format check
         if: steps.members.outputs.empty == 'false'
         run: cargo fmt --all -- --check
@@ -31,9 +38,6 @@ jobs:
       - name: Test
         if: steps.members.outputs.empty == 'false'
         run: cargo test --workspace
-      - name: Install protoc (gRPC feature)
-        if: steps.members.outputs.empty == 'false'
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Clippy (gRPC feature)
         if: steps.members.outputs.empty == 'false'
         run: cargo clippy -p creda-core --features grpc --all-targets -- -D warnings
