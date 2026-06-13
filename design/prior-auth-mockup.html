@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Creda · Prior Authorization (Da Vinci CRD / DTR / PAS · mockup)</title>
+<title>Credara · Prior Authorization (Da Vinci CRD / DTR / PAS · mockup)</title>
 <style>
   :root {
     --bg:#eef2f6; --surface:#fff; --surface-2:#f7f9fc;
@@ -146,7 +146,7 @@
 </head>
 <body>
   <div class="appbar">
-    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Clinical Workflow · Prior Authorization</span></div>
+    <div class="brand"><span class="mark">C</span> Credara <span class="ctx">· Clinical Workflow · Prior Authorization</span></div>
     <div class="spacer"></div>
     <div class="who"><span class="dot"></span> Dr. A. Reyes · Mercy General</div>
   </div>
@@ -160,13 +160,13 @@
 
 <script>
 /* ----------------------------------------------------------------------------
-   Creda · Prior Authorization mockup (Da Vinci CRD / DTR / PAS).
+   Credara · Prior Authorization mockup (Da Vinci CRD / DTR / PAS).
    - CRD: real-time coverage check at order time → required / not required.
    - DTR: payer Questionnaire pre-populated from the patient's EHR FHIR data
      (Condition, Observation, MedicationStatement, ImagingStudy …), gaps the
      clinician completes, explicit attestation.
    - PAS: FHIR submission to the payer; status round-trip → decision.
-   Creda's value-add: the attestation is a signed Attest event in the patient's
+   Credara's value-add: the attestation is a signed Attest event in the patient's
    identity DAG — tamper-evident, independently auditable (see the receipt).
 ---------------------------------------------------------------------------- */
 
@@ -287,7 +287,7 @@ function hdrHTML(o){
       <div class="lab">Patient</div>
       <div class="val">${PATIENT.name}</div>
       <div class="sub">DOB ${PATIENT.dob} · ${PATIENT.sex} · ${PATIENT.mrn}</div>
-      <div style="margin-top:5px"><span class="verifiedchip"><span class="d"></span>Identity verified · ${PATIENT.confidence}% · via Creda</span></div>
+      <div style="margin-top:5px"><span class="verifiedchip"><span class="d"></span>Identity verified · ${PATIENT.confidence}% · via Credara</span></div>
     </div>
     <div class="col">
       <div class="lab">Order</div>
@@ -473,7 +473,7 @@ function decisionCardHTML(o){
   </div>`;
 }
 
-/* ---- Provenance receipt (Creda's value-add) ---- */
+/* ---- Provenance receipt (Credara's value-add) ---- */
 function receiptCardHTML(o){
   return `<div class="section receipt">
     <div class="hd">

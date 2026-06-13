@@ -1,4 +1,4 @@
-# Creda — Manual End-to-End Harness (persona clients)
+# Credara — Manual End-to-End Harness (persona clients)
 
 The five persona clients are the project's **manual end-to-end test harness**: driven against a
 **real** bridge they exercise the full path — client → FHIR → bridge → gRPC → Core → DAG → gossip —

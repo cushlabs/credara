@@ -4,7 +4,7 @@ This document defines the target layout of the Credara repository and which part
 the technical specification governs each component. It is the map the build follows
 through milestones **M0–M9** (see the milestone table in `README.md`). The
 authoritative source of truth for all technical decisions is
-`docs/creda-technical-spec.md`; where this document and the spec disagree, the
+`docs/credara-technical-spec.md`; where this document and the spec disagree, the
 spec wins.
 
 ## Guiding principle
@@ -52,8 +52,8 @@ creda/
 │       └── ci-docs.yml        # Renders the spec and validates internal links.
 │
 ├── docs/
-│   ├── creda-technical-spec.md   # AUTHORITATIVE specification, Sections 1–13 + appendices.
-│   ├── creda-technical-spec.pdf  # Rendered spec for non-technical reviewers.
+│   ├── credara-technical-spec.md   # AUTHORITATIVE specification, Sections 1–13 + appendices.
+│   ├── credara-technical-spec.pdf  # Rendered spec for non-technical reviewers.
 │   ├── DESIGN_QUEUE.md           # Queued design reqs (DQ-1..DQ-5: non-root, ansible, testbed,
 │   │                             #   Hummingbird images, Docker-only dev env).
 │   ├── DEVELOPMENT.md            # Docker-only developer workflow (DQ-5).

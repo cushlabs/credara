@@ -213,10 +213,10 @@ Remaining for the release bar (next sessions):
    = `tsc -b && vite build`. `npx` is not installed on the maintainer host.)
 2. `make -C testbed ui-up-real && make -C testbed reset` — behavioral baseline.
 3. Drift check: grep clients for fixture imports (see audit table) and confirm the spec/reference
-   architecture (`docs/creda-technical-spec.md` §8.5, `design/creda-reference-architecture.html`)
+   architecture (`docs/credara-technical-spec.md` §8.5, `design/credara-reference-architecture.html`)
    still match the code. ~~**Known drift to remediate**: the reference architecture HTML predates
    GetSubgraphEvents, the plain-provider operation layout, TCP gRPC mode, and the seed/reset
-   lifecycle.~~ **Remediated (session 2)**: `creda-reference-architecture.html` now documents the
+   lifecycle.~~ **Remediated (session 2)**: `credara-reference-architecture.html` now documents the
    seven gRPC RPCs incl. GetSubgraphEvents + the parent→child materialize fix (engine/grpcsrv/grpc-if
    nodes), the Patient-typed `$creda-*` plain-provider layout (bridge nodes), `tcp://0.0.0.0:50051`
    testbed gRPC mode (uds/grpcsrv nodes), and the append-forward wipe-and-reseed lifecycle (dag node).

@@ -1,6 +1,6 @@
-# Creda — Closed Synthetic Pilot Runbook
+# Credara — Closed Synthetic Pilot Runbook
 
-Stand up a **real, multi-peer, propagating Creda network** across hosts/organizations using
+Stand up a **real, multi-peer, propagating Credara network** across hosts/organizations using
 **synthetic, non-PHI events only**. This is the sanctioned bridge between the single-host kind
 testbed and a real deployment: real peers, real libp2p gossip + anti-entropy, real signing and
 admission control — but **zero regulated data**, so no HIPAA/BAA/IRB exposure.
@@ -28,7 +28,7 @@ admission control — but **zero regulated data**, so no HIPAA/BAA/IRB exposure.
 
 ## 1. Network & admission design (decide before any deploy)
 
-- **Participants**: the closed set of orgs/peers in the pilot. Creda is a *vetted* network —
+- **Participants**: the closed set of orgs/peers in the pilot. Credara is a *vetted* network —
   inbound replication refuses everything until the **participant registry** is populated (§3.6,
   §10.7).
 - **Per peer**: a unique Ed25519 **institutional signing key** (32 raw bytes). The `institution_id`

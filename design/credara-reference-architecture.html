@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Creda · Reference Architecture</title>
+<title>Credara · Reference Architecture</title>
 <style>
   :root {
     --bg: #eef2f6;
@@ -129,7 +129,7 @@
 </head>
 <body>
   <div class="appbar">
-    <div class="brand"><span class="mark">C</span> Creda <span class="ctx">· Reference Architecture</span></div>
+    <div class="brand"><span class="mark">C</span> Credara <span class="ctx">· Reference Architecture</span></div>
     <div class="spacer"></div>
     <div class="ctx">Decentralized cross-institution identity provenance &amp; portable authorization</div>
   </div>
@@ -154,11 +154,11 @@
 
 <script>
 /* ============================================================================
-   Creda reference architecture (interactive). Single-file, fake-data-free —
+   Credara reference architecture (interactive). Single-file, fake-data-free —
    it documents the actual system: a per-institution Kubernetes deployment
    (Core + FHIR Bridge + dual-control Export Gate / Verifier) and the
    cross-institution libp2p P2P substrate they federate over.
-   Spec references are to docs/creda-technical-spec.md.
+   Spec references are to docs/credara-technical-spec.md.
 ============================================================================ */
 
 const LAYER_COLORS = {
@@ -182,7 +182,7 @@ const BANDS = [
     ]
   },
   {
-    layer:'engine', tag:'APPLICATION', nm:'Creda Core engine', dsc:'the domain logic — what makes Creda Creda',
+    layer:'engine', tag:'APPLICATION', nm:'Credara Core engine', dsc:'the domain logic — what makes Credara Credara',
     chips:[
       {id:'engine', nm:'Engine (creda-core)', meta:'composes everything'},
       {id:'events', nm:'Event model (creda-events)', meta:'signed DAG'},
@@ -237,7 +237,7 @@ const BANDS = [
 /* ---- Detail content for every component ---- */
 const INFO = {
   // North interfaces
-  fhir:{layer:'north', t:'FHIR R4 API', role:'The clinical front door. EHRs and applications speak standard HL7 FHIR R4 to the Bridge — Creda meets healthcare where it already is.',
+  fhir:{layer:'north', t:'FHIR R4 API', role:'The clinical front door. EHRs and applications speak standard HL7 FHIR R4 to the Bridge — Credara meets healthcare where it already is.',
     facts:['HAPI FHIR “Plain Server” (not a full datastore) — translator, not reasoner','Patient / Consent / Provenance / AuditEvent resources + custom $creda-* operations','US Core profiles; clinical reads serve the effective identity projection','Test-data records are filtered from clinical responses (§11.4.1)'], spec:'Spec §8, §10.4'},
   'libp2p-if':{layer:'north', t:'libp2p peer API', role:'The peer-to-peer face. This is how this institution’s peer exchanges signed events with peers at other institutions — no central hub.',
     facts:['gossipsub for event propagation, Kademlia DHT for discovery','Anti-entropy reconciliation repairs gaps (Merkle root over the UUID set)','Exposed via a NodePort / LoadBalancer Service','Off-by-default build feature; enabled in the shipped image'], spec:'Spec §6'},
@@ -279,7 +279,7 @@ const INFO = {
     facts:['/livez — restart if the process wedges','/readyz — hold traffic until the store is open and the socket is bound'], spec:'Spec §10.5'},
 
   // Kubernetes
-  sts:{layer:'k8s', t:'StatefulSet', role:'A Creda peer is stateful — it owns an event store and a stable identity — so it is deployed as a StatefulSet, not a Deployment.',
+  sts:{layer:'k8s', t:'StatefulSet', role:'A Credara peer is stateful — it owns an event store and a stable identity — so it is deployed as a StatefulSet, not a Deployment.',
     facts:['Stable network identity + ordered, persistent storage per peer','Core and Bridge run as two containers in the same pod','Bound to the data PVC'], spec:'Spec §10.5, §10.6'},
   svc:{layer:'k8s', t:'Services', role:'Three distinct front doors for three distinct traffic types.',
     facts:['ClusterIP for FHIR (north / clinical clients)','NodePort or LoadBalancer for libp2p (east–west / peers)','Headless Service for peer discovery'], spec:'Spec §10.6'},
@@ -301,11 +301,11 @@ const INFO = {
   // Infrastructure
   ns:{layer:'infra', t:'Namespace (restricted PSS)', role:'The deployment installs under the “restricted” Pod Security Standard — the strictest tier.',
     facts:['Enforces the non-root, no-privilege posture cluster-side','Set up idempotently by the Ansible play (DQ-2)'], spec:'DQ-1, DQ-2'},
-  identity:{layer:'infra', t:'cert-manager + SPIRE', role:'Platform identity and certificates, installed as prerequisites before the Creda release.',
+  identity:{layer:'infra', t:'cert-manager + SPIRE', role:'Platform identity and certificates, installed as prerequisites before the Credara release.',
     facts:['Workload identity (SPIFFE/SPIRE) and certificate lifecycle (cert-manager)','Underpins UDAP-style institutional identity','Installed by the Ansible play onto an existing cluster'], spec:'Spec §10.6, DQ-2'},
   storage:{layer:'infra', t:'Object storage (S3 / MinIO)', role:'Where snapshots live. The same chart uses bundled MinIO on-prem or S3 in cloud — config only.',
     facts:['Snapshot push/pull for fast peer bootstrap','MinIO on-prem, S3 in cloud — identical image and chart'], spec:'Spec §6.2.5, §6'},
-  nodes:{layer:'infra', t:'Cluster nodes', role:'Any conformant Kubernetes. Creda is bring-your-own-cluster.',
+  nodes:{layer:'infra', t:'Cluster nodes', role:'Any conformant Kubernetes. Credara is bring-your-own-cluster.',
     facts:['Multi-arch images: x86_64 and aarch64','Runs on a laptop (Compose), on-prem k8s, or cloud k8s'], spec:'Spec §6, §10.6'},
 
   // Federation
@@ -315,7 +315,7 @@ const INFO = {
     facts:['Patient-centric: the grant is bound to the patient subgraph, non-transferable','Consent can originate from any peer — but a patient typically manages it from their own patient peer client','Each peer runs the same seven-step evaluation locally (§4.6)','Revocation propagates as an event; bounded revocation latency is a target (§4.7)'], spec:'Spec §4'},
   trust:{layer:'fed', t:'Trust & data boundaries', role:'What keeps a decentralized health network safe: cryptographic provenance, data minimization, and dual control at the edges.',
     facts:['UDAP certificate fingerprints identify every event’s author','Tokenized demographics; clinical payloads never enter the trust graph','Export Gate (egress) + Verifier (ingest) form dual control at institution boundaries'], spec:'Spec §3.2, §4.5, §9'},
-  peer:{layer:'fed', t:'Institution peer', role:'Each participating institution runs its own Creda cluster (the stack in the other tab). Hospitals, clinics, labs, HIEs/QHINs — all equal peers.',
+  peer:{layer:'fed', t:'Institution peer', role:'Each participating institution runs its own Credara cluster (the stack in the other tab). Hospitals, clinics, labs, HIEs/QHINs — all equal peers.',
     facts:['Self-sovereign: owns its keys, its store, and its policy posture','Connects to others only over libp2p; no shared database','Serves its own clinicians via the FHIR Bridge'], spec:'Spec §6, §10'},
   patientpeer:{layer:'patient', t:'Patient client (consent application)', role:'A patient-controlled application that authors signed Grants, Revocations, Attests, and co-signed Links. Architecturally distinct from institutional peers — the patient runs a client, not a peer, and submits through any admitted institutional peer that exposes a patient-mediated endpoint.',
     facts:[
@@ -366,9 +366,9 @@ const INFO = {
     facts:['Verification: Referral chain from the CMS Link','Parents: the CMS Link (broad anchor)','Brings additional corroboration into the confidence model'], spec:'Spec §3.4.1'},
 
   /* ---------- Service & port surface tab ---------- */
-  'p-clinical':{layer:'p_in', t:'Clinical systems · EHR · SMART apps', role:'The institution’s own clinical front. Existing systems hit the Bridge over standard FHIR R4 — Creda does not replace them.',
+  'p-clinical':{layer:'p_in', t:'Clinical systems · EHR · SMART apps', role:'The institution’s own clinical front. Existing systems hit the Bridge over standard FHIR R4 — Credara does not replace them.',
     facts:['TLS terminates at the institutional Ingress','SMART-on-FHIR authorization server (institutional OIDC IdP)','Bridge enforces SMART scopes per request','Core is never exposed to clinical traffic'], spec:'Spec §8, §9.1.8'},
-  'p-peers-in':{layer:'p_in', t:'Inbound libp2p (other peers)', role:'Other admitted Creda peers connect to this peer to gossip events, run anti-entropy, and pull events by id.',
+  'p-peers-in':{layer:'p_in', t:'Inbound libp2p (other peers)', role:'Other admitted Credara peers connect to this peer to gossip events, run anti-entropy, and pull events by id.',
     facts:['Port 4001 TCP (configurable per institution; libp2p / IPFS convention)','Noise-encrypted; mutually authenticated via UDAP cert + SPIFFE SVID','Connection is opened by the remote peer — direction matters for NetworkPolicy','Tokenized event content only; never cleartext PHI'], spec:'Spec §6, §10.6.5'},
   'p-kubelet':{layer:'p_int', t:'Kubelet (cluster-internal)', role:'The Kubernetes node agent. Polls health endpoints to decide pod lifecycle and routing.',
     facts:['Probes /livez and /readyz on port 9090 TCP','Cluster-internal only — never exposed via Ingress','Held to a strict timing budget so rolling upgrades stay safe (§10.6.7)'], spec:'Spec §10.5.3'},
@@ -377,7 +377,7 @@ const INFO = {
 
   'p-bridge':{layer:'p_in', t:'HAPI FHIR Bridge container · STATELESS', role:'Java/Kotlin HAPI Plain Server. The Bridge is a translation layer with no database — every FHIR operation delegates to Core via gRPC.',
     facts:['HAPI Plain Server mode (explicitly not JPA, §8.3.3) — no DB, no JDBC','Stateless: every FHIR query becomes a gRPC call into Core','Resource providers (Patient · Consent · Provenance · AuditEvent) + SMART-on-FHIR enforcement live here','Patient-typed $creda-* operations ride a separate HAPI plain provider (typeName="Patient") so they do not collide with the Patient resource provider','Hummingbird OpenJDK FIPS distroless base; non-root'], spec:'Spec §8, §8.2.9, §10.4'},
-  'p-core':{layer:'p_in', t:'Creda Core container', role:'The Rust peer daemon. Owns the event DAG, the libp2p endpoint, the gRPC server, the AE scheduler, and the health endpoint.',
+  'p-core':{layer:'p_in', t:'Credara Core container', role:'The Rust peer daemon. Owns the event DAG, the libp2p endpoint, the gRPC server, the AE scheduler, and the health endpoint.',
     facts:['Mandatory signature verification at ingest (§3.6)','Replicator: gossip publish, AE peer-exchange, DHT discovery','Engine: signed event creation, subgraph projection, authorization evaluation','Hummingbird FIPS distroless base; non-root, read-only rootfs'], spec:'Spec §10.1'},
   'p-uds':{layer:'p_int', t:'Unix domain socket (Bridge ↔ Core)', role:'The production gRPC path. A shared emptyDir mounts /var/run/creda into both containers; the gRPC server binds the socket there.',
     facts:['No network port; no TLS; no firewall implication','Trust boundary is the pod, not a wire','Testbed UAT peer runs grpcSocket=tcp://0.0.0.0:50051 — the chart exposes the grpc Service port for tcp:// values, the Bridge dials loopback (same pod), and in-cluster seed Jobs can reach Core','Socket bound 0o660 — shared pod fsGroup permits Bridge to connect'], spec:'Spec §10.5.1'},
@@ -441,7 +441,7 @@ const PORTS_DIAGRAM = {
              sub:'HTTPS · institutional Ingress · FHIR R4 · SMART scopes' },
   /* row 2 (east-west) — left & right shoulders of the pod */
   peersIn: { id:'p-peers-in', x:  40, y: 170, w: 200, h: 80,  role:'inbound',
-             title:'Other Creda peers (inbound)',
+             title:'Other Credara peers (inbound)',
              sub:'libp2p · Noise · UDAP + SPIFFE auth' },
   coord:   { id:'p-coord',    x:  40, y: 320, w: 200, h: 80,  role:'trust',
              title:'Legal coordinator',
@@ -457,7 +457,7 @@ const PORTS_DIAGRAM = {
   uds:     { id:'p-uds',      x: 300, y: 295, w: 400, h: 35,  role:'internal',
              title:'Bridge ↔ Core · gRPC over UDS' },
   core:    { id:'p-core',     x: 300, y: 345, w: 400, h: 100, role:'inbound',
-             title:'Creda Core (Rust)',
+             title:'Credara Core (Rust)',
              sub:'mandatory ingest verification · Replicator · AE' },
   dag:     { id:'p-dag',      x: 300, y: 460, w: 400, h: 50,  role:'dag',
              title:'Signed event DAG · system of record',
@@ -513,7 +513,7 @@ function intro(){
     ports:'Service & port surface'
   };
   const blurbs = {
-    stack: 'Each institution runs <b>one self-contained Kubernetes deployment</b>. Read it bottom-to-top: a conformant cluster, then the Helm-managed Kubernetes objects, the pod, the containers, and finally the <b>Creda Core engine</b> that does the real work — exposed northward via FHIR and a gRPC socket, and east–west to peers via libp2p. <br><br>Click any block for what it is and why it’s there.',
+    stack: 'Each institution runs <b>one self-contained Kubernetes deployment</b>. Read it bottom-to-top: a conformant cluster, then the Helm-managed Kubernetes objects, the pod, the containers, and finally the <b>Credara Core engine</b> that does the real work — exposed northward via FHIR and a gRPC socket, and east–west to peers via libp2p. <br><br>Click any block for what it is and why it’s there.',
     fed:   'There is <b>no central server</b>. Every institution runs the cluster from another tab, and the peers federate directly over a <b>libp2p</b> substrate — gossiping signed, content-addressed events. Authorization is <b>portable</b> (it travels with the data), trust is cryptographic, and dual control guards every boundary. <br><br>Click a peer or a fabric layer for detail.',
     dag:   'A synthetic patient subgraph spanning roughly a decade and six institutional parties — what the network actually exchanges. Each node is a <b>signed event</b>; arrows are parent references. Read left-to-right by time, top-to-bottom by who authored what. <br><br>The DAG is the audit trail by construction: every assertion is signed, every link is contestable, every authorization grant and revocation is a permanent record. Click any event for what it asserts and the spec section that defines it.',
     ports: 'The view a network team or enterprise architect needs at deployment time. <br><br>Two architectural anchors: the <b>signed event DAG (on the PVC) is the system of record</b>, and the <b>FHIR Bridge is stateless</b> — HAPI Plain Server, no JPA, no database. Cleartext PHI never crosses the peer boundary; everything outbound is tokenized. <br><br>Click any box for port number, direction, and the spec section that governs it.'
@@ -602,7 +602,7 @@ function renderFed(){
      <svg class="fed" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
        ${edges}${hub}${nodes}${side}
      </svg>
-     <div class="flowline">Each peer is a full Creda cluster (other tab). Signed events propagate by gossip; gaps heal by anti-entropy; consent rides along as events.</div>`;
+     <div class="flowline">Each peer is a full Credara cluster (other tab). Signed events propagate by gossip; gaps heal by anti-entropy; consent rides along as events.</div>`;
 }
 
 function syncSelectedStroke(){

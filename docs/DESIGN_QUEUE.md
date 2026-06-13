@@ -1,4 +1,4 @@
-# Creda — Design Queue
+# Credara — Design Queue
 
 Queued design requirements and refinements that extend the technical specification.
 Each item records the requirement, its rationale, which milestone it attaches to, and
@@ -6,14 +6,14 @@ acceptance criteria. This file is the local backlog until issue tracking exists 
 remote; when the GitHub repo is created, each open item below should become a tracked
 issue.
 
-> The authoritative source of truth remains `creda-technical-spec.md`. Items here refine
+> The authoritative source of truth remains `credara-technical-spec.md`. Items here refine
 > or constrain how a milestone is built; they do not override the spec's architecture.
 
 ---
 
 ## DQ-1 — Non-root containers (cross-cutting hardening) — REQUIRED
 
-**Requirement.** Every Creda container runs as an unprivileged, non-root user. No
+**Requirement.** Every Credara container runs as an unprivileged, non-root user. No
 component runs as UID 0, in any environment (laptop, on-prem, cloud). This is a hard
 constraint, not a default that can be relaxed per-deployment.
 
@@ -48,15 +48,15 @@ no container requests added capabilities or privilege escalation.
 
 ## DQ-2 — Ansible playbook: deploy onto an existing cluster
 
-**Requirement.** Ship an Ansible playbook that automates installing Creda **onto an
+**Requirement.** Ship an Ansible playbook that automates installing Credara **onto an
 existing Kubernetes cluster**. It does not provision the cluster itself; it assumes a
 working cluster and kubeconfig.
 
 **Scope (decided).** The playbook:
 1. Validates prerequisites (reachable cluster, Helm present, required API versions).
-2. Installs/ensures Creda's cluster dependencies — **cert-manager** (UDAP cert rotation)
+2. Installs/ensures Credara's cluster dependencies — **cert-manager** (UDAP cert rotation)
    and **SPIRE** (SPIFFE workload identity) — idempotently, pinned to known-good versions.
-3. Deploys the Creda **Helm release** with a supplied values file, including the non-root
+3. Deploys the Credara **Helm release** with a supplied values file, including the non-root
    securityContext settings from DQ-1.
 4. Verifies rollout (pods Ready, liveness/readiness passing) and reports status.
 
@@ -64,14 +64,14 @@ Out of scope (for this item): OS/host provisioning, container-runtime install, a
 standing up k8s itself. (If full bare-metal provisioning is wanted later, add a separate
 layered play — tracked as a future item, not this one.)
 
-**Rationale.** Operators adopting Creda will commonly already run k8s; "deployable with
+**Rationale.** Operators adopting Credara will commonly already run k8s; "deployable with
 little to no oversight" (spec §6) means a one-command, idempotent, repeatable install
 against that cluster.
 
 **Attaches to.** M8 (Deployment). Depends on the Helm chart existing.
 
 **Acceptance criteria.** `ansible-playbook deploy.yml -e @cluster-values.yml` against a
-clean existing cluster brings up a working Creda peer with cert-manager and SPIRE present;
+clean existing cluster brings up a working Credara peer with cert-manager and SPIRE present;
 re-running is idempotent (no changes on second run); the play fails fast with a clear
 message if prerequisites are missing.
 
@@ -81,7 +81,7 @@ message if prerequisites are missing.
 
 ## DQ-3 — Local multi-peer test bed (Compose + kind/k3d)
 
-**Requirement.** A local test bed that simulates a small Creda network (2–3+ peers) and
+**Requirement.** A local test bed that simulates a small Credara network (2–3+ peers) and
 verifies the system behaves as it would in production. Two paths, same scenarios:
 
 - **Compose path (`testbed/compose/`)** — fast, lightweight multi-peer bring-up for
@@ -120,7 +120,7 @@ unmodified Helm chart under the restricted Pod Security Standard.
 
 ## DQ-4 — Container base images: Fedora Hummingbird (FIPS, distroless) — REQUIRED
 
-**Requirement.** All Creda container images — both **build** stages and **runtime** stages,
+**Requirement.** All Credara container images — both **build** stages and **runtime** stages,
 for every binary — are based on **Fedora Hummingbird** hardened distroless images, using the
 **FIPS-validated variants by default**.
 
@@ -131,16 +131,16 @@ variants and multi-arch support (x86_64 and **aarch64**). It ships images for ou
 stacks: a **Rust** image (Core, Export Gate, Verifier) and an **OpenJDK** image (the HAPI
 FHIR Bridge).
 
-**Decided scope.** Container images only. Creda standardizes its build and runtime base
+**Decided scope.** Container images only. Credara standardizes its build and runtime base
 images on Hummingbird; the **host OS remains the operator's choice** (Hummingbird also ships
 a bootable read-only-root OS, noted here as an option operators may adopt for extra posture,
-but Creda does not require it).
+but Credara does not require it).
 
 **Why.**
 - **Lower attack surface + near-zero CVE.** Distroless removes the shell and package
   manager; Hummingbird's pipeline rebuilds and reships on upstream patches, keeping CVE
   counts near zero — a meaningful upgrade over a static generic distroless base.
-- **FIPS by default fits the domain.** PHI handling and Creda's FIPS 204 (ML-DSA-65) /
+- **FIPS by default fits the domain.** PHI handling and Credara's FIPS 204 (ML-DSA-65) /
   FIPS 205 (SLH-DSA) post-quantum signature choices align with FIPS-validated crypto in the
   base image; many healthcare and federal deployments require it.
 - **Reinforces DQ-1.** Distroless nonroot images are exactly what the non-root requirement
@@ -156,20 +156,20 @@ but Creda does not require it).
 - **CI (M8):** the existing "no root" gate (DQ-1) plus a base-image check that fails if an
   image is not a pinned Hummingbird base; surface the Grype/CVE status in CI.
 
-**Acceptance criteria.** Every Creda image FROMs a pinned Fedora Hummingbird base (FIPS by
+**Acceptance criteria.** Every Credara image FROMs a pinned Fedora Hummingbird base (FIPS by
 default); images run non-root under the restricted Pod Security Standard (DQ-1); a CVE scan
 of the shipped images shows near-zero high/critical findings; images build and run on both
 x86_64 and aarch64.
 
 **Supersedes.** The generic "distroless" base-image choice (spec §10.6 / the original
-decision record). This is a *specialization* of "distroless," not a contradiction — Creda's
+decision record). This is a *specialization* of "distroless," not a contradiction — Credara's
 distroless base is now specifically Fedora Hummingbird.
 
 ---
 
 ## DQ-5 — Reproducible developer environment: Docker-only, deps auto-provisioned — REQUIRED
 
-**Requirement.** A developer (or CI) must be able to build and test Creda **without manually
+**Requirement.** A developer (or CI) must be able to build and test Credara **without manually
 installing a toolchain**. The Rust toolchain, the C compiler (for pqcrypto), and all
 dependencies are evaluated and provisioned by the environment, not by a human following a
 checklist. The only host prerequisite is a container engine — Podman or Docker.

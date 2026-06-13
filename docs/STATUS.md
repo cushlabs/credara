@@ -1,12 +1,12 @@
-# Creda — Implementation Status
+# Credara — Implementation Status
 
-**Read this before contributing.** Creda is pre-launch software (see the README banner: not
+**Read this before contributing.** Credara is pre-launch software (see the README banner: not
 deployed to a real network, not independently security-reviewed, **do not use with real PHI**).
 This file is the single authoritative map of *what is real vs. what is not*, so nothing in the
 tree silently misleads you. Where this file and the code disagree, that is a bug — file it.
 
 The companion `docs/HANDOFF.md` is the rolling working-session log; this file is the durable,
-contributor-facing summary. The authoritative *design* is `docs/creda-technical-spec.md`; tracked
+contributor-facing summary. The authoritative *design* is `docs/credara-technical-spec.md`; tracked
 unknowns live in its **§13 Open Questions**.
 
 ## Legend

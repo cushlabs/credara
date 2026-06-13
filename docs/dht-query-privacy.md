@@ -8,7 +8,7 @@ decision).
 
 ## The problem (and why lookups leak at all)
 
-Creda uses a Kademlia DHT for **discovery**: a `token → [peer IDs that hold this subgraph]` record
+Credara uses a Kademlia DHT for **discovery**: a `token → [peer IDs that hold this subgraph]` record
 (§6.1.6; token = salted hash of demographics, §9.2). No single peer holds the full index — each
 record lives on the peers whose node-IDs are XOR-closest to the token. So a lookup is **iterative
 and multi-hop**: the querier asks progressively-closer peers "who do you know nearer to key T?"

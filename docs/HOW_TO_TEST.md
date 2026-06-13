@@ -1,10 +1,10 @@
-# How to Get Started Testing Creda
+# How to Get Started Testing Credara
 
 Welcome. This is the on-ramp for new testers. If you can install Docker and run
-`make`, you can test Creda — there is no Rust, JDK, or Kubernetes toolchain to set
+`make`, you can test Credara — there is no Rust, JDK, or Kubernetes toolchain to set
 up by hand.
 
-> **Synthetic data only.** Creda is pre-launch healthcare infrastructure. Never use
+> **Synthetic data only.** Credara is pre-launch healthcare infrastructure. Never use
 > it with real PHI, real credentials, or real institutional keys. All testing uses
 > the synthetic data generator (M9) with `test-data` tagging. See
 > [`SECURITY.md`](../SECURITY.md) and the security note in
@@ -32,17 +32,17 @@ cd creda
 
 The two documents to read first:
 
-- [`README.md`](../README.md) — what Creda is and the architectural thesis.
+- [`README.md`](../README.md) — what Credara is and the architectural thesis.
 - [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) — how the dev container works and the
   full `make` target list.
 
-The spec ([`docs/creda-technical-spec.md`](creda-technical-spec.md)) is
+The spec ([`docs/credara-technical-spec.md`](credara-technical-spec.md)) is
 authoritative but ~81 pages. You do not need to read it to start testing — pull it
 up when a test fails and you need to understand which invariant was violated.
 
 ## The three test paths
 
-Creda has three complementary test surfaces. Run the first two unconditionally; run the
+Credara has three complementary test surfaces. Run the first two unconditionally; run the
 third when you are touching anything user-facing or want to do user-acceptance testing
 against the persona clients.
 
@@ -78,7 +78,7 @@ If your test report references `creda-events`, `creda-store`, `creda-graph`,
 
 The in-process suite cannot exercise the real libp2p adapter — gossipsub mesh,
 Kademlia DHT, anti-entropy over the wire — because all of that requires more than
-one process. The testbed brings up a kind cluster with two Creda peers and runs
+one process. The testbed brings up a kind cluster with two Credara peers and runs
 scenarios against it.
 
 ```sh
@@ -172,7 +172,7 @@ cd testbed
 make ui-up-real
 ```
 
-Brings up a single Creda peer (Core + Bridge) in namespace `creda-uat`, deploys the
+Brings up a single Credara peer (Core + Bridge) in namespace `creda-uat`, deploys the
 clients chart alongside it, and wires the clients' nginx `/fhir` reverse proxy at the
 bridge's in-cluster Service. Same image as mock-mode UAT — the SPA switches modes at
 container start based on the `FHIR_BASE` env var the chart passes in.

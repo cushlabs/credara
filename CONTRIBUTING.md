@@ -7,7 +7,7 @@ guide before opening a pull request.
 ## The two rules that matter most
 
 1. **Spec-first.** The authoritative source of truth is
-   [`docs/creda-technical-spec.md`](docs/creda-technical-spec.md). Read the relevant
+   [`docs/credara-technical-spec.md`](docs/credara-technical-spec.md). Read the relevant
    section *in full* before writing code for a component, and **cite the section in your
    commit messages** (for example, `M3: implement effective-identity projection per §5.2.4`).
    When this guide, the build guide, or any other document disagrees with the spec, the

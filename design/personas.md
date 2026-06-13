@@ -1,8 +1,8 @@
-# Creda — Personas & Contexts
+# Credara — Personas & Contexts
 
-This document captures who Creda's interfaces serve and what each is allowed to see and do.
+This document captures who Credara's interfaces serve and what each is allowed to see and do.
 It is a design reference for the mockups in this folder, not a specification — the authoritative
-source is [`docs/creda-technical-spec.md`](../docs/creda-technical-spec.md).
+source is [`docs/credara-technical-spec.md`](../docs/credara-technical-spec.md).
 
 There are two intersecting axes:
 

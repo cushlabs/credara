@@ -1,4 +1,4 @@
-# Developing Creda
+# Developing Credara
 
 **The only thing you install is a container engine — Podman or Docker.** The Rust toolchain,
 the C compiler, and every dependency live inside a dev container, so nobody sets up `cargo`,
@@ -66,7 +66,7 @@ ln -s "$(pwd)/anchor" /usr/local/bin/anchor    # or ~/.local/bin/anchor, if that
 or add a shell alias to `~/.zshrc`:
 
 ```sh
-alias anchor="$HOME/Documents/projects/Creda/anchor"
+alias anchor="$HOME/Documents/projects/Credara/anchor"
 ```
 
 Other dev tasks are plain `make` targets from the repo root — `make test`, `make ci`, `make fmt`,

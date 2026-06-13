@@ -8,7 +8,7 @@
 //! serialization, Blake3 content hashing, UUIDv7 identifiers, and the algorithm-agile
 //! signature scheme.
 //!
-//! Governing specification sections (see `docs/creda-technical-spec.md`):
+//! Governing specification sections (see `docs/credara-technical-spec.md`):
 //! - §3  Identity Model — the seven identity event types and the signature model.
 //! - §4  Portable Authorization — the three authorization event types.
 //! - §5  Data Structures — the event node schema, PQC requirements, payload schemas, UUIDv7

@@ -1,4 +1,4 @@
-# Creda: Technical Specification
+# Credara: Technical Specification
 
 **Version:** 0.1.0-draft
 **Status:** Draft
@@ -9,41 +9,41 @@
 
 ## 1. Overview
 
-Creda is a decentralized, peer-to-peer substrate for cross-institutional patient identity provenance and portable authorization. Each institution operates a Creda peer that participates in a vetted network governed by a legal coordinator (the admission control authority) but operates without runtime coordination. Identity events — assertions, links, contestations, attestations, amendments, tombstones, and deceased declarations — and authorization events — grants, revocations, and export receipts — form a directed acyclic graph that records who asserted what about a patient, what that patient authorized, when, and based on what prior assertions. The graph is replicated asynchronously across thousands of peers via gossip and anti-entropy, with FHIR R4 as the integration surface for institutional systems.
+Credara is a decentralized, peer-to-peer substrate for cross-institutional patient identity provenance and portable authorization. Each institution operates a Credara peer that participates in a vetted network governed by a legal coordinator (the admission control authority) but operates without runtime coordination. Identity events — assertions, links, contestations, attestations, amendments, tombstones, and deceased declarations — and authorization events — grants, revocations, and export receipts — form a directed acyclic graph that records who asserted what about a patient, what that patient authorized, when, and based on what prior assertions. The graph is replicated asynchronously across thousands of peers via gossip and anti-entropy, with FHIR R4 as the integration surface for institutional systems.
 
 Identity continuity and portable authorization are **co-primary capabilities**. Identity continuity establishes who a patient is across institutions; portable authorization establishes what they have permitted — as a signed, scoped artifact that travels with data references and is verifiable at any point of use, not only at the moment a query is served. Authorization is enforced through a dual-control model: a source-side Export Gate validates authorization before data leaves a source system, and a relying-side Verifier independently confirms authorization, identity continuity, and provenance integrity at the point of use, locally and offline if needed.
 
-Creda solves a problem that today's MPI and exchange ecosystem does not: cross-institutional patient identity with cryptographic provenance, persistent and revocable authorization, no central authority, and no vendor lock-in. Institutions retain sovereignty over their own assertions; patients can participate directly through signed self-attestations; and the entire history is tamper-evident by construction. The architecture builds on existing standards and components — UDAP, SMART on FHIR, HAPI FHIR, libp2p, SPIRE, TEFCA tokenization — rather than reinventing them, and is designed for incremental adoption alongside existing MPIs rather than as a forklift replacement.
+Credara solves a problem that today's MPI and exchange ecosystem does not: cross-institutional patient identity with cryptographic provenance, persistent and revocable authorization, no central authority, and no vendor lock-in. Institutions retain sovereignty over their own assertions; patients can participate directly through signed self-attestations; and the entire history is tamper-evident by construction. The architecture builds on existing standards and components — UDAP, SMART on FHIR, HAPI FHIR, libp2p, SPIRE, TEFCA tokenization — rather than reinventing them, and is designed for incremental adoption alongside existing MPIs rather than as a forklift replacement.
 
 ## 2. Design Principles
 
 These are the system-level architectural principles that govern every design decision in this spec. They apply across identity, authorization, security, networking, deployment, and governance — broader than the identity-specific tenets enumerated in Section 3.2. Where a proposed change would conflict with one of these principles, the principle wins.
 
-**Verification, not mediation.** Creda verifies authorization, provenance, and state. It does not itself grant, deny, broker, or mediate access to clinical data. Access decisions remain with the responding institution under applicable law and policy. This boundary is structural, not aspirational — no Creda component has the capability to grant or deny access to health records. It confirms that an authorization is signed, scoped, unexpired, and unrevoked; the institution decides what to do with that confirmation. This principle is what keeps Creda on the right side of the line between "infrastructure that enables trust decisions" and "a system that makes access decisions for institutions."
+**Verification, not mediation.** Credara verifies authorization, provenance, and state. It does not itself grant, deny, broker, or mediate access to clinical data. Access decisions remain with the responding institution under applicable law and policy. This boundary is structural, not aspirational — no Credara component has the capability to grant or deny access to health records. It confirms that an authorization is signed, scoped, unexpired, and unrevoked; the institution decides what to do with that confirmation. This principle is what keeps Credara on the right side of the line between "infrastructure that enables trust decisions" and "a system that makes access decisions for institutions."
 
-**Decentralization is structural, not aspirational.** No runtime coordinator, no central data store, no privileged peer roles. Admission control exists — participants are vetted and admitted to a trust framework — but once admitted, operations are peer-to-peer. Any architectural decision that would reintroduce a central runtime authority is rejected, even when centralization would be operationally simpler. The model parallels DirectTrust, the non-profit trade association established in 2012 that operates the trust framework underlying Direct Secure Messaging in US healthcare: DirectTrust accredits and governs participants but does not mediate the messages they exchange.[^directtrust] Creda follows the same pattern — vetted participation, peer-to-peer operations.
+**Decentralization is structural, not aspirational.** No runtime coordinator, no central data store, no privileged peer roles. Admission control exists — participants are vetted and admitted to a trust framework — but once admitted, operations are peer-to-peer. Any architectural decision that would reintroduce a central runtime authority is rejected, even when centralization would be operationally simpler. The model parallels DirectTrust, the non-profit trade association established in 2012 that operates the trust framework underlying Direct Secure Messaging in US healthcare: DirectTrust accredits and governs participants but does not mediate the messages they exchange.[^directtrust] Credara follows the same pattern — vetted participation, peer-to-peer operations.
 
 [^directtrust]: DirectTrust, "Direct Secure Messaging," https://directtrust.org/what-we-do/direct-secure-messaging.
 
-**Provenance is first-class, not metadata.** Every fact about a patient's identity is traceable to who asserted it, when, and based on what prior assertions. Provenance is the structural backbone of the system, not an audit log bolted on afterward. Where existing systems return match scores without explanation, Creda returns the full evidentiary chain. Where existing systems treat audit as a separate compliance system, Creda's data structure *is* the audit trail.
+**Provenance is first-class, not metadata.** Every fact about a patient's identity is traceable to who asserted it, when, and based on what prior assertions. Provenance is the structural backbone of the system, not an audit log bolted on afterward. Where existing systems return match scores without explanation, Credara returns the full evidentiary chain. Where existing systems treat audit as a separate compliance system, Credara's data structure *is* the audit trail.
 
 **Institutional sovereignty.** Each institution owns and controls only what it created. No institution can modify, censor, or override another institution's assertions. The system has no privileged actor that can rewrite history on behalf of others. Trust between institutions is established through cryptographic signatures and reputation, not through deference to a centralized authority. This principle is what makes peer-to-peer participation politically viable — institutions adopt the network because participation does not require ceding control.
 
-**Standards over invention.** Build on UDAP, SMART on FHIR, HAPI FHIR, HL7 Implementation Guide processes, libp2p, SPIFFE, TEFCA tokenization, and NIST post-quantum cryptography. Reinvent only what is genuinely Creda-specific: the healthcare event semantics, the consent model, the disambiguation algorithm, the integration glue. New code is reserved for the healthcare-domain layer; everything else is assembled from existing components. Appendix C documents the specific component for each technical decision.
+**Standards over invention.** Build on UDAP, SMART on FHIR, HAPI FHIR, HL7 Implementation Guide processes, libp2p, SPIFFE, TEFCA tokenization, and NIST post-quantum cryptography. Reinvent only what is genuinely Credara-specific: the healthcare event semantics, the consent model, the disambiguation algorithm, the integration glue. New code is reserved for the healthcare-domain layer; everything else is assembled from existing components. Appendix C documents the specific component for each technical decision.
 
-**Additive, not invasive.** Creda extends the existing FHIR and US Health IT ecosystem rather than replacing it. Non-Creda consumers see standard FHIR resources with extensions they can ignore. Institutions retain their existing MPIs, EHRs, and FHIR endpoints; Creda joins as a complementary identity provenance layer. Adoption is incremental — institutions can start as Observers (consuming through a participating QHIN), graduate to Light participants, and eventually become Full participants over multi-year arcs. The architecture is designed for a decade of coexistence with legacy infrastructure, not a forklift cutover.
+**Additive, not invasive.** Credara extends the existing FHIR and US Health IT ecosystem rather than replacing it. Non-Credara consumers see standard FHIR resources with extensions they can ignore. Institutions retain their existing MPIs, EHRs, and FHIR endpoints; Credara joins as a complementary identity provenance layer. Adoption is incremental — institutions can start as Observers (consuming through a participating QHIN), graduate to Light participants, and eventually become Full participants over multi-year arcs. The architecture is designed for a decade of coexistence with legacy infrastructure, not a forklift cutover.
 
-**Privacy by structure, not policy.** Data minimization, demographic tokenization, and consent enforcement are architectural properties of the system, not administrative rules layered on top. Cleartext PHI never traverses the gossip network. Consent events are enforceable predicates evaluated at every responding peer, not policies in a separate database. The system makes it structurally difficult to leak PHI rather than relying on operators to follow procedures. When a privacy-preserving option requires more engineering than the alternative, Creda chooses the privacy-preserving option.
+**Privacy by structure, not policy.** Data minimization, demographic tokenization, and consent enforcement are architectural properties of the system, not administrative rules layered on top. Cleartext PHI never traverses the gossip network. Consent events are enforceable predicates evaluated at every responding peer, not policies in a separate database. The system makes it structurally difficult to leak PHI rather than relying on operators to follow procedures. When a privacy-preserving option requires more engineering than the alternative, Credara chooses the privacy-preserving option.
 
 **Honest about tradeoffs.** Every significant design decision documents what it trades off. The right-to-be-forgotten / cryptographic integrity tension is named explicitly, not hidden. The bottom-up adoption strategy acknowledges the chicken-and-egg problem of network effects. The vetted-network model acknowledges the tension between openness and admission control. Section 13 enumerates unresolved questions rather than pretending the spec is complete. This honesty is not a presentation choice — it is how the spec earns the trust required for institutional adoption of the resulting system.
 
-**Designed for longevity.** Patient identity provenance must remain verifiable for decades. The architecture treats long-term durability as a baseline requirement, not a future enhancement: post-quantum cryptography readiness from day one, algorithm-agile signatures with explicit migration paths, periodic salt rotation, extensible event type enums, versioned FHIR Implementation Guides, and a coordinator role designed to be transferable across organizational successors. The spec assumes Creda will outlive its founding institutions, founding coordinator, and founding cryptographic primitives.
+**Designed for longevity.** Patient identity provenance must remain verifiable for decades. The architecture treats long-term durability as a baseline requirement, not a future enhancement: post-quantum cryptography readiness from day one, algorithm-agile signatures with explicit migration paths, periodic salt rotation, extensible event type enums, versioned FHIR Implementation Guides, and a coordinator role designed to be transferable across organizational successors. The spec assumes Credara will outlive its founding institutions, founding coordinator, and founding cryptographic primitives.
 
 ## 3. Identity Model
 
 ### 3.1 Principles
 
-The following principles are foundational to Creda's identity model. They are not guidelines — they are invariants that every design decision must satisfy.
+The following principles are foundational to Credara's identity model. They are not guidelines — they are invariants that every design decision must satisfy.
 
 **An identity is a subgraph, not a record.** There is no single golden record for a patient. A patient's identity is the totality of assertions made about them by institutions over time, represented as a directed acyclic subgraph. Each institution's view of a patient is a projection of the subgraph visible to them. The subgraph is the source of truth; any flat record is a derived artifact.
 
@@ -67,13 +67,13 @@ Tenets are operational commitments the engineering team adheres to when building
 
 **Design for the deceased.** Death is a first-class identity lifecycle event, not an afterthought. The system must handle provenance chain closure, retention windows, and eventual data disposition from day one.
 
-**Interoperability is not optional.** Every identity event must be expressible as a FHIR resource. Every Creda node must expose a standard FHIR API. Non-Creda participants must be able to interact with the system through standard FHIR operations without understanding the underlying DAG. Creda extends the ecosystem — it does not fork it.
+**Interoperability is not optional.** Every identity event must be expressible as a FHIR resource. Every Credara node must expose a standard FHIR API. Non-Credara participants must be able to interact with the system through standard FHIR operations without understanding the underlying DAG. Credara extends the ecosystem — it does not fork it.
 
 **Privacy by structure, not policy.** Data minimization, demographic tokenization, and consent enforcement are architectural properties of the system, not administrative policies layered on top. The system should make it structurally difficult to leak PII, not merely against the rules.
 
 ### 3.3 What Is an Identity
 
-In Creda, a patient identity is not a single record in a database. It is a directed acyclic subgraph composed of identity events — discrete, signed assertions made by institutions (or patients) over time. Each event references zero or more prior events, forming a provenance chain that records how the identity was established, verified, linked, corrected, and eventually closed.
+In Credara, a patient identity is not a single record in a database. It is a directed acyclic subgraph composed of identity events — discrete, signed assertions made by institutions (or patients) over time. Each event references zero or more prior events, forming a provenance chain that records how the identity was established, verified, linked, corrected, and eventually closed.
 
 The subgraph for a single patient may have multiple independent roots, created by institutions that encountered the patient without knowledge of each other. These roots remain independent until a link event connects them. Even after linking, the original roots and their downstream chains retain their independent provenance — the link is an assertion of equivalence, not a merge that destroys history.
 
@@ -81,7 +81,7 @@ To evaluate a patient's current identity, a consumer traverses the subgraph from
 
 ### 3.4 Identity Event Types
 
-Every node in the DAG is an event. All events share a common structure (defined in Section 5.1) and are distinguished by their event type. Creda's event types span two co-primary concerns — identity continuity (Section 3) and portable authorization (Section 4) — within a single shared enum:
+Every node in the DAG is an event. All events share a common structure (defined in Section 5.1) and are distinguished by their event type. Credara's event types span two co-primary concerns — identity continuity (Section 3) and portable authorization (Section 4) — within a single shared enum:
 
 ```
 enum IdentityEventType {
@@ -101,7 +101,7 @@ enum IdentityEventType {
 }
 ```
 
-The identity event types are described in this section; the authorization event types are described in Section 4.3. They share one enum, one node schema, and one replication fabric, but answer different questions: identity events are evaluated to compute who a patient is (advisory), while authorization events are evaluated to determine what is permitted (enforced). The `AuthorizationGrant` type supersedes the simpler `Consent` type from earlier Creda drafts — a consent directive is now expressed as an `AuthorizationGrant` with a minimal scope. Note that `AuthorizationRevocation` (withdrawing a permission) and `Tombstone` (scrubbing PII for right-to-be-forgotten) are deliberately distinct event types; Creda does not overload a single "revocation" concept across permission-withdrawal and content-destruction, because conflating them creates ambiguity in enforcement and audit.
+The identity event types are described in this section; the authorization event types are described in Section 4.3. They share one enum, one node schema, and one replication fabric, but answer different questions: identity events are evaluated to compute who a patient is (advisory), while authorization events are evaluated to determine what is permitted (enforced). The `AuthorizationGrant` type supersedes the simpler `Consent` type from earlier Credara drafts — a consent directive is now expressed as an `AuthorizationGrant` with a minimal scope. Note that `AuthorizationRevocation` (withdrawing a permission) and `Tombstone` (scrubbing PII for right-to-be-forgotten) are deliberately distinct event types; Credara does not overload a single "revocation" concept across permission-withdrawal and content-destruction, because conflating them creates ambiguity in enforcement and audit.
 
 This enum is **extensible**. New event types can be introduced via FHIR Implementation Guide versioning without breaking existing nodes. During replication, nodes that encounter an unknown event type must preserve the event and propagate it, but may ignore it during local subgraph traversal. This ensures forward compatibility as the protocol evolves.
 
@@ -155,7 +155,7 @@ A Tombstone event implements the right to be forgotten under applicable law (e.g
 
 The Tombstone replaces the demographic content of targeted nodes with a deletion marker. The graph structure — edges, event types, timestamps, and the fact that a node existed — may be retained for audit and structural integrity, but all PII is irreversibly scrubbed. What remains is a shell: the provenance chain shows that Institution A made an assertion on a given date, and that assertion was later tombstoned at the patient's request, but the content of the assertion is gone.
 
-Tombstoning breaks content-addressed hashing, since the hash of a node changes when its content is replaced. To handle this, Creda uses **stable UUIDs as the primary addressing scheme**. Each identity event is assigned a UUID at creation time, and all references between events (parent pointers, link targets, contest targets, etc.) use UUIDs, not content hashes. Content hashes serve as an **optional integrity check** — they can verify that a node's payload has not been tampered with, but they are not load-bearing for graph traversal or replication. After tombstoning, the content hash is voided and marked as such. The graph structure remains intact because UUID-based references are unaffected by content changes.
+Tombstoning breaks content-addressed hashing, since the hash of a node changes when its content is replaced. To handle this, Credara uses **stable UUIDs as the primary addressing scheme**. Each identity event is assigned a UUID at creation time, and all references between events (parent pointers, link targets, contest targets, etc.) use UUIDs, not content hashes. Content hashes serve as an **optional integrity check** — they can verify that a node's payload has not been tampered with, but they are not load-bearing for graph traversal or replication. After tombstoning, the content hash is voided and marked as such. The graph structure remains intact because UUID-based references are unaffected by content changes.
 
 Tombstone events propagate through the gossip network like any other event. Peers that receive a Tombstone must scrub the targeted content from their local stores. Failure to propagate tombstones is a compliance violation.
 
@@ -194,7 +194,7 @@ Patient-originated events (when patients hold their own keys) use a separate sig
 
 ## 4. Portable Authorization
 
-Identity provenance answers *who* a patient is. Portable authorization answers *what they have authorized* — and, critically, makes that answer verifiable at the point where data is actually used, not only at the moment a query is served. These are co-primary capabilities. Identity continuity without authorization is incomplete: you know who the patient is but cannot confirm what they permitted. Authorization without identity continuity is meaningless: you hold an authorization artifact but cannot confirm it belongs to this patient. Creda exists because cross-institutional health data exchange requires both, and neither exists today as shared infrastructure.
+Identity provenance answers *who* a patient is. Portable authorization answers *what they have authorized* — and, critically, makes that answer verifiable at the point where data is actually used, not only at the moment a query is served. These are co-primary capabilities. Identity continuity without authorization is incomplete: you know who the patient is but cannot confirm what they permitted. Authorization without identity continuity is meaningless: you hold an authorization artifact but cannot confirm it belongs to this patient. Credara exists because cross-institutional health data exchange requires both, and neither exists today as shared infrastructure.
 
 This section defines authorization as a first-class primitive alongside the identity model of Section 3. The two share the same DAG, the same event-node schema (Section 5), the same replication fabric (Sections 6–7), and the same signing and trust model. Authorization is not a separate system bolted onto identity — it is a parallel set of event types and an enforcement model that travels on the same rails.
 
@@ -202,7 +202,7 @@ This section defines authorization as a first-class primitive alongside the iden
 
 Current health data exchange verifies authorization at the moment of transfer and then forgets it. Once data leaves a source system, the authorization that permitted the exchange becomes invisible to downstream consumers. If a patient revokes consent an hour later, systems that already received the data have no way to know — and no obligation to check. Authorization is treated as a transient gate, checked once and discarded.
 
-Creda treats authorization as a **persistent, verifiable state** that travels with the data reference and can be confirmed at any point of use. When a patient authorizes an exchange, the result is a signed, scoped artifact recorded in the DAG. Any relying system can later re-verify that artifact — its signature, scope, expiration, audience, and revocation status — locally, without contacting the originating institution. Authorization stops being a moment and becomes a checkable, revocable, auditable condition that persists across the full data lifecycle.
+Credara treats authorization as a **persistent, verifiable state** that travels with the data reference and can be confirmed at any point of use. When a patient authorizes an exchange, the result is a signed, scoped artifact recorded in the DAG. Any relying system can later re-verify that artifact — its signature, scope, expiration, audience, and revocation status — locally, without contacting the originating institution. Authorization stops being a moment and becomes a checkable, revocable, auditable condition that persists across the full data lifecycle.
 
 ### 4.2 Authorization as Verifiable State
 
@@ -214,7 +214,7 @@ Authorization is represented as a portable, verifiable state object within the D
 - **Verifiable at any point of use** by traversing the provenance chain and checking the signature.
 - **Non-transferable**: bound to the specified patient and audience; it cannot be reassigned.
 
-Creda verifies authorization state. It does not itself grant, deny, broker, or mediate access to clinical data. Access decisions remain with the responding institution under applicable law and policy. This boundary is structural, not aspirational — no Creda component has the capability to grant or deny access to health records. It verifies that an authorization is signed, scoped, unexpired, and unrevoked; the institution decides what to do with that verification.
+Credara verifies authorization state. It does not itself grant, deny, broker, or mediate access to clinical data. Access decisions remain with the responding institution under applicable law and policy. This boundary is structural, not aspirational — no Credara component has the capability to grant or deny access to health records. It verifies that an authorization is signed, scoped, unexpired, and unrevoked; the institution decides what to do with that verification.
 
 ### 4.3 Authorization Event Types
 
@@ -222,7 +222,7 @@ Authorization introduces three event types that join the identity event types in
 
 #### 4.3.1 AuthorizationGrant
 
-An AuthorizationGrant records a patient's directive granting specific institutions (or classes of institutions) access to their subgraph and associated data. It supersedes the simpler Consent event type from earlier Creda drafts — a Consent is an AuthorizationGrant with a minimal scope. The Grant payload specifies:
+An AuthorizationGrant records a patient's directive granting specific institutions (or classes of institutions) access to their subgraph and associated data. It supersedes the simpler Consent event type from earlier Credara drafts — a Consent is an AuthorizationGrant with a minimal scope. The Grant payload specifies:
 
 - **Scope**: which subgraph segments, which event types, which data categories.
 - **Audience**: a specific institutional identity (UDAP fingerprint), an institutional class (e.g., "any TEFCA QHIN," verified against the Participant Registry), or a constrained wildcard (e.g., "any institution with an active BAA").
@@ -232,7 +232,7 @@ An AuthorizationGrant records a patient's directive granting specific institutio
 - **Use-mode constraints**: read-only, read-and-rely, or read-and-export.
 - **Non-transferability binding**: the authorization is bound to the specified patient and cannot be reassigned.
 
-An AuthorizationGrant may be created by the patient (if they hold a signing key) or by an institution acting on the patient's documented directive. The richer purpose enumeration is what makes Creda authorization useful beyond clinical TPO — research, AI, and federal program scopes carry distinct enforcement semantics (Section 4.6).
+An AuthorizationGrant may be created by the patient (if they hold a signing key) or by an institution acting on the patient's documented directive. The richer purpose enumeration is what makes Credara authorization useful beyond clinical TPO — research, AI, and federal program scopes carry distinct enforcement semantics (Section 4.6).
 
 #### 4.3.2 AuthorizationRevocation
 
@@ -240,7 +240,7 @@ An AuthorizationRevocation supersedes a prior AuthorizationGrant. It references 
 
 Revocation does not delete the original Grant — the Grant remains in the DAG as an audit record showing that authorization was once granted and later withdrawn. This is materially stronger than revocation via an API call to a central service: revocation latency is deterministic and auditable at every peer, and the revocation itself is a signed, permanent event rather than a database mutation that could be silently reversed.
 
-Note the relationship to the identity-side Tombstone (Section 3.4.6): Tombstone scrubs PII content for right-to-be-forgotten compliance; AuthorizationRevocation withdraws a permission. They are distinct operations with distinct event types — Creda deliberately does not overload a single "revocation" concept across both, because conflating "this permission no longer holds" with "this content must be destroyed" creates ambiguity in enforcement and audit.
+Note the relationship to the identity-side Tombstone (Section 3.4.6): Tombstone scrubs PII content for right-to-be-forgotten compliance; AuthorizationRevocation withdraws a permission. They are distinct operations with distinct event types — Credara deliberately does not overload a single "revocation" concept across both, because conflating "this permission no longer holds" with "this content must be destroyed" creates ambiguity in enforcement and audit.
 
 #### 4.3.3 ExportReceipt
 
@@ -250,7 +250,7 @@ ExportReceipts create a non-repudiable chain of custody. The source can prove it
 
 #### 4.3.4 Access requests are deliberately off-chain (hybrid workflow)
 
-A relying institution often wants to *ask* a patient for access before any Grant exists. Creda models this request as **off-chain** — it is **not** a DAG event — while the patient's *answer* is the existing on-chain AuthorizationGrant (Section 4.3.1) and any resulting disclosure is the existing on-chain ExportReceipt (Section 4.3.3). This hybrid split is deliberate:
+A relying institution often wants to *ask* a patient for access before any Grant exists. Credara models this request as **off-chain** — it is **not** a DAG event — while the patient's *answer* is the existing on-chain AuthorizationGrant (Section 4.3.1) and any resulting disclosure is the existing on-chain ExportReceipt (Section 4.3.3). This hybrid split is deliberate:
 
 - An access request is transient *intent*, not constitutive of identity. Admitting it to the append-forward DAG would permanently retain frivolous or spam requests (the graph cannot forget) and would broadcast "institution X is interested in patient Y" to every peer holding the subgraph — precisely the value-privacy leak tracked as a hard gate in Section 13.3. Keeping the request off-chain confines that interest signal to the requester and the patient.
 - The request needs to reach exactly one party (the patient), not be replicated and enforced network-wide. Only the *answer* (the Grant) must be portable and auditable, and it already is.
@@ -268,7 +268,7 @@ This portability is what enables verification at the point of use. The Artifact 
 
 ### 4.5 Dual-Control Enforcement
 
-Creda enforces authorization at two independent control points. Neither the source nor the relying party can unilaterally circumvent authorization: the source cannot export without a valid artifact, and the relying party cannot use data without local verification.
+Credara enforces authorization at two independent control points. Neither the source nor the relying party can unilaterally circumvent authorization: the source cannot export without a valid artifact, and the relying party cannot use data without local verification.
 
 #### 4.5.1 Source Side: Export Gate
 
@@ -280,7 +280,7 @@ The Export Gate runs at the source — typically inside or adjacent to the insti
 
 At the point of use, the **Verifier** validates three things together: that the authorization artifact is valid (signature, scope, expiration, audience, revocation status), that identity continuity holds for the patient (the subgraph traversal confirms the artifact belongs to this patient), and that the provenance chain is intact (no broken signatures or missing parents in the relevant chain).
 
-The Verifier operates locally and can function offline using its most recent synchronized DAG state. It does not require a callback to the source system for routine verification. This is essential for two reasons: resilience (verification continues during network partitions or source outages) and adoption (a consuming system — an EHR, a payer adjudication system, a research platform — can embed the Verifier and check authorization locally without running a full Creda peer).
+The Verifier operates locally and can function offline using its most recent synchronized DAG state. It does not require a callback to the source system for routine verification. This is essential for two reasons: resilience (verification continues during network partitions or source outages) and adoption (a consuming system — an EHR, a payer adjudication system, a research platform — can embed the Verifier and check authorization locally without running a full Credara peer).
 
 #### 4.5.3 Why Two Controls
 
@@ -293,7 +293,7 @@ Identity continuity is verified at both control points: the Export Gate confirms
 
 ### 4.6 Authorization Evaluation Algorithm
 
-When a Creda peer at Institution B receives a query from Institution A requesting access to events in a patient's subgraph, the responding peer executes the following algorithm before returning any events. The algorithm is local: it requires no network calls, no callback to the patient, and no contact with a central consent service. It is also the reference logic for the Verifier's evaluation function.
+When a Credara peer at Institution B receives a query from Institution A requesting access to events in a patient's subgraph, the responding peer executes the following algorithm before returning any events. The algorithm is local: it requires no network calls, no callback to the patient, and no contact with a central consent service. It is also the reference logic for the Verifier's evaluation function.
 
 **Step 1 — Collect AuthorizationGrants.** Walk the patient's local subgraph and collect all AuthorizationGrant events in the responding peer's local store. Only Grants targeting this patient's subgraph are considered. Grants are collected regardless of current status; revoked Grants are filtered in Step 2.
 
@@ -328,13 +328,13 @@ The defaults are *policy starting points, not protocol invariants*. Per §5.3.2,
 
 ### 4.7 Revocation Propagation and Bounded Latency
 
-Because authorization revocation is safety-relevant — a patient who revokes consent expects that revocation to take effect — Creda treats revocation propagation latency as a measurable, bounded property rather than a best-effort hope. Three bounds apply:
+Because authorization revocation is safety-relevant — a patient who revokes consent expects that revocation to take effect — Credara treats revocation propagation latency as a measurable, bounded property rather than a best-effort hope. Three bounds apply:
 
 - **Bound 1 (gossip propagation):** under normal conditions, an AuthorizationRevocation propagates to subscribed peers within the gossip convergence window (typically 1–2 seconds across the network, Section 6.1.1). This is the common case.
 - **Bound 2 (anti-entropy):** a peer that missed the revocation via gossip — due to transient unavailability or partition — receives it during the next anti-entropy cycle for the affected subgraph (15 minutes for active subgraphs, Section 6.2.5).
 - **Bound 3 (worst-case convergence):** following an extended partition, revocations reconcile when connectivity is restored and anti-entropy completes. This bound is partition-duration-dependent and therefore not fixed; it is the case operators monitor for.
 
-Bound 1 is realistic and validated by the gossip design. Bounds 2 and 3 are stated as architectural commitments but require pilot validation (Section 13). Conformance tests (Section 10.5 tooling) verify that a revocation injected at one peer is reflected at subscribed peers within Bound 1 under normal conditions. This bounded-latency posture is materially stronger than revocation via a central service, where latency is opaque and unauditable; in Creda, revocation latency is deterministic under normal conditions and auditable at every peer.
+Bound 1 is realistic and validated by the gossip design. Bounds 2 and 3 are stated as architectural commitments but require pilot validation (Section 13). Conformance tests (Section 10.5 tooling) verify that a revocation injected at one peer is reflected at subscribed peers within Bound 1 under normal conditions. This bounded-latency posture is materially stronger than revocation via a central service, where latency is opaque and unauditable; in Credara, revocation latency is deterministic under normal conditions and auditable at every peer.
 
 ### 4.8 Relationship to the Identity Model
 
@@ -349,7 +349,7 @@ The two interact at exactly one point: an authorization is bound to a patient vi
 
 ### 5.1 Identity Event Node
 
-Every identity event in Creda is stored as a node with the following schema:
+Every identity event in Credara is stored as a node with the following schema:
 
 ```
 struct IdentityEventNode {
@@ -401,13 +401,13 @@ struct IdentityEventNode {
 
 #### 5.1.1 Serialization and Determinism
 
-Signature verification requires that the same logical event always produces the same byte sequence. Creda uses **canonical CBOR (RFC 8949, Core Deterministic Encoding)** as its serialization format. Map keys are sorted lexicographically, floating-point values are avoided (all numeric values are integers or fixed-point), and optional fields that are absent are omitted entirely rather than encoded as null. This ensures that any two implementations serializing the same event produce identical bytes, and therefore identical signatures.
+Signature verification requires that the same logical event always produces the same byte sequence. Credara uses **canonical CBOR (RFC 8949, Core Deterministic Encoding)** as its serialization format. Map keys are sorted lexicographically, floating-point values are avoided (all numeric values are integers or fixed-point), and optional fields that are absent are omitted entirely rather than encoded as null. This ensures that any two implementations serializing the same event produce identical bytes, and therefore identical signatures.
 
 Protobuf was considered but rejected due to its non-deterministic handling of map fields and unknown fields, which would require additional canonicalization layers.
 
 #### 5.1.2 Post-Quantum Cryptography Requirements
 
-Creda is designed for longevity — patient identity subgraphs may persist for decades, and identity provenance must remain verifiable over the full lifetime of the data. This makes post-quantum cryptographic (PQC) readiness a requirement from day one, not a future migration.
+Credara is designed for longevity — patient identity subgraphs may persist for decades, and identity provenance must remain verifiable over the full lifetime of the data. This makes post-quantum cryptographic (PQC) readiness a requirement from day one, not a future migration.
 
 **Hash function.** Blake3 is used for content hashes. Blake3 is not directly threatened by quantum computing — Grover's algorithm reduces the effective security of a hash function by half (256-bit hash → 128-bit equivalent security against quantum search), and Blake3's 256-bit output provides a 128-bit post-quantum security margin, which meets NIST's recommended floor. Blake3 was chosen over SHA-256 (slower, same PQC security margin) and SHA-3 (less mature Rust ecosystem). If future NIST guidance raises the floor above 128-bit quantum security, the content hash field supports algorithm agility — the hash is stored alongside an algorithm identifier, allowing a transition to Blake3 with a longer output or a successor function without schema changes.
 
@@ -428,13 +428,13 @@ enum SignatureAlgorithm {
 }
 ```
 
-**Migration path.** Creda launches with `Ed25519` as the default to align with current UDAP certificate infrastructure. Institutions that are PQC-ready may use `MlDsa65` (NIST FIPS 204, the primary post-quantum digital signature standard) or the hybrid `Ed25519MlDsa65` mode, which requires both signatures to verify and provides security against both classical and quantum adversaries during the transition period.
+**Migration path.** Credara launches with `Ed25519` as the default to align with current UDAP certificate infrastructure. Institutions that are PQC-ready may use `MlDsa65` (NIST FIPS 204, the primary post-quantum digital signature standard) or the hybrid `Ed25519MlDsa65` mode, which requires both signatures to verify and provides security against both classical and quantum adversaries during the transition period.
 
 The hybrid mode is recommended for institutions that want PQC protection today without abandoning classical verification that existing tooling understands. SLH-DSA (FIPS 205) is included as a stateless fallback — its signatures are larger but it does not depend on maintaining state, making it suitable for environments where stateful key management is impractical.
 
 **Verification policy.** A peer's signature verification policy determines which algorithms it accepts. The minimum policy is: accept `Ed25519` (for backward compatibility), accept `MlDsa65` and `SlhDsa256s` (for PQC), accept `Ed25519MlDsa65` (hybrid). A future network-level policy update can deprecate `Ed25519`-only signatures once PQC adoption reaches a sufficient threshold, enforced by a configurable cutoff date after which classical-only signatures are rejected.
 
-**"Harvest now, decrypt later" defense.** The primary PQC threat to Creda is not real-time forgery but the "harvest now, decrypt later" attack — an adversary captures signed events today and attempts to forge or re-sign them once quantum computers can break classical signatures. The hybrid signature mode defends against this: even if Ed25519 is broken, the ML-DSA-65 component remains secure. For events signed with classical-only Ed25519 before PQC adoption, institutions may optionally re-sign historical events with a PQC algorithm via an Attest event that references the original and adds a PQC signature layer, providing retroactive quantum resistance for critical provenance chains.
+**"Harvest now, decrypt later" defense.** The primary PQC threat to Credara is not real-time forgery but the "harvest now, decrypt later" attack — an adversary captures signed events today and attempts to forge or re-sign them once quantum computers can break classical signatures. The hybrid signature mode defends against this: even if Ed25519 is broken, the ML-DSA-65 component remains secure. For events signed with classical-only Ed25519 before PQC adoption, institutions may optionally re-sign historical events with a PQC algorithm via an Attest event that references the original and adds a PQC signature layer, providing retroactive quantum resistance for critical provenance chains.
 
 #### 5.1.3 Payload Schema per Event Type
 
@@ -499,7 +499,7 @@ enum EventPayload {
 
 #### 5.1.4 UUID Generation
 
-Creda uses **UUIDv7** (RFC 9562) for all event node identifiers. UUIDv7 encodes a Unix timestamp in the high bits, providing natural time-ordering at the storage layer without requiring a separate timestamp index. The random component of the UUIDv7 is seeded with the creating institution's node ID, reducing collision probability across institutions generating events concurrently to a level that is negligible at the scale of the system (millions of patients, thousands of nodes).
+Credara uses **UUIDv7** (RFC 9562) for all event node identifiers. UUIDv7 encodes a Unix timestamp in the high bits, providing natural time-ordering at the storage layer without requiring a separate timestamp index. The random component of the UUIDv7 is seeded with the creating institution's node ID, reducing collision probability across institutions generating events concurrently to a level that is negligible at the scale of the system (millions of patients, thousands of nodes).
 
 UUIDv7 was chosen over UUIDv4 (no temporal ordering) and ULID (non-standard, limited ecosystem support in Rust) for its combination of time-ordering, uniqueness guarantees, and broad library support.
 
@@ -542,7 +542,7 @@ The effective identity is a **projection**, not a stored record. It may differ b
 
 Efficient subgraph operations require secondary indexes maintained alongside the primary event store:
 
-- **Demographic token → subgraph entry points**: enables matching queries. When an institution needs to find subgraphs for a patient presenting at registration, it tokenizes the patient's demographics and looks up matching entry points. This is the primary interface between Creda and institutional matching logic.
+- **Demographic token → subgraph entry points**: enables matching queries. When an institution needs to find subgraphs for a patient presenting at registration, it tokenizes the patient's demographics and looks up matching entry points. This is the primary interface between Credara and institutional matching logic.
 - **Institution ID → event UUIDs**: enables institutional audit. An institution can enumerate all events it has ever created across all patient subgraphs.
 - **Event UUID → event node**: primary key lookup for individual event retrieval.
 - **Parent UUID → child UUIDs**: forward traversal index. Given an event, find all events that reference it as a parent. Necessary for computing leaf nodes and for propagating tombstone effects forward through the graph.
@@ -572,7 +572,7 @@ All fields are optional. An Assert event need not carry all demographics — an 
 
 #### 5.3.2 Per-Field Confidence Model
 
-Confidence in Creda is computed **per demographic field, not per patient**. A patient's date of birth might be high-confidence (verified by government ID at three independent institutions) while their address is low-confidence (self-reported once, two years ago). This granularity prevents a single strong assertion from inflating confidence in unrelated fields.
+Confidence in Credara is computed **per demographic field, not per patient**. A patient's date of birth might be high-confidence (verified by government ID at three independent institutions) while their address is low-confidence (self-reported once, two years ago). This granularity prevents a single strong assertion from inflating confidence in unrelated fields.
 
 For a given demographic field, the confidence score is a function of four inputs:
 
@@ -609,7 +609,7 @@ The decay curve is configurable — linear, exponential, or step-function with a
 
 When institutions assert **conflicting values** for the same demographic field (e.g., different dates of birth, different spellings of a name), the effective identity computation does not pick a winner. Instead, it flags the field as **disputed** and presents all asserted values with their respective confidence scores.
 
-Resolution is left to the consuming institution. Creda's role is to surface the disagreement and provide the evidence (provenance chains for each competing assertion) — not to adjudicate. A consuming institution may choose the highest-confidence value, may flag the patient for manual review, or may apply its own resolution logic. The system makes the disagreement visible rather than silently choosing.
+Resolution is left to the consuming institution. Credara's role is to surface the disagreement and provide the evidence (provenance chains for each competing assertion) — not to adjudicate. A consuming institution may choose the highest-confidence value, may flag the patient for manual review, or may apply its own resolution logic. The system makes the disagreement visible rather than silently choosing.
 
 This design reflects the reality that demographic conflicts often indicate real-world complexity (legal name vs. preferred name, old address vs. new address, data entry error at one institution) rather than a system failure. The correct resolution depends on context that only the consuming institution has.
 
@@ -631,7 +631,7 @@ The ceiling mechanism is the structural complement to §4.6 step 5.5: even if th
 
 ## 6. Network Architecture
 
-Creda's network is a fully decentralized peer-to-peer overlay. There are no leader nodes, coordinator nodes, or privileged peers. Every peer can accept writes, serve reads, participate in gossip, and contribute to the distributed hash table. This section describes the network components in dependency order: foundational components that the system cannot function without, complementary components that reinforce each other, architectural choices where alternatives exist, and components that can be deferred for initial deployment.
+Credara's network is a fully decentralized peer-to-peer overlay. There are no leader nodes, coordinator nodes, or privileged peers. Every peer can accept writes, serve reads, participate in gossip, and contribute to the distributed hash table. This section describes the network components in dependency order: foundational components that the system cannot function without, complementary components that reinforce each other, architectural choices where alternatives exist, and components that can be deferred for initial deployment.
 
 ### 6.1 Foundational Components
 
@@ -639,12 +639,12 @@ These components are non-negotiable. The system does not function without them.
 
 #### 6.1.1 Peer Identity
 
-Each Creda peer is a k8s pod (or set of pods) operated by an institution. Peer identity is established through two independent credentials that serve different purposes:
+Each Credara peer is a k8s pod (or set of pods) operated by an institution. Peer identity is established through two independent credentials that serve different purposes:
 
-- **SPIFFE ID** (via SPIRE, the SPIFFE runtime): Authenticates the workload. Proves "this is a legitimate Creda peer process running in an authorized k8s cluster." The SPIFFE ID is issued by the institution's SPIRE server and is scoped to the Creda workload. It is used for transport-layer authentication during the Noise handshake (see Section 6.2.3).
-- **UDAP certificate**: Authenticates the institution. Proves "this process belongs to Hospital X, a real healthcare organization registered in the US Health IT trust framework." The UDAP certificate is the same credential the institution uses for FHIR endpoint authentication, tying Creda's trust model to the existing ecosystem.
+- **SPIFFE ID** (via SPIRE, the SPIFFE runtime): Authenticates the workload. Proves "this is a legitimate Credara peer process running in an authorized k8s cluster." The SPIFFE ID is issued by the institution's SPIRE server and is scoped to the Credara workload. It is used for transport-layer authentication during the Noise handshake (see Section 6.2.3).
+- **UDAP certificate**: Authenticates the institution. Proves "this process belongs to Hospital X, a real healthcare organization registered in the US Health IT trust framework." The UDAP certificate is the same credential the institution uses for FHIR endpoint authentication, tying Credara's trust model to the existing ecosystem.
 
-Both credentials are required. A peer presenting only a SPIFFE ID is an authenticated workload but an unknown institution — it cannot sign identity events. A peer presenting only a UDAP certificate has institutional identity but no workload attestation — it could be a compromised process impersonating a Creda peer.
+Both credentials are required. A peer presenting only a SPIFFE ID is an authenticated workload but an unknown institution — it cannot sign identity events. A peer presenting only a UDAP certificate has institutional identity but no workload attestation — it could be a compromised process impersonating a Credara peer.
 
 The peer's UDAP certificate fingerprint is the `institution_id` on every identity event it creates. The SPIFFE ID is ephemeral and per-pod — it does not appear in the identity graph, only in transport-layer authentication.
 
@@ -664,13 +664,13 @@ An institution may operate multiple peers for redundancy and load distribution, 
 
 #### 6.1.3 Network Join Protocol
 
-Joining the Creda network requires both technical onboarding and a legal admission step. The legal step is non-optional: under HIPAA, any peer that receives Protected Health Information (PHI) — including the tokenized demographics carried in identity events — must have a Business Associate Agreement (BAA) in place with each other peer's covered entity. Creda formalizes this through a **Network Participation Agreement (NPA)**, a multi-party BAA framework that participating institutions sign once to establish bilateral BAA coverage with all other participants.
+Joining the Credara network requires both technical onboarding and a legal admission step. The legal step is non-optional: under HIPAA, any peer that receives Protected Health Information (PHI) — including the tokenized demographics carried in identity events — must have a Business Associate Agreement (BAA) in place with each other peer's covered entity. Credara formalizes this through a **Network Participation Agreement (NPA)**, a multi-party BAA framework that participating institutions sign once to establish bilateral BAA coverage with all other participants.
 
 The join process:
 
 1. **Legal admission.** The institution executes the NPA with the network's legal coordinator (typically a participating HIE or a designated nonprofit serving this role). The NPA establishes BAA coverage between the new institution and all existing participants. Existing participants are notified of the new participant via an out-of-band registry.
-2. **Credential issuance.** Upon NPA execution, the institution's UDAP certificate is registered in the **Creda Participant Registry** — a signed, replicated list of authorized institutional UDAP certificate fingerprints. The registry itself is maintained as a Creda subgraph (using the same DAG mechanics described in this spec, with the legal coordinator as the asserting institution), making it tamper-evident and decentralized in the same way as patient identity data.
-3. **Technical deployment.** The institution deploys a Creda peer configured with their UDAP certificate and SPIFFE identity.
+2. **Credential issuance.** Upon NPA execution, the institution's UDAP certificate is registered in the **Credara Participant Registry** — a signed, replicated list of authorized institutional UDAP certificate fingerprints. The registry itself is maintained as a Credara subgraph (using the same DAG mechanics described in this spec, with the legal coordinator as the asserting institution), making it tamper-evident and decentralized in the same way as patient identity data.
+3. **Technical deployment.** The institution deploys a Credara peer configured with their UDAP certificate and SPIFFE identity.
 4. **Network entry.** The peer connects to a bootstrap peer and performs mutual authentication (Noise handshake with SPIFFE, UDAP certificate exchange). The bootstrap peer verifies the UDAP certificate fingerprint against the Participant Registry. If the fingerprint is not registered or has been revoked, the connection is rejected.
 5. **Mesh and DHT bootstrap.** The bootstrap peer shares its partial view of the network. The new peer begins gossipsub mesh joining and Kademlia DHT bootstrap (iterative `FIND_NODE` queries to populate its routing table).
 6. **Operational readiness.** Within a few seconds, the peer has an active view, is participating in gossip, and is reachable via the DHT.
@@ -684,7 +684,7 @@ Bootstrap peers themselves are operationally important but not architecturally p
 
 #### 6.1.4 Gossip Protocol for Event Propagation
 
-New identity events propagate through the network via epidemic gossip. When an institution's local system creates an event (e.g., a new Assert during patient registration), the local Creda peer:
+New identity events propagate through the network via epidemic gossip. When an institution's local system creates an event (e.g., a new Assert during patient registration), the local Credara peer:
 
 1. Validates the event (schema, signature, structural integrity).
 2. Stores the event in its local event store.
@@ -698,7 +698,7 @@ Each receiving peer performs the same validation, stores locally, and pushes to 
 
 #### 6.1.5 Distributed Hash Table for Subgraph Routing
 
-Creda runs a Kademlia DHT for patient subgraph discovery. The DHT answers the question: "Which peers hold identity events for this patient?"
+Credara runs a Kademlia DHT for patient subgraph discovery. The DHT answers the question: "Which peers hold identity events for this patient?"
 
 When Institution A needs to find a patient's subgraph (e.g., a patient presents at registration and the institution wants to check for existing identity provenance), it:
 
@@ -724,7 +724,7 @@ dht_key = SHA-512(
 
 The full 512-bit (64-byte) digest is used as the Kademlia routing key. Field separators (ASCII unit separator, `0x1F`) prevent boundary ambiguities between adjacent tokens.
 
-**Why SHA-512.** The DHT key is the only Creda hash with a network-wide coordination role — every peer must compute the same value for the same demographics, or the same patient lands in different buckets at different institutions and identity continuity silently breaks across the divergence line. That makes the DHT key the wrong place for a hash whose only FIPS path is a future migration. SHA-512 is FIPS 180-4 validated under the OpenSSL FIPS module that ships with UBI and the Hummingbird FIPS images, satisfying federal-program procurement (VA, IHS, DoD Health, federally-funded HIE work) without an algorithm-migration window. The 512-bit output also provides a 256-bit post-quantum security margin against Grover search — double the margin Blake3-256 or SHA-256 provides — which is appropriate for a primitive whose identity-continuity guarantees must survive decades of cryptanalytic progress. Per-event content hashes (§5.1.2) and Merkle roots (§6.1.8) remain on Blake3 because they're per-peer integrity primitives, not network-wide routing keys; they tolerate algorithm agility cleanly when future guidance demands a change.
+**Why SHA-512.** The DHT key is the only Credara hash with a network-wide coordination role — every peer must compute the same value for the same demographics, or the same patient lands in different buckets at different institutions and identity continuity silently breaks across the divergence line. That makes the DHT key the wrong place for a hash whose only FIPS path is a future migration. SHA-512 is FIPS 180-4 validated under the OpenSSL FIPS module that ships with UBI and the Hummingbird FIPS images, satisfying federal-program procurement (VA, IHS, DoD Health, federally-funded HIE work) without an algorithm-migration window. The 512-bit output also provides a 256-bit post-quantum security margin against Grover search — double the margin Blake3-256 or SHA-256 provides — which is appropriate for a primitive whose identity-continuity guarantees must survive decades of cryptanalytic progress. Per-event content hashes (§5.1.2) and Merkle roots (§6.1.8) remain on Blake3 because they're per-peer integrity primitives, not network-wide routing keys; they tolerate algorithm agility cleanly when future guidance demands a change.
 
 The tokenization scheme must produce the same output across all institutions for the same input demographics — this is defined in Section 9.2 and is critical for the DHT to function. The choice of fields (family name, DOB, sex) balances specificity (enough to narrow results) with availability (these three fields are almost always present at registration).
 
@@ -747,7 +747,7 @@ The only semantic edge case is concurrent Link events that assert conflicting id
 
 #### 6.1.8 Merkle Root for Anti-Entropy
 
-Anti-entropy requires a fast mechanism for two peers to determine whether their copies of a patient subgraph are in sync. Creda computes a **Merkle root over the sorted set of event UUIDs** in a subgraph.
+Anti-entropy requires a fast mechanism for two peers to determine whether their copies of a patient subgraph are in sync. Credara computes a **Merkle root over the sorted set of event UUIDs** in a subgraph.
 
 This is deliberately not a Merkle root over event contents — tombstoned nodes would cause roots to diverge even when both peers have the same event set. By hashing only the sorted UUID set, two peers that hold the same events (regardless of content mutations due to tombstoning) will compute the same root.
 
@@ -777,13 +777,13 @@ The active view is maintained by periodic shuffling — peers exchange passive v
 
 **The networking layer** is **libp2p** (Rust implementation via `rust-libp2p`). libp2p provides:
 
-- **Gossipsub**: topic-based publish-subscribe with mesh management that subsumes the partial-view protocol. Gossipsub's mesh overlay aligns naturally with Creda's needs — each patient subgraph can be a topic, and peers subscribe to topics for patients they care about.
+- **Gossipsub**: topic-based publish-subscribe with mesh management that subsumes the partial-view protocol. Gossipsub's mesh overlay aligns naturally with Credara's needs — each patient subgraph can be a topic, and peers subscribe to topics for patients they care about.
 - **Kademlia DHT**: the DHT implementation described in Section 6.1.5.
 - **Noise protocol**: encrypted, authenticated transport (see Section 6.2.3).
 - **NAT traversal and relay**: enables peers behind firewalls or NATs to participate, critical for on-premises deployments.
 - **Connection multiplexing**: multiple logical streams over a single connection, reducing connection overhead between peers.
 
-libp2p was chosen over a custom networking stack because it is hardened by the IPFS, Filecoin, and Ethereum ecosystems, has a mature Rust implementation, and provides all required primitives in a single dependency. The alternative — building gossip, DHT, encryption, and NAT traversal from scratch on raw QUIC — is viable but represents 6-12 months of additional engineering effort with no functional advantage. If the team has concerns about libp2p (binary size, API stability, health IT compliance review), the networking layer is abstracted behind a trait boundary in Creda Core (Section 10.1) to allow future replacement.
+libp2p was chosen over a custom networking stack because it is hardened by the IPFS, Filecoin, and Ethereum ecosystems, has a mature Rust implementation, and provides all required primitives in a single dependency. The alternative — building gossip, DHT, encryption, and NAT traversal from scratch on raw QUIC — is viable but represents 6-12 months of additional engineering effort with no functional advantage. If the team has concerns about libp2p (binary size, API stability, health IT compliance review), the networking layer is abstracted behind a trait boundary in Credara Core (Section 10.1) to allow future replacement.
 
 #### 6.2.2 Gossip Batching and Rate Limiting
 
@@ -818,7 +818,7 @@ Encryption without peer identity authentication is vulnerable to man-in-the-midd
 
 **Topic-based gossip with bucketing.** Not every peer needs every event. At millions of patients across thousands of peers, full-mesh gossip of all events is bandwidth-prohibitive. A naive design would assign one gossipsub topic per patient subgraph, but topic cardinality in the millions stresses gossipsub's mesh management and creates per-topic overhead that does not amortize well.
 
-Creda instead uses **bucketed topics**. Each patient subgraph's DHT key is hashed into one of 1,024 topic buckets:
+Credara instead uses **bucketed topics**. Each patient subgraph's DHT key is hashed into one of 1,024 topic buckets:
 
 ```
 topic_id = "creda/v1/subgraph/" + (Blake3(dht_key) mod 1024)
@@ -869,11 +869,11 @@ Where the design admits alternatives, this section documents the choice made and
 
 **Choice: libp2p.**
 
-libp2p provides gossipsub, Kademlia DHT, Noise transport, NAT traversal, and connection multiplexing in a single, well-maintained Rust crate (`rust-libp2p`). It is the networking layer for IPFS, Filecoin, and Ethereum's consensus clients — systems that operate at scales comparable to or exceeding Creda's target.
+libp2p provides gossipsub, Kademlia DHT, Noise transport, NAT traversal, and connection multiplexing in a single, well-maintained Rust crate (`rust-libp2p`). It is the networking layer for IPFS, Filecoin, and Ethereum's consensus clients — systems that operate at scales comparable to or exceeding Credara's target.
 
-The alternative is a custom stack built on QUIC (via the `quinn` crate) with bespoke gossip, DHT, and encryption implementations. This offers more control and potentially smaller binary size, but at the cost of 6-12 months of additional engineering, extensive security review, and ongoing maintenance of networking primitives that are not Creda's core value proposition.
+The alternative is a custom stack built on QUIC (via the `quinn` crate) with bespoke gossip, DHT, and encryption implementations. This offers more control and potentially smaller binary size, but at the cost of 6-12 months of additional engineering, extensive security review, and ongoing maintenance of networking primitives that are not Credara's core value proposition.
 
-The risk of libp2p is dependency on an external project's roadmap and potential compliance concerns in a health IT context (libp2p has not been reviewed for HIPAA-regulated environments). To mitigate this, Creda Core (Section 10.1) abstracts the networking layer behind a trait boundary (`NetworkTransport`), allowing libp2p to be replaced if necessary without restructuring the rest of the system.
+The risk of libp2p is dependency on an external project's roadmap and potential compliance concerns in a health IT context (libp2p has not been reviewed for HIPAA-regulated environments). To mitigate this, Credara Core (Section 10.1) abstracts the networking layer behind a trait boundary (`NetworkTransport`), allowing libp2p to be replaced if necessary without restructuring the rest of the system.
 
 #### 6.3.2 Snapshot Storage: Object Storage vs. Peer-to-Peer Transfer
 
@@ -895,7 +895,7 @@ These components add significant value but are not required for an initial deplo
 
 Since there is no admission control — any institution with a valid UDAP certificate can join — the network needs a mechanism to handle misbehaving peers. Misbehavior includes: flooding events with invalid signatures, propagating events that fail schema validation, refusing to propagate tombstones (a compliance violation), or consistently failing to respond to anti-entropy requests.
 
-Creda uses a **local reputation score per peer**. Each peer maintains its own reputation table — there is no global blacklist (which would reintroduce centralization). Reputation is computed from:
+Credara uses a **local reputation score per peer**. Each peer maintains its own reputation table — there is no global blacklist (which would reintroduce centralization). Reputation is computed from:
 
 - **Signature validity rate**: percentage of events received from this peer with valid signatures.
 - **Schema validity rate**: percentage of events that pass schema validation.
@@ -939,7 +939,7 @@ These metrics feed into the operational monitoring described in Section 11.2. Wi
 
 This section describes how events propagate, how peers stay in sync, and how the system behaves under concurrent writes and failures. It builds on the network architecture (Section 6) and adds the storage layer, the consistency semantics consumers can rely on, and the tooling decisions that govern operational behavior.
 
-A core design goal is **deployability without specialized operations expertise**. A Creda peer must be runnable on a developer laptop for testing, on a small on-premises k8s cluster at a community hospital, or on a managed cloud k8s service at a large health system, with similar configuration and similar operational requirements across all three environments. Tooling choices throughout this section are evaluated against this goal explicitly.
+A core design goal is **deployability without specialized operations expertise**. A Credara peer must be runnable on a developer laptop for testing, on a small on-premises k8s cluster at a community hospital, or on a managed cloud k8s service at a large health system, with similar configuration and similar operational requirements across all three environments. Tooling choices throughout this section are evaluated against this goal explicitly.
 
 ### 7.1 Consistency Model
 
@@ -980,11 +980,11 @@ Operators can alert on these thresholds. Bounded staleness is not a guarantee th
 
 Cycles in the patient identity DAG are structurally impossible. An event can only reference parent UUIDs that already exist (and therefore have UUIDs that predate the new event in logical-clock terms). There is no concurrent write operation that can create a cycle, so no cycle-detection logic is needed at write time, during gossip propagation, or during anti-entropy reconciliation.
 
-This is a core simplification. Many distributed graph systems spend significant complexity on cycle prevention or detection — Creda gets it for free from the append-forward design.
+This is a core simplification. Many distributed graph systems spend significant complexity on cycle prevention or detection — Credara gets it for free from the append-forward design.
 
 #### 7.2.2 Append-Forward Structural Mutations
 
-Creda distinguishes two kinds of mutation:
+Credara distinguishes two kinds of mutation:
 
 **Structural mutations** change the graph topology — adding new nodes, modifying parent references, reordering events, removing nodes. **These are forbidden except for adding new nodes.** The graph is structurally append-forward: new events can be added, but existing events cannot be removed and existing parent references cannot be modified. Sending an event to another peer never invalidates that peer's existing topology.
 
@@ -1009,7 +1009,7 @@ The only semantic conflicts are concurrent Link events asserting incompatible id
 
 #### 7.3.1 Embedded Key-Value Store per Peer
 
-Each peer persists events in an embedded key-value store, mounted on a k8s persistent volume. Events are keyed by UUID; secondary indexes (Section 5.2.5) are maintained either directly via additional column families in the KV store or via a separate index store managed by Creda Core.
+Each peer persists events in an embedded key-value store, mounted on a k8s persistent volume. Events are keyed by UUID; secondary indexes (Section 5.2.5) are maintained either directly via additional column families in the KV store or via a separate index store managed by Credara Core.
 
 An embedded store (rather than a network-attached database) is the right choice because it eliminates a network hop on every read and write, simplifies deployment (no separate database container or managed service to provision), and aligns with the goal of laptop-deployable peers.
 
@@ -1027,7 +1027,7 @@ Default retention: 7 daily snapshots and 4 weekly snapshots per institution. Old
 
 ### 7.4 Tooling Decisions
 
-This section evaluates the tooling choices Creda faces in the storage and operational layers. Each tool is rated on three axes:
+This section evaluates the tooling choices Credara faces in the storage and operational layers. Each tool is rated on three axes:
 
 - **Kubernetes nativity (1-5)**: How naturally the tool integrates with k8s primitives. 5 = first-class k8s citizen with operators, CRDs, native scheduling. 1 = runs on k8s but treats it as a generic VM host.
 - **Ease of deployment (1-5)**: How much operator skill and configuration is required. 5 = one command, sensible defaults, runs anywhere. 1 = requires dedicated platform team to operate.
@@ -1042,7 +1042,7 @@ This section evaluates the tooling choices Creda faces in the storage and operat
 | **SQLite** | 5 | 5 | yes | Single-file storage, trivially auditable. Does not scale to millions of events efficiently. Acceptable for very small deployments or development. |
 | **redb** | 5 | 5 | yes | Pure Rust, ACID transactions, embedded. Newer than sled but design is conservative. Worth re-evaluating in 12-18 months. |
 
-**Recommendation:** RocksDB as the default. The storage engine is abstracted behind a `Store` trait in Creda Core, so a peer can be configured to use sled or SQLite for development with a single configuration change.
+**Recommendation:** RocksDB as the default. The storage engine is abstracted behind a `Store` trait in Credara Core, so a peer can be configured to use sled or SQLite for development with a single configuration change.
 
 #### 7.4.2 Workflow Orchestration for Operational Tasks
 
@@ -1052,23 +1052,23 @@ This is **not** the patient identity DAG — that is persistent data, not a work
 |------|:---:|:---:|:---:|---|
 | **Kubernetes CronJobs** | 5 | 5 | yes | Built into k8s. No additional dependency. Best for simple scheduled tasks. Limited expressiveness — no DAG semantics, no retries beyond k8s defaults, no observability beyond pod logs. **Recommended for simple periodic tasks.** |
 | **Argo Workflows** | 5 | 3 | partial | Native k8s DAG orchestrator. Excellent for multi-step pipelines (e.g., "snapshot → upload → notify peers → garbage-collect old snapshot"). Requires Argo controller installed in the cluster. Argo CRDs are k8s-native but represent additional surface area. **Recommended for multi-step operational pipelines.** |
-| **Temporal** | 3 | 2 | partial | Powerful workflow engine with durable execution. Language-agnostic SDKs. Overkill for Creda's operational needs and adds a significant dependency (Temporal server cluster). Better suited for application-level business workflows than infrastructure tasks. |
-| **Apache Airflow** | 2 | 1 | no | Heavyweight, Python-centric, designed for data engineering pipelines rather than infrastructure orchestration. Not k8s-native (k8s executor exists but feels bolted on). **Not recommended for Creda.** |
+| **Temporal** | 3 | 2 | partial | Powerful workflow engine with durable execution. Language-agnostic SDKs. Overkill for Credara's operational needs and adds a significant dependency (Temporal server cluster). Better suited for application-level business workflows than infrastructure tasks. |
+| **Apache Airflow** | 2 | 1 | no | Heavyweight, Python-centric, designed for data engineering pipelines rather than infrastructure orchestration. Not k8s-native (k8s executor exists but feels bolted on). **Not recommended for Credara.** |
 
 **Recommendation:** Kubernetes CronJobs for simple scheduled tasks (snapshot generation, retention sweeps). Argo Workflows for multi-step pipelines (legacy MPI bulk import, cross-region anti-entropy coordination, large-scale tombstone propagation campaigns). Both are deployable as the institution's needs grow — start with CronJobs, add Argo Workflows when complexity warrants it.
 
-**Important clarification on Argo:** Argo Workflows orchestrates the *execution* of operational tasks. The Creda patient identity DAG is the *data being managed*, and is implemented within Creda Core (Rust, libp2p, RocksDB) — not in Argo. Confusing these layers would be a category error. Argo Workflows could, for example, run a workflow that triggers a peer to compute a snapshot, upload it to S3, and notify other peers — but Argo does not store, replicate, or query the patient identity graph itself.
+**Important clarification on Argo:** Argo Workflows orchestrates the *execution* of operational tasks. The Credara patient identity DAG is the *data being managed*, and is implemented within Credara Core (Rust, libp2p, RocksDB) — not in Argo. Confusing these layers would be a category error. Argo Workflows could, for example, run a workflow that triggers a peer to compute a snapshot, upload it to S3, and notify other peers — but Argo does not store, replicate, or query the patient identity graph itself.
 
 #### 7.4.3 Deployment Packaging
 
 | Tool | K8s Nativity | Ease of Deploy | Laptop | Notes |
 |------|:---:|:---:|:---:|---|
 | **Helm chart** | 5 | 5 | yes | Industry standard. Templated YAML manifests with values files. Most institutions already operate Helm. Easy to customize for site-specific needs. **Recommended baseline.** |
-| **Kubernetes Operator** | 5 | 3 | partial | Custom controller that manages Creda peer lifecycle (snapshot scheduling, certificate rotation, Participant Registry sync). More powerful than Helm for ongoing operations. Requires writing and maintaining the operator. **Recommended at scale (50+ peer institutions or for managed offerings).** |
-| **Raw manifests** | 5 | 3 | yes | Plain YAML. Maximum transparency but no abstraction over environment differences. Suitable for very simple deployments or for embedding Creda into existing GitOps workflows. |
+| **Kubernetes Operator** | 5 | 3 | partial | Custom controller that manages Credara peer lifecycle (snapshot scheduling, certificate rotation, Participant Registry sync). More powerful than Helm for ongoing operations. Requires writing and maintaining the operator. **Recommended at scale (50+ peer institutions or for managed offerings).** |
+| **Raw manifests** | 5 | 3 | yes | Plain YAML. Maximum transparency but no abstraction over environment differences. Suitable for very simple deployments or for embedding Credara into existing GitOps workflows. |
 | **Compose (Podman/Docker)** | 1 | 5 | yes | Not k8s-native at all. Useful for local development (Podman or Docker) and demo deployments. Should be provided alongside k8s manifests but not as the primary deployment mode. |
 
-**Recommendation:** Kubernetes is the production target — provide a Helm chart as the primary deployment artifact, with a Compose file (Podman or Docker) for local development only. A Kubernetes Operator should be developed once Creda has more than ~20 production deployments and patterns of operational toil emerge that the operator can automate.
+**Recommendation:** Kubernetes is the production target — provide a Helm chart as the primary deployment artifact, with a Compose file (Podman or Docker) for local development only. A Kubernetes Operator should be developed once Credara has more than ~20 production deployments and patterns of operational toil emerge that the operator can automate.
 
 #### 7.4.4 Object Storage for Snapshots
 
@@ -1079,18 +1079,18 @@ This is **not** the patient identity DAG — that is persistent data, not a work
 | **Local filesystem** (PersistentVolume) | 5 | 5 | yes | Simplest. Snapshots written to a mounted volume. No external service. Acceptable for development and very small deployments. Loses the durability and cross-zone properties of object storage. |
 | **Ceph / Rook** | 4 | 2 | no | Powerful but operationally complex. Worth considering only if the institution already operates Ceph for other workloads. |
 
-**Recommendation:** Configurable per institution. The snapshot interface in Creda Core abstracts over an S3-compatible API; institutions plug in their preferred backend. Default: MinIO bundled in the Helm chart for self-contained on-prem deployments, with cloud S3-compatible storage as a one-line configuration override.
+**Recommendation:** Configurable per institution. The snapshot interface in Credara Core abstracts over an S3-compatible API; institutions plug in their preferred backend. Default: MinIO bundled in the Helm chart for self-contained on-prem deployments, with cloud S3-compatible storage as a one-line configuration override.
 
 #### 7.4.5 Observability Stack
 
 | Tool | K8s Nativity | Ease of Deploy | Laptop | Notes |
 |------|:---:|:---:|:---:|---|
-| **Prometheus + Grafana** | 5 | 4 | yes | Industry standard. Prometheus scrapes Creda peer metrics endpoints; Grafana provides dashboards. Helm charts available. **Recommended baseline.** |
+| **Prometheus + Grafana** | 5 | 4 | yes | Industry standard. Prometheus scrapes Credara peer metrics endpoints; Grafana provides dashboards. Helm charts available. **Recommended baseline.** |
 | **OpenTelemetry** | 5 | 3 | partial | Newer, more flexible (metrics + traces + logs unified). Requires a collector deployment. Worth adopting for tracing across peer-to-peer calls. **Recommended as a complement to Prometheus, not a replacement.** |
 | **Datadog / New Relic / commercial APM** | 3 | 4 | no | Closed-source, vendor lock-in, monthly cost. Some institutions standardize on these for organizational reasons. Should be supported via OTLP export but not as the primary path. |
 | **Kubernetes-native logging only (kubectl logs)** | 5 | 5 | yes | Minimal. Acceptable for development; insufficient for production. |
 
-**Recommendation:** Ship Prometheus metric endpoints and OpenTelemetry trace export from Creda peers. Include a default Grafana dashboard set in the Helm chart. Institutions can route the metrics and traces to whatever backend they already operate.
+**Recommendation:** Ship Prometheus metric endpoints and OpenTelemetry trace export from Credara peers. Include a default Grafana dashboard set in the Helm chart. Institutions can route the metrics and traces to whatever backend they already operate.
 
 #### 7.4.6 Identity and Certificate Management
 
@@ -1098,14 +1098,14 @@ This is **not** the patient identity DAG — that is persistent data, not a work
 |------|:---:|:---:|:---:|---|
 | **SPIRE (SPIFFE Runtime Environment)** | 5 | 3 | partial | The reference SPIFFE implementation. k8s-native via the SPIRE Kubernetes Workload Registrar. Required for the SPIFFE ID component of peer identity (Section 6.1.1). **Recommended.** |
 | **cert-manager** | 5 | 5 | yes | Automated certificate issuance and rotation in k8s. Handles UDAP certificate lifecycle if the institution's UDAP CA exposes ACME or a supported issuer. **Recommended for UDAP cert management.** |
-| **Istio / Linkerd service mesh** | 4 | 2 | partial | Provide mTLS and identity but at the cost of significant operational complexity. Overkill for Creda — peer-to-peer communication uses libp2p's Noise transport, not k8s service mesh. **Not recommended.** |
+| **Istio / Linkerd service mesh** | 4 | 2 | partial | Provide mTLS and identity but at the cost of significant operational complexity. Overkill for Credara — peer-to-peer communication uses libp2p's Noise transport, not k8s service mesh. **Not recommended.** |
 | **Manual certificate management** | 5 | 1 | yes | Provisioning UDAP certs and SPIFFE IDs manually. Acceptable only for very small deployments or development. |
 
 **Recommendation:** SPIRE for SPIFFE ID issuance, cert-manager for UDAP certificate rotation. Both are deployable via Helm and have established operational patterns.
 
 #### 7.4.7 Tooling Summary
 
-The default Creda deployment stack, optimized for "deployable with little to no oversight":
+The default Credara deployment stack, optimized for "deployable with little to no oversight":
 
 - **Storage**: RocksDB embedded, mounted on a k8s PersistentVolume.
 - **Operational orchestration**: Kubernetes CronJobs for simple tasks; Argo Workflows added when multi-step pipelines emerge.
@@ -1120,7 +1120,7 @@ This stack runs on:
 - **A small on-premises k8s cluster**: Helm chart with bundled MinIO. Used by community hospitals and small HIEs.
 - **A managed cloud k8s service**: Helm chart with cloud S3-compatible storage and the institution's existing Prometheus/Grafana. Used by large health systems and HIEs.
 
-The same Helm chart and the same Creda peer container image work in all three environments — only configuration values change.
+The same Helm chart and the same Credara peer container image work in all three environments — only configuration values change.
 
 ### 7.5 Retention and Lifecycle Tasks
 
@@ -1132,39 +1132,39 @@ Several scheduled tasks operate on the local event store independently of networ
 - **Index compaction**: monthly, run RocksDB compaction on indexes to reclaim space and improve query performance.
 - **Reputation decay**: hourly, apply temporal decay to peer reputation scores so that misbehavior in the distant past does not permanently penalize a peer that has since reformed.
 
-These tasks are deployed alongside the Creda peer in the same Helm chart. Each is a small, idempotent CronJob that can run on any peer in an institution — they do not require a designated leader.
+These tasks are deployed alongside the Credara peer in the same Helm chart. Each is a small, idempotent CronJob that can run on any peer in an institution — they do not require a designated leader.
 
 ## 8. FHIR Integration
 
-Creda's identity model is intentionally aligned with FHIR's existing primitives. The patient identity DAG is a natural fit for FHIR Provenance, the effective identity projection maps to FHIR Patient, and the read/write operations align with established FHIR REST patterns and operations. The result is a system that extends the FHIR ecosystem rather than replacing it: a non-Creda consumer sees normal FHIR resources with optional extensions they can ignore, while a Creda-aware consumer gains access to the full provenance graph and the trust signals derived from it.
+Credara's identity model is intentionally aligned with FHIR's existing primitives. The patient identity DAG is a natural fit for FHIR Provenance, the effective identity projection maps to FHIR Patient, and the read/write operations align with established FHIR REST patterns and operations. The result is a system that extends the FHIR ecosystem rather than replacing it: a non-Credara consumer sees normal FHIR resources with optional extensions they can ignore, while a Credara-aware consumer gains access to the full provenance graph and the trust signals derived from it.
 
-This section defines the Creda FHIR Implementation Guide (IG) at a level sufficient for the engineering team. The full IG — including FSH source files, ImplementationGuide resource, generated profiles, examples, and conformance tests — is a separate deliverable maintained alongside the Creda Core source tree.
+This section defines the Credara FHIR Implementation Guide (IG) at a level sufficient for the engineering team. The full IG — including FSH source files, ImplementationGuide resource, generated profiles, examples, and conformance tests — is a separate deliverable maintained alongside the Credara Core source tree.
 
 ### 8.1 Patient Resource Mapping
 
 #### 8.1.1 Patient as Projection, Not Record
 
-A FHIR `Patient` resource returned by Creda is **computed**, not stored. Each query yields a Patient projected from the effective identity computation (Section 5.2.4) over the events visible to the responding peer. Two consequences follow:
+A FHIR `Patient` resource returned by Credara is **computed**, not stored. Each query yields a Patient projected from the effective identity computation (Section 5.2.4) over the events visible to the responding peer. Two consequences follow:
 
 - The same `Patient/[id]` query on two peers may return slightly different resources if the peers have different subsets of the patient's subgraph. This is by design — the system does not pretend to offer a single universal truth.
 - The Patient's `meta.lastUpdated` reflects the wall-clock timestamp of the most recent event in the subgraph visible to the responding peer, not a database row update time.
 
 The `Patient.id` is an **opaque, randomly-generated UUID** assigned by the responding peer when the patient is first projected and stable thereafter at that peer. This follows conventional FHIR usage — IDs are opaque tokens that consumers should not parse or derive meaning from. Stable Patient.id values at the provider also support local caching, bookmarking, and integration with downstream systems that retain references.
 
-The Creda subgraph identifier — the deterministic root set hash — is exposed via the `Patient.identifier` slicing described in Section 8.1.2, not as `Patient.id`. This separation is important: `Patient.id` is a local handle managed by the responding peer for its consumers, while the subgraph identifier is the global, deterministic key that all Creda-aware peers compute identically from the same subgraph. Two peers serving the same patient will assign different `Patient.id` values but will produce the same subgraph identifier, allowing Creda-aware consumers to recognize the same underlying identity across peers.
+The Credara subgraph identifier — the deterministic root set hash — is exposed via the `Patient.identifier` slicing described in Section 8.1.2, not as `Patient.id`. This separation is important: `Patient.id` is a local handle managed by the responding peer for its consumers, while the subgraph identifier is the global, deterministic key that all Credara-aware peers compute identically from the same subgraph. Two peers serving the same patient will assign different `Patient.id` values but will produce the same subgraph identifier, allowing Credara-aware consumers to recognize the same underlying identity across peers.
 
 When new events expand the root set (e.g., a Link event connects previously-independent roots), the subgraph identifier changes accordingly and the prior identifier is retained as a historical identifier slice. The `Patient.id` itself does not change — it remains stable at the responding peer regardless of subgraph evolution.
 
 #### 8.1.2 Identifier Slicing
 
-`Patient.identifier` is sliced by `identifier.system` to surface the multiple identifier sources Creda aggregates:
+`Patient.identifier` is sliced by `identifier.system` to surface the multiple identifier sources Credara aggregates:
 
 - **Slice: institutional MRN.** One slice per asserting institution, with `system` set to the institution's MRN namespace (typically `urn:oid:[institution-OID]`). Each slice carries the MRN and a reference to the asserting Assert event via the `provenance` extension on the identifier.
 - **Slice: payer member ID.** One slice per payer, with `system` set to the payer's identifier namespace. Carries member IDs from insurance card presentations.
-- **Slice: Creda subgraph identifier.** A single slice with `system` set to `http://credara.network/identifier/subgraph` and `value` set to the deterministic root set hash. This is the global, peer-independent identifier that all Creda-aware peers compute identically from the same subgraph. Creda-aware consumers use this for cross-peer identity resolution and for following the underlying provenance graph.
-- **Slice: historical Creda subgraph identifiers.** Zero or more slices with `system` set to `http://credara.network/identifier/subgraph-historical`, carrying prior subgraph identifier hashes from before Link events expanded the root set. Allows consumers to recognize a patient under their previously-known subgraph identifier even after the subgraph has merged with others.
+- **Slice: Credara subgraph identifier.** A single slice with `system` set to `http://credara.network/identifier/subgraph` and `value` set to the deterministic root set hash. This is the global, peer-independent identifier that all Credara-aware peers compute identically from the same subgraph. Credara-aware consumers use this for cross-peer identity resolution and for following the underlying provenance graph.
+- **Slice: historical Credara subgraph identifiers.** Zero or more slices with `system` set to `http://credara.network/identifier/subgraph-historical`, carrying prior subgraph identifier hashes from before Link events expanded the root set. Allows consumers to recognize a patient under their previously-known subgraph identifier even after the subgraph has merged with others.
 
-Non-Creda consumers see this as a normal Patient with multiple identifiers from multiple systems — the standard FHIR pattern for cross-institutional identifiers. Creda-aware consumers can follow the subgraph identifier into the full provenance graph.
+Non-Credara consumers see this as a normal Patient with multiple identifiers from multiple systems — the standard FHIR pattern for cross-institutional identifiers. Credara-aware consumers can follow the subgraph identifier into the full provenance graph.
 
 #### 8.1.3 Per-Field Confidence Extensions
 
@@ -1180,7 +1180,7 @@ The extension contains:
 - `inputs` (BackboneElement, repeating): the factors that produced the score — `verificationMethod`, `attestationCount`, `independentInstitutionCount`, `decayFactor`, `agreementWeight`.
 - `assertingEvents` (Reference to Provenance, repeating): the events that contribute to this field's value, allowing a consumer to drill into the underlying assertions.
 
-The extension can attach to any individual demographic element — `Patient.name`, `Patient.birthDate`, `Patient.address`, `Patient.identifier`, etc. Consumers that don't understand the extension see normal demographic values; Creda-aware consumers see the trust signals.
+The extension can attach to any individual demographic element — `Patient.name`, `Patient.birthDate`, `Patient.address`, `Patient.identifier`, etc. Consumers that don't understand the extension see normal demographic values; Credara-aware consumers see the trust signals.
 
 #### 8.1.4 Disagreement Representation
 
@@ -1189,42 +1189,42 @@ When demographics conflict across the subgraph (Section 5.3.4), the projected Pa
 - **Primary value selection.** The "primary" value for each field is selected per a configurable policy: highest confidence (default), most-recent assertion, most-attested assertion, or institution-specific custom logic. The primary value occupies the standard FHIR element (e.g., `Patient.birthDate`).
 - **Alternate values via extension.** Other asserted values are surfaced via a `http://credara.network/StructureDefinition/disputed-value` extension on the same element. Each alternate carries its own value, confidence score, and reference to the asserting event. A `disputed` flag on the parent element signals to consumers that the field has competing assertions.
 
-Consuming institutions are free to ignore the disagreement and use the primary value, or to surface the dispute to clinicians and registrars for manual resolution. Creda's role is to make the disagreement visible — it does not adjudicate.
+Consuming institutions are free to ignore the disagreement and use the primary value, or to surface the dispute to clinicians and registrars for manual resolution. Credara's role is to make the disagreement visible — it does not adjudicate.
 
 #### 8.1.5 Effective Identity vs. Raw Subgraph Query Modes
 
-Creda supports two query modes for Patient retrieval, selectable via a query parameter:
+Credara supports two query modes for Patient retrieval, selectable via a query parameter:
 
 - **`_creda-mode=projection`** (default). Returns the computed effective identity as a Patient resource. This is the mode every FHIR consumer uses by default and matches standard FHIR semantics.
-- **`_creda-mode=subgraph`**. Returns a Bundle containing the Patient projection plus all Provenance resources representing the events in the subgraph. Useful for Creda-aware consumers that want the full evidentiary chain in a single round trip rather than following links.
+- **`_creda-mode=subgraph`**. Returns a Bundle containing the Patient projection plus all Provenance resources representing the events in the subgraph. Useful for Credara-aware consumers that want the full evidentiary chain in a single round trip rather than following links.
 
 For deeper inspection, `Patient/[id]/$creda-provenance` (Section 8.2.5) provides a richer interface than the subgraph query mode.
 
 ### 8.2 FHIR Implementation Guide
 
-The Creda FHIR IG is published at `http://credara.network/fhir/ig/v1` and follows standard HL7 IG conventions. It conforms to FHIR R4 (with R5 conformance planned for v1.1 once US Core publishes its R5 baseline).
+The Credara FHIR IG is published at `http://credara.network/fhir/ig/v1` and follows standard HL7 IG conventions. It conforms to FHIR R4 (with R5 conformance planned for v1.1 once US Core publishes its R5 baseline).
 
 #### 8.2.1 US Core Conformance
 
-CredaPatient (Section 8.2.2) conforms to the US Core Patient profile. Every CredaPatient is a valid US Core Patient — the Creda profile adds extensions and slicing constraints but does not loosen any US Core requirements. This is essential for adoption: institutions that already meet US Core requirements (which is most of the US ecosystem post-ONC certification) can produce CredaPatient resources without changing their core data model.
+CredaPatient (Section 8.2.2) conforms to the US Core Patient profile. Every CredaPatient is a valid US Core Patient — the Credara profile adds extensions and slicing constraints but does not loosen any US Core requirements. This is essential for adoption: institutions that already meet US Core requirements (which is most of the US ecosystem post-ONC certification) can produce CredaPatient resources without changing their core data model.
 
-The profile chain is: `Patient (FHIR R4 base) → US Core Patient → CredaPatient`. Other Creda profiles similarly conform to US Core baselines where they exist (US Core Provenance, US Core Consent).
+The profile chain is: `Patient (FHIR R4 base) → US Core Patient → CredaPatient`. Other Credara profiles similarly conform to US Core baselines where they exist (US Core Provenance, US Core Consent).
 
 #### 8.2.2 Profile: CredaPatient
 
 CredaPatient constrains FHIR Patient with:
 
-- **Required extensions:** subgraph identifier, root set, last-modified-event UUID. These are `mustSupport` — a Creda-aware consumer that does not handle these extensions cannot correctly interact with CredaPatient. A non-Creda-aware consumer ignoring the extensions still sees a valid US Core Patient.
+- **Required extensions:** subgraph identifier, root set, last-modified-event UUID. These are `mustSupport` — a Credara-aware consumer that does not handle these extensions cannot correctly interact with CredaPatient. A non-Credara-aware consumer ignoring the extensions still sees a valid US Core Patient.
 - **Optional extensions:** per-field confidence, disagreement flags, deceased declaration provenance reference. These are `mustSupport` only for the producing peer (the Bridge must populate them when applicable) but consumers may ignore them without compromising basic clinical use.
-- **Required slicing on `Patient.identifier`:** the Creda subgraph identifier slice is `mustSupport`. Other slices are optional based on data availability.
+- **Required slicing on `Patient.identifier`:** the Credara subgraph identifier slice is `mustSupport`. Other slices are optional based on data availability.
 
-The decision to make subgraph identifier `mustSupport` while making per-field confidence optional reflects a deliberate design judgment: the subgraph identifier is structural (without it, a Creda-aware consumer cannot navigate to provenance), while confidence is informational (a consumer that ignores it gets a valid Patient, just without the trust signals).
+The decision to make subgraph identifier `mustSupport` while making per-field confidence optional reflects a deliberate design judgment: the subgraph identifier is structural (without it, a Credara-aware consumer cannot navigate to provenance), while confidence is informational (a consumer that ignores it gets a valid Patient, just without the trust signals).
 
 #### 8.2.3 Profile: CredaProvenance
 
-Each Creda identity event maps to a CredaProvenance resource. The mapping is direct because FHIR Provenance is already designed for recording who did what, when, on what evidence:
+Each Credara identity event maps to a CredaProvenance resource. The mapping is direct because FHIR Provenance is already designed for recording who did what, when, on what evidence:
 
-| Creda Event Field | FHIR Provenance Element |
+| Credara Event Field | FHIR Provenance Element |
 |---|---|
 | Event UUID | `Provenance.id` (URN form) |
 | Event type | `Provenance.activity` (custom CodeableConcept) |
@@ -1236,16 +1236,16 @@ Each Creda identity event maps to a CredaProvenance resource. The mapping is dir
 | Verification method (Assert) | `Provenance.signature.type` |
 | Payload (event-specific) | extension `http://credara.network/StructureDefinition/event-payload` |
 
-A consumer that understands FHIR Provenance but not Creda gets a meaningful audit-style record of identity events. A Creda-aware consumer can additionally inspect the payload extension and follow the entity references to walk the full DAG.
+A consumer that understands FHIR Provenance but not Credara gets a meaningful audit-style record of identity events. A Credara-aware consumer can additionally inspect the payload extension and follow the entity references to walk the full DAG.
 
 CredaProvenance conforms to US Core Provenance where the US Core profile applies.
 
 #### 8.2.4 Provenance vs. AuditEvent
 
-Creda events are conceptually closer to **Provenance** than to **AuditEvent**, even though both FHIR resources record actions. The distinction matters because the engineering team will face this question repeatedly:
+Credara events are conceptually closer to **Provenance** than to **AuditEvent**, even though both FHIR resources record actions. The distinction matters because the engineering team will face this question repeatedly:
 
-- **Provenance** records the source of a fact — "this Patient's birth date came from this Assert event by this institution on this date." Creda events are constitutive of the Patient: they ARE the source. Without the events, there is no Patient.
-- **AuditEvent** records the access or modification history of a resource — "this user queried this Patient at this time." Creda also generates AuditEvents, but for read-side activity tracking (who queried which subgraph), not for identity events themselves.
+- **Provenance** records the source of a fact — "this Patient's birth date came from this Assert event by this institution on this date." Credara events are constitutive of the Patient: they ARE the source. Without the events, there is no Patient.
+- **AuditEvent** records the access or modification history of a resource — "this user queried this Patient at this time." Credara also generates AuditEvents, but for read-side activity tracking (who queried which subgraph), not for identity events themselves.
 
 The split: identity events are CredaProvenance resources. Reads, queries, and access checks generate FHIR AuditEvent resources via the standard HAPI auditing infrastructure, stored separately from the identity DAG. Consumers looking for "what happened to this patient's identity" query Provenance. Consumers looking for "who looked at this patient" query AuditEvent.
 
@@ -1256,7 +1256,7 @@ GET Patient/[id]/$creda-provenance
 GET Patient/[id]/$creda-provenance?event-type=Link&since=2025-01-01
 ```
 
-Returns a Bundle of CredaProvenance resources representing the full provenance graph for the patient, optionally filtered by event type, date range, asserting institution, or depth from leaf nodes. This is the primary interop surface for non-Creda consumers who want to inspect the chain via standard FHIR rather than speaking the underlying gRPC protocol.
+Returns a Bundle of CredaProvenance resources representing the full provenance graph for the patient, optionally filtered by event type, date range, asserting institution, or depth from leaf nodes. This is the primary interop surface for non-Credara consumers who want to inspect the chain via standard FHIR rather than speaking the underlying gRPC protocol.
 
 The Bundle includes a `Bundle.link` of type `next` for pagination when the subgraph is large. Bundle entries are sorted by logical clock to produce a causally-coherent traversal order.
 
@@ -1273,7 +1273,7 @@ POST Patient/[id]/$creda-attest
 }
 ```
 
-Records an Attest event on the patient's identity chain. This is the FHIR-side write interface for attestations — saves consumers from having to implement Creda's native event-creation API for what will be one of the most common write cases (every clinical encounter that relies on the identity should attest).
+Records an Attest event on the patient's identity chain. This is the FHIR-side write interface for attestations — saves consumers from having to implement Credara's native event-creation API for what will be one of the most common write cases (every clinical encounter that relies on the identity should attest).
 
 The operation returns the newly-created CredaProvenance resource representing the Attest event.
 
@@ -1291,7 +1291,7 @@ POST Patient/[id]/$creda-link
 }
 ```
 
-Creates a Link event between two Patient subgraphs. The institution invoking this operation must be party to one of the linked subgraphs (Section 3.4.3 enforcement is performed by Creda Core, not the Bridge).
+Creates a Link event between two Patient subgraphs. The institution invoking this operation must be party to one of the linked subgraphs (Section 3.4.3 enforcement is performed by Credara Core, not the Bridge).
 
 ```
 POST Provenance/[id]/$creda-contest
@@ -1319,7 +1319,7 @@ POST Patient/[id]/$creda-tombstone
 }
 ```
 
-Triggers a Tombstone event after the institution has validated the underlying right-to-be-forgotten request. The institution is responsible for the legal validation; Creda enforces only the structural and signature requirements. The `legalBasis` parameter maps to the Tombstone payload's `legal_basis` field.
+Triggers a Tombstone event after the institution has validated the underlying right-to-be-forgotten request. The institution is responsible for the legal validation; Credara enforces only the structural and signature requirements. The `legalBasis` parameter maps to the Tombstone payload's `legal_basis` field.
 
 This is one of the more sensitive operations and requires elevated authorization (typically a privacy officer's credentials, mediated by the institution's existing access control), enforced at the institution's FHIR endpoint before reaching the Bridge.
 
@@ -1345,15 +1345,15 @@ POST Patient/[id]/$creda-authorize
 
 `$creda-verify` returns a Parameters resource with the decision (`authorized` / `denied` / `denied-revoked` / `denied-expired` / `denied-out-of-scope`), the governing Grant reference, and — when authorized — the scope and use-mode the Grant permits. Because the Verifier operates locally (Section 10.3.3), `$creda-verify` can be served from stale state during a partition, in which case the response includes the age of the responding peer's DAG view.
 
-These operations make portable authorization usable by FHIR consumers that do not embed the native Verifier SDK — a payer adjudication system or an EHR can `POST $creda-verify` to a Creda Bridge and act on the decision, rather than linking the Rust Verifier library directly.
+These operations make portable authorization usable by FHIR consumers that do not embed the native Verifier SDK — a payer adjudication system or an EHR can `POST $creda-verify` to a Credara Bridge and act on the decision, rather than linking the Rust Verifier library directly.
 
 #### 8.2.10 Operation: $creda-disambiguate
 
 The standard FHIR `Patient/$match` operation returns scored candidates but does not support interactive verification. When `$match` returns multiple candidates with similar scores — a common situation at front-desk registration when two patients have similar demographics — the registrar today resorts to ad-hoc, unaudited out-of-band questions ("when was your last visit?", "what's your insurance member ID?") drawn from whatever their local system happens to show.
 
-Creda's provenance chains contain rich, signed history that is uniquely suited to provenance-grounded disambiguation. The `$creda-disambiguate` operation formalizes this: given a set of ambiguous candidates, the operation returns differentiating questions whose answers exist in the candidates' provenance chains but differ between them. The patient's answers are scored against each candidate's chain, producing a refined match with significantly higher confidence. Critically, the verification itself is recorded as an Attest event in the chain, creating durable provenance for the manual disambiguation.
+Credara's provenance chains contain rich, signed history that is uniquely suited to provenance-grounded disambiguation. The `$creda-disambiguate` operation formalizes this: given a set of ambiguous candidates, the operation returns differentiating questions whose answers exist in the candidates' provenance chains but differ between them. The patient's answers are scored against each candidate's chain, producing a refined match with significantly higher confidence. Critically, the verification itself is recorded as an Attest event in the chain, creating durable provenance for the manual disambiguation.
 
-**Direct patient verification is the preferred mechanism.** When the patient holds their own Creda signing key (the patient-as-participant model from Section 3.1), the patient signs a self-verification event directly — confirming their own identity from a phone or other authenticated client without a registrar intermediary. Registrar-mediated challenge questions via this operation are the fallback for patients without their own key, which today is most patients but should diminish over time as patient-side keys become more available.
+**Direct patient verification is the preferred mechanism.** When the patient holds their own Credara signing key (the patient-as-participant model from Section 3.1), the patient signs a self-verification event directly — confirming their own identity from a phone or other authenticated client without a registrar intermediary. Registrar-mediated challenge questions via this operation are the fallback for patients without their own key, which today is most patients but should diminish over time as patient-side keys become more available.
 
 ##### 8.2.10.1 Operation Flow
 
@@ -1375,7 +1375,7 @@ POST Patient/$creda-disambiguate
 }
 ```
 
-The Bridge invokes Creda Core, which inspects the candidates' subgraphs and selects questions designed to disambiguate. The response is a Parameters resource containing a question set:
+The Bridge invokes Credara Core, which inspects the candidates' subgraphs and selects questions designed to disambiguate. The response is a Parameters resource containing a question set:
 
 ```
 {
@@ -1445,7 +1445,7 @@ The refined match includes a reference to the newly-created Attest event, which 
 
 ##### 8.2.10.2 Question Selection
 
-Question selection is performed by Creda Core based on the candidates' subgraphs. The selection algorithm:
+Question selection is performed by Credara Core based on the candidates' subgraphs. The selection algorithm:
 
 1. Identify facts in each candidate's subgraph that are signed by trusted institutions and recent enough to be memorable.
 2. Find facts that **differ** between candidates — facts where each candidate has a different answer or where one candidate has the fact and others don't.
@@ -1468,7 +1468,7 @@ The operation has several built-in protections against misuse:
 
 ##### 8.2.10.4 Patient-Direct Verification (Preferred)
 
-When the patient holds their own Creda signing key, registrar-mediated questions are unnecessary. Instead, the patient performs self-verification directly:
+When the patient holds their own Credara signing key, registrar-mediated questions are unnecessary. Instead, the patient performs self-verification directly:
 
 ```
 POST Patient/$creda-self-verify
@@ -1484,7 +1484,7 @@ POST Patient/$creda-self-verify
 }
 ```
 
-The patient signs an event asserting "I am the subject of this subgraph" using their own key (typically held in a patient-facing application authenticated via OAuth2/OIDC). Creda Core verifies the signature against the patient's registered public key, and on success creates an Attest event with verification method `patient-self-attestation`. This is structurally stronger than registrar-mediated challenge questions: the patient has cryptographically proven possession of their key, and no one else needs to be in the loop.
+The patient signs an event asserting "I am the subject of this subgraph" using their own key (typically held in a patient-facing application authenticated via OAuth2/OIDC). Credara Core verifies the signature against the patient's registered public key, and on success creates an Attest event with verification method `patient-self-attestation`. This is structurally stronger than registrar-mediated challenge questions: the patient has cryptographically proven possession of their key, and no one else needs to be in the loop.
 
 The two paths are complementary:
 
@@ -1505,96 +1505,96 @@ The SearchParameter is defined in the IG with token format and tokenization sche
 
 #### 8.2.12 CapabilityStatement
 
-Each Creda peer's HAPI FHIR Bridge advertises its Creda capabilities via the standard `CapabilityStatement` resource at `metadata`:
+Each Credara peer's HAPI FHIR Bridge advertises its Credara capabilities via the standard `CapabilityStatement` resource at `metadata`:
 
-- **Implements**: the Creda IG (via `CapabilityStatement.implementationGuide`).
+- **Implements**: the Credara IG (via `CapabilityStatement.implementationGuide`).
 - **Profiles**: CredaPatient, CredaProvenance, CredaAuthorization (FHIR Consent base; Section 9.3 and Section 4).
 - **Operations**: `$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$creda-authorize`, `$creda-revoke`, `$creda-verify`, `$creda-export`.
 - **Extensions**: subgraph identifier, root set, per-field confidence, disagreement flag, etc.
 - **Search parameters**: `_creda-token`, plus standard FHIR Patient search parameters.
 
-A consumer probes a FHIR endpoint with `GET metadata` to determine if it speaks Creda before attempting Creda-specific operations, exactly as the existing FHIR ecosystem handles capability discovery.
+A consumer probes a FHIR endpoint with `GET metadata` to determine if it speaks Credara before attempting Credara-specific operations, exactly as the existing FHIR ecosystem handles capability discovery.
 
 #### 8.2.13 Subscription Support
 
-HAPI's FHIR Subscription mechanism is mapped to Creda's gossip topic subscriptions. A FHIR client creates a Subscription resource targeting `Patient/[id]` or a search criterion; the Bridge translates this into a Creda gossip subscription for the relevant topic bucket. When matching events arrive via gossip, the Bridge generates Subscription notifications as FHIR Bundles delivered to the subscriber's notification endpoint.
+HAPI's FHIR Subscription mechanism is mapped to Credara's gossip topic subscriptions. A FHIR client creates a Subscription resource targeting `Patient/[id]` or a search criterion; the Bridge translates this into a Credara gossip subscription for the relevant topic bucket. When matching events arrive via gossip, the Bridge generates Subscription notifications as FHIR Bundles delivered to the subscriber's notification endpoint.
 
 This gives FHIR clients a standard interface for real-time updates without needing to understand gossipsub or subscribe directly to libp2p topics. The translation is unidirectional — Subscriptions support reads, not writes.
 
 #### 8.2.14 Bulk Data Export
 
-FHIR Bulk Data ($export) is increasingly important for population health, payment, and operations workflows. Creda's event log is a natural fit for bulk export — events are timestamped, signed, and chronologically ordered.
+FHIR Bulk Data ($export) is increasingly important for population health, payment, and operations workflows. Credara's event log is a natural fit for bulk export — events are timestamped, signed, and chronologically ordered.
 
-Creda supports `$export` at three levels:
+Credara supports `$export` at three levels:
 
 - **System-level (`/$export`)**: not supported. Exporting all events for all patients across the network would violate consent and BAA scoping. Institutions wanting a full event dump for their own patients use the institutional snapshot mechanism (Section 7.3.3) instead.
 - **Patient-level (`Patient/[id]/$export`)**: returns the patient's projected resources (Patient, related CredaProvenance, related Consent). Subject to consent enforcement — only resources the requesting institution is authorized to see are included.
 - **Group-level (`Group/[id]/$export`)**: returns resources for all patients in a defined Group, useful for cohort export. Same consent enforcement applies per-patient.
 
-Exports return data in the standard FHIR Bulk Data NDJSON format. Because Creda's events are signed, the exported CredaProvenance resources retain their signatures, and a downstream consumer can verify the cryptographic integrity of the exported data without trusting the exporter — a property that standard FHIR Bulk Data lacks.
+Exports return data in the standard FHIR Bulk Data NDJSON format. Because Credara's events are signed, the exported CredaProvenance resources retain their signatures, and a downstream consumer can verify the cryptographic integrity of the exported data without trusting the exporter — a property that standard FHIR Bulk Data lacks.
 
 ### 8.3 HAPI FHIR Bridge Architecture
 
 #### 8.3.1 Process Boundary
 
-The HAPI FHIR Bridge runs as a separate process from Creda Core. Both run in the same k8s pod and communicate via gRPC over a Unix domain socket within the pod's filesystem.
+The HAPI FHIR Bridge runs as a separate process from Credara Core. Both run in the same k8s pod and communicate via gRPC over a Unix domain socket within the pod's filesystem.
 
 - **HAPI FHIR Bridge**: Java/Kotlin, builds on HAPI FHIR R4. Handles all FHIR REST routing, validation, capability advertisement, subscription management, bulk data, and resource serialization.
-- **Creda Core**: Rust. Handles DAG operations, signature verification, gossip, DHT, anti-entropy, and storage.
+- **Credara Core**: Rust. Handles DAG operations, signature verification, gossip, DHT, anti-entropy, and storage.
 
 The split gives us the maturity and ecosystem of HAPI FHIR (the de facto standard for FHIR servers) for the FHIR layer, and the performance and memory safety of Rust for the network and storage layers, without compromising either. The Unix socket avoids network overhead for the in-pod RPC and aligns with k8s sidecar patterns.
 
 #### 8.3.2 Bridge as Translator, Not Reasoner
 
-The Bridge's job is purely translation: incoming FHIR requests map to Creda Core RPCs, and Creda Core responses map to FHIR resources. All identity logic — confidence computation, traversal, signature verification, conflict detection — happens in Creda Core. The Bridge has no business logic of its own beyond the mapping.
+The Bridge's job is purely translation: incoming FHIR requests map to Credara Core RPCs, and Credara Core responses map to FHIR resources. All identity logic — confidence computation, traversal, signature verification, conflict detection — happens in Credara Core. The Bridge has no business logic of its own beyond the mapping.
 
-This separation is enforced by Creda Core's gRPC interface, which exposes operations like `GetEffectiveIdentity(subgraph_id) → ProjectedIdentity`, `GetSubgraph(subgraph_id, depth) → Vec<Event>`, `CreateAssert(payload) → Event`, etc. The Bridge translates these to FHIR but does not implement them.
+This separation is enforced by Credara Core's gRPC interface, which exposes operations like `GetEffectiveIdentity(subgraph_id) → ProjectedIdentity`, `GetSubgraph(subgraph_id, depth) → Vec<Event>`, `CreateAssert(payload) → Event`, etc. The Bridge translates these to FHIR but does not implement them.
 
 The benefit is operational: the Bridge can be replaced or supplemented (e.g., a different FHIR server implementation, or a non-FHIR API like SMART on FHIR backend services) without re-implementing identity logic.
 
 #### 8.3.3 HAPI Plain Server, Not JPA
 
-HAPI FHIR has multiple deployment modes. Creda uses **Plain Server** mode where resource providers are custom Java classes that delegate to Creda Core. The HAPI **JPA Server** mode (which stores FHIR resources in a relational database) is explicitly **NOT used**.
+HAPI FHIR has multiple deployment modes. Credara uses **Plain Server** mode where resource providers are custom Java classes that delegate to Credara Core. The HAPI **JPA Server** mode (which stores FHIR resources in a relational database) is explicitly **NOT used**.
 
-The reason: Creda's source of truth is the event store managed by Creda Core, not a parallel relational schema. Using HAPI JPA would introduce a second persistence layer that has to be kept in sync with the event store, doubling complexity and creating consistency hazards. Plain Server with custom resource providers has a longer initial implementation cost (writing the providers) but a much cleaner long-term architecture.
+The reason: Credara's source of truth is the event store managed by Credara Core, not a parallel relational schema. Using HAPI JPA would introduce a second persistence layer that has to be kept in sync with the event store, doubling complexity and creating consistency hazards. Plain Server with custom resource providers has a longer initial implementation cost (writing the providers) but a much cleaner long-term architecture.
 
 The Bridge's resource providers handle the FHIR REST verbs:
 
-- `read` and `vread`: project an effective identity from the event store via Creda Core RPC.
-- `search`: translate FHIR search parameters into Creda Core queries.
-- `create` and `update`: route through the appropriate Creda event-creation operation. Direct PUT/POST to `Patient` is rejected — Patient is a projection, not a resource; clients must use `$creda-link`, `$creda-attest`, etc.
+- `read` and `vread`: project an effective identity from the event store via Credara Core RPC.
+- `search`: translate FHIR search parameters into Credara Core queries.
+- `create` and `update`: route through the appropriate Credara event-creation operation. Direct PUT/POST to `Patient` is rejected — Patient is a projection, not a resource; clients must use `$creda-link`, `$creda-attest`, etc.
 - `delete` on Patient: rejected. Patient deletion is a `$creda-tombstone` operation.
 - Resource history (`_history`): returns the chronological sequence of Provenance resources for the patient subgraph.
 
 ### 8.4 TEFCA / QHIN Interoperability
 
-#### 8.4.1 QHIN as a Creda Peer
+#### 8.4.1 QHIN as a Credara Peer
 
-The most natural integration path: a QHIN runs a Creda peer and uses it for identity resolution. The QHIN's existing FHIR `Patient/$match` endpoint queries Creda internally — the QHIN becomes a Creda-aware resolver while presenting its standard QHIN interface to participants.
+The most natural integration path: a QHIN runs a Credara peer and uses it for identity resolution. The QHIN's existing FHIR `Patient/$match` endpoint queries Credara internally — the QHIN becomes a Credara-aware resolver while presenting its standard QHIN interface to participants.
 
-Non-Creda QHIN participants (covered entities relying on the QHIN) see no change. They call the QHIN's endpoints exactly as before. The QHIN now has access to richer identity provenance and improved match accuracy via the Creda network, which translates into better $match results and fewer ambiguous responses, but the wire protocol is unchanged.
+Non-Credara QHIN participants (covered entities relying on the QHIN) see no change. They call the QHIN's endpoints exactly as before. The QHIN now has access to richer identity provenance and improved match accuracy via the Credara network, which translates into better $match results and fewer ambiguous responses, but the wire protocol is unchanged.
 
-This is the recommended adoption path: institutions don't have to run Creda peers themselves to benefit from the network — their QHIN can be the entry point.
+This is the recommended adoption path: institutions don't have to run Credara peers themselves to benefit from the network — their QHIN can be the entry point.
 
 #### 8.4.2 QHIN-to-QHIN Identity Exchange
 
-Today, TEFCA's QHIN-to-QHIN exchange relies on each QHIN performing its own matching against incoming queries. With Creda, two QHINs that both participate exchange identity provenance directly via the peer-to-peer network. A patient query that crosses QHIN boundaries no longer requires a chain of $match calls between QHINs — both QHINs can independently navigate the same shared subgraph.
+Today, TEFCA's QHIN-to-QHIN exchange relies on each QHIN performing its own matching against incoming queries. With Credara, two QHINs that both participate exchange identity provenance directly via the peer-to-peer network. A patient query that crosses QHIN boundaries no longer requires a chain of $match calls between QHINs — both QHINs can independently navigate the same shared subgraph.
 
 This reduces inter-QHIN query volume, improves latency, and provides both sides with full provenance for the matched identity rather than an opaque match score.
 
-#### 8.4.3 Backward Compatibility for Non-Creda Participants
+#### 8.4.3 Backward Compatibility for Non-Credara Participants
 
-A covered entity that does not run Creda but receives a CredaPatient resource (via a QHIN that does) sees a normal FHIR Patient with extra extensions they can ignore. Standard FHIR processing rules apply: unknown extensions are preserved if the consumer round-trips the resource, ignored if the consumer doesn't understand them, but never cause the resource to fail validation against base Patient or US Core Patient.
+A covered entity that does not run Credara but receives a CredaPatient resource (via a QHIN that does) sees a normal FHIR Patient with extra extensions they can ignore. Standard FHIR processing rules apply: unknown extensions are preserved if the consumer round-trips the resource, ignored if the consumer doesn't understand them, but never cause the resource to fail validation against base Patient or US Core Patient.
 
-Creda is **additive**, not invasive. The IG is designed so that every Creda extension is optional from the consumer's perspective and the underlying Patient remains fully usable for clinical workflows even when extensions are stripped.
+Credara is **additive**, not invasive. The IG is designed so that every Credara extension is optional from the consumer's perspective and the underlying Patient remains fully usable for clinical workflows even when extensions are stripped.
 
 #### 8.4.4 Patient Access via Individual Access Services
 
-TEFCA's Individual Access Services (IAS) lets patients access their own data across networks. With Creda, IAS calls can return a patient's full identity provenance chain — the patient sees who has asserted what about them, which institutions have linked their records, and any contestations or amendments in their history.
+TEFCA's Individual Access Services (IAS) lets patients access their own data across networks. With Credara, IAS calls can return a patient's full identity provenance chain — the patient sees who has asserted what about them, which institutions have linked their records, and any contestations or amendments in their history.
 
 This aligns with 21st Century Cures Act information blocking rules and provides patient-side transparency that does not exist in today's MPI-based system. Patients can identify incorrect links, request tombstoning of erroneous data, and verify their identity is accurate across institutions.
 
-The IAS interface for Creda-aware patients includes:
+The IAS interface for Credara-aware patients includes:
 
 - `Patient/[id]/$creda-provenance`: the full provenance chain.
 - `Patient/[id]/$creda-tombstone`: patient-initiated right-to-be-forgotten requests, subject to the patient's authentication and the institution's privacy officer review.
@@ -1604,11 +1604,11 @@ These patient-facing operations require patient authentication via OAuth2/OIDC (
 
 ### 8.5 FAST Consent Framework Alignment
 
-The HL7 FHIR-at-Scale Taskforce (FAST) is producing a consent framework — published as the **Scalable Consent Management** Implementation Guide (`hl7.fhir.us.consent-management`, US Realm, FHIR R4, STU 1 ballot as of late 2025). Because Creda's portable-authorization layer (Section 4) and the FAST Consent IG address overlapping problems — recording a patient's directive once and keeping it consistent and enforceable as data moves across many institutions — implementers and standards reviewers will ask how Creda relates to FAST Consent. This section answers that directly: it states what the FAST Consent IG actually specifies in its first edition, maps each FAST actor, operation, and profile to a Creda component with a conformance status, identifies where Creda exceeds the IG and where it diverges, and defines the implementation plan for Creda to expose conformant FAST Consent roles through the Bridge.
+The HL7 FHIR-at-Scale Taskforce (FAST) is producing a consent framework — published as the **Scalable Consent Management** Implementation Guide (`hl7.fhir.us.consent-management`, US Realm, FHIR R4, STU 1 ballot as of late 2025). Because Credara's portable-authorization layer (Section 4) and the FAST Consent IG address overlapping problems — recording a patient's directive once and keeping it consistent and enforceable as data moves across many institutions — implementers and standards reviewers will ask how Credara relates to FAST Consent. This section answers that directly: it states what the FAST Consent IG actually specifies in its first edition, maps each FAST actor, operation, and profile to a Credara component with a conformance status, identifies where Credara exceeds the IG and where it diverges, and defines the implementation plan for Credara to expose conformant FAST Consent roles through the Bridge.
 
-The framing is deliberate. Creda does **not** adopt FAST Consent's repository-and-subscription transport as its internal model — Creda's internal model is the signed-event DAG of Sections 4–7, which is strictly stronger. Rather, Creda treats the FAST Consent IG as an **interoperability surface at the Bridge**, in exactly the same spirit as US Core (Section 8.2.1) and TEFCA/QHIN (Section 8.4): Creda can present a conformant FAST Consent face to the ecosystem while its substrate remains the DAG.
+The framing is deliberate. Credara does **not** adopt FAST Consent's repository-and-subscription transport as its internal model — Credara's internal model is the signed-event DAG of Sections 4–7, which is strictly stronger. Rather, Credara treats the FAST Consent IG as an **interoperability surface at the Bridge**, in exactly the same spirit as US Core (Section 8.2.1) and TEFCA/QHIN (Section 8.4): Credara can present a conformant FAST Consent face to the ecosystem while its substrate remains the DAG.
 
-**Scoping decision: adopt the vocabulary, not the infrastructure.** FAST Consent Edition 1 and Creda solve the *same* problem — discoverable, consistent consent at scale — with *different* fabrics. FAST's scale mechanism is repository federation: Admin Services act as holders of record and stay consistent by notifying one another over a SubscriptionTopic. Creda's portable-authorization layer (Section 4) dissolves that problem rather than coordinating it: a Grant is a signed event already replicated by gossip/anti-entropy and, on the path this section's reviewers care about, *already attached to the data reference it authorizes* (Section 4.4) and re-verified locally at the point of use (Section 4.5.2). When the directive travels with the data and is in the relying peer's DAG view, there is nothing to discover across a federation of repositories. Consequently Creda adopts **only** the parts of FAST Consent that add interoperability value at the edge — the `FASTConsent` profile shape, the three operation semantics, and the associated value sets — and deliberately declines the repository-federation infrastructure, which is redundant with the DAG and weaker than it. The committed scope is the thin Bridge face defined in Section 8.5.6 (phases F0–F2); repository synchronization, ceremony-document capture, and full federated conformance are explicitly out of the default build and are added only on demand (a mandate or a legacy FAST-only counterparty). This keeps the implementation aligned with the Creda tenets — *verification, not mediation*; *provenance by structure*; *standards over invention* — instead of bolting a second, weaker consent fabric onto a substrate that already does the job.
+**Scoping decision: adopt the vocabulary, not the infrastructure.** FAST Consent Edition 1 and Credara solve the *same* problem — discoverable, consistent consent at scale — with *different* fabrics. FAST's scale mechanism is repository federation: Admin Services act as holders of record and stay consistent by notifying one another over a SubscriptionTopic. Credara's portable-authorization layer (Section 4) dissolves that problem rather than coordinating it: a Grant is a signed event already replicated by gossip/anti-entropy and, on the path this section's reviewers care about, *already attached to the data reference it authorizes* (Section 4.4) and re-verified locally at the point of use (Section 4.5.2). When the directive travels with the data and is in the relying peer's DAG view, there is nothing to discover across a federation of repositories. Consequently Credara adopts **only** the parts of FAST Consent that add interoperability value at the edge — the `FASTConsent` profile shape, the three operation semantics, and the associated value sets — and deliberately declines the repository-federation infrastructure, which is redundant with the DAG and weaker than it. The committed scope is the thin Bridge face defined in Section 8.5.6 (phases F0–F2); repository synchronization, ceremony-document capture, and full federated conformance are explicitly out of the default build and are added only on demand (a mandate or a legacy FAST-only counterparty). This keeps the implementation aligned with the Credara tenets — *verification, not mediation*; *provenance by structure*; *standards over invention* — instead of bolting a second, weaker consent fabric onto a substrate that already does the job.
 
 #### 8.5.1 What the FAST Consent IG Specifies (Edition 1)
 
@@ -1620,23 +1620,23 @@ The first-edition IG is narrower and more concrete than the broader FAST "comput
 - **Scale mechanism.** Repositories are kept consistent through FHIR **Subscriptions** on a defined `FASTConsentSubscriptionTopic` — "ensuring Consent records are updated amongst a set of Consent Registries." This is the IG's answer to *scale*: many repositories, eventually consistent via subscription notification.
 - **Vocabulary.** `FAST Consent Statuses` (`active` / `inactive`), LOINC consent-document types, and search parameters for `controller`, `grantee`, `manager`, `organizationId`, and `patientId`.
 
-What the Edition-1 ballot **does not** normatively define is a runtime consent **decision** operation (a `$consent-decision`-style PDP call) or a consent **enforcement** point. Adjudication — evaluating whether a given request is permitted by the stored consent — is left to implementers and to companion work (e.g., the Data Access Policies IG and prior LEAP/CDS experiments). This matters for the mapping below: Creda's *enforcement* machinery (Sections 4.5–4.6, 9.3) has no normative FAST Consent counterpart to conform to yet, whereas Creda's *record-and-replicate* machinery maps onto the IG almost one-to-one.
+What the Edition-1 ballot **does not** normatively define is a runtime consent **decision** operation (a `$consent-decision`-style PDP call) or a consent **enforcement** point. Adjudication — evaluating whether a given request is permitted by the stored consent — is left to implementers and to companion work (e.g., the Data Access Policies IG and prior LEAP/CDS experiments). This matters for the mapping below: Credara's *enforcement* machinery (Sections 4.5–4.6, 9.3) has no normative FAST Consent counterpart to conform to yet, whereas Credara's *record-and-replicate* machinery maps onto the IG almost one-to-one.
 
 #### 8.5.2 Conceptual Fit
 
-At the level of intent, the alignment is strong. Both systems treat a patient's directive as a first-class, machine-processable artifact that must remain valid and discoverable after the moment of capture, across institutional boundaries, at scale. The three FAST operations correspond directly to three of Creda's authorization event types:
+At the level of intent, the alignment is strong. Both systems treat a patient's directive as a first-class, machine-processable artifact that must remain valid and discoverable after the moment of capture, across institutional boundaries, at scale. The three FAST operations correspond directly to three of Credara's authorization event types:
 
-- `$file-consent` ↔ **`AuthorizationGrant`** (Section 4.3.1). Filing a consent is creating a Grant; a bare consent directive is, in Creda's own words, "an AuthorizationGrant with a minimal scope."
-- `$revoke-consent` ↔ **`AuthorizationRevocation`** (Section 4.3.2). Both withdraw a prior directive; FAST flips a status to `inactive`, Creda appends a signed Revocation referencing the Grant's UUID.
+- `$file-consent` ↔ **`AuthorizationGrant`** (Section 4.3.1). Filing a consent is creating a Grant; a bare consent directive is, in Credara's own words, "an AuthorizationGrant with a minimal scope."
+- `$revoke-consent` ↔ **`AuthorizationRevocation`** (Section 4.3.2). Both withdraw a prior directive; FAST flips a status to `inactive`, Credara appends a signed Revocation referencing the Grant's UUID.
 - `$record-disclosure` ↔ **`ExportReceipt`** (Section 4.3.3). Both create a durable, queryable record that data moved under a specific governing directive.
 
-The replication intents also rhyme: FAST keeps consent consistent across repositories via SubscriptionTopic notification; Creda keeps Grants consistent across peers via gossip and anti-entropy (Sections 6–7). They solve the same consistency problem with different fabrics.
+The replication intents also rhyme: FAST keeps consent consistent across repositories via SubscriptionTopic notification; Credara keeps Grants consistent across peers via gossip and anti-entropy (Sections 6–7). They solve the same consistency problem with different fabrics.
 
 #### 8.5.3 Actor, Operation, and Profile Mapping
 
-The table maps each FAST Consent IG artifact to its Creda counterpart and a conformance status. Status values: **Native** (Creda already implements the equivalent semantics, no FAST-facing surface yet), **Bridge-mappable** (achievable by extending the Bridge with no Core changes), **Bridge + Core** (requires Bridge work plus a Core capability), and **Divergent** (Creda's model intentionally differs).
+The table maps each FAST Consent IG artifact to its Credara counterpart and a conformance status. Status values: **Native** (Credara already implements the equivalent semantics, no FAST-facing surface yet), **Bridge-mappable** (achievable by extending the Bridge with no Core changes), **Bridge + Core** (requires Bridge work plus a Core capability), and **Divergent** (Credara's model intentionally differs).
 
-| FAST Consent artifact | Kind | Creda counterpart | Conformance status |
+| FAST Consent artifact | Kind | Credara counterpart | Conformance status |
 |---|---|---|---|
 | **Admin Service** (consent administration server / repository) | Actor | The peer + HAPI FHIR Bridge (Sections 8.3, 10.4) acting as a consent repository over the DAG | Bridge-mappable |
 | **Client** (files/reviews consents) | Actor | Any FHIR client of the Bridge; the patient-side IAS surface (Section 8.4.4) is the natural patient Client | Bridge-mappable |
@@ -1645,41 +1645,41 @@ The table maps each FAST Consent IG artifact to its Creda counterpart and a conf
 | `$record-disclosure` | Operation | `$creda-export` (Section 8.2.9) → `ExportReceipt` | Bridge-mappable |
 | `FASTConsent` (on `Consent`) | Profile | `CredaAuthorization` (on `Consent`, Section 8.2.12) projecting an `AuthorizationGrant` | Bridge + Core (add FASTConsent-conformant projection + grantee/controller/manager mapping) |
 | `FASTConsentAuditEvent` (on `AuditEvent`) | Profile | ExportReceipt projected as AuditEvent (cf. Provenance-vs-AuditEvent split, Section 8.2.4) | Bridge-mappable |
-| `FASTDocumentReference` / `QuestionnaireResponse` (consent ceremony) | Profile | No counterpart — Creda records the *directive*, not the *ceremony artifact* | Bridge + Core (attach ceremony DocumentReference to the Grant) |
-| `FASTConsentSubscriptionTopic` (repository sync) | SubscriptionTopic | Gossip + anti-entropy replication (Sections 6.1.1, 6.2.5); FHIR Subscription bridging (Section 8.2.13) | Divergent (Creda's DAG sync supersedes; a FAST Subscription face is optional) |
+| `FASTDocumentReference` / `QuestionnaireResponse` (consent ceremony) | Profile | No counterpart — Credara records the *directive*, not the *ceremony artifact* | Bridge + Core (attach ceremony DocumentReference to the Grant) |
+| `FASTConsentSubscriptionTopic` (repository sync) | SubscriptionTopic | Gossip + anti-entropy replication (Sections 6.1.1, 6.2.5); FHIR Subscription bridging (Section 8.2.13) | Divergent (Credara's DAG sync supersedes; a FAST Subscription face is optional) |
 | `FAST Consent Statuses` (`active`/`inactive`) | ValueSet | Grant active vs. validated-Revocation-present (Section 4.6 steps 1–2) | Bridge-mappable |
 | search params: `grantee`, `controller`, `manager`, `organizationId`, `patientId` | SearchParameter | Grant `audience`, patient subgraph id, originating institution | Bridge-mappable |
 | Runtime consent **decision** (not in Edition 1) | — | Seven-step evaluation algorithm (Section 4.6); Verifier (Section 4.5.2) | Native (no FAST artifact to conform to yet) |
 | Consent **enforcement point** (not in Edition 1) | — | Export Gate + Verifier dual control (Section 4.5) | Native |
 
-The summary the table is meant to convey: **every record-and-replicate role in the FAST Consent IG is reachable from the Bridge**, most of them without touching Core. The only artifacts requiring Core involvement are the FASTConsent projection fidelity (grantee/controller/manager semantics) and consent-ceremony document capture. And the parts of Creda with no FAST counterpart — runtime decision and enforcement — are precisely Creda's differentiators, not gaps.
+The summary the table is meant to convey: **every record-and-replicate role in the FAST Consent IG is reachable from the Bridge**, most of them without touching Core. The only artifacts requiring Core involvement are the FASTConsent projection fidelity (grantee/controller/manager semantics) and consent-ceremony document capture. And the parts of Credara with no FAST counterpart — runtime decision and enforcement — are precisely Credara's differentiators, not gaps.
 
-#### 8.5.4 Where Creda Exceeds the FAST Consent IG
+#### 8.5.4 Where Credara Exceeds the FAST Consent IG
 
-Conforming to the FAST Consent transport does not require Creda to weaken any of its properties, and on several axes Creda is materially stronger than a baseline FAST Consent repository:
+Conforming to the FAST Consent transport does not require Credara to weaken any of its properties, and on several axes Credara is materially stronger than a baseline FAST Consent repository:
 
-- **Tamper-evidence.** A `FASTConsent` is a mutable REST resource whose integrity depends on the repository that holds it. A Creda `AuthorizationGrant` is a signed event in an append-forward DAG (Section 7.2.2); its integrity is structural and independently verifiable.
-- **Verification at point of use.** FAST Consent has no normative point-of-use re-verification; once a repository discloses, the consent's continued validity is not checked downstream. Creda's Portable Authorization Artifact (Section 4.4) and Verifier (Section 4.5.2) re-verify locally at every point of use, including offline.
-- **Bounded revocation latency.** FAST repository sync is eventually consistent with no stated bound. Creda commits to measurable revocation-propagation bounds (Section 4.7).
-- **Non-repudiable disclosure chain.** `$record-disclosure` writes an AuditEvent at the disclosing repository. Creda's `ExportReceipt` is a signed event that both source and recipient can be bound to (Section 4.3.3), producing a two-sided chain of custody.
-- **No central or semi-central repository.** FAST presumes consent repositories (Admin Services) as holders of record. Creda has no holder of record; every peer that needs a Grant holds a verifiable copy.
+- **Tamper-evidence.** A `FASTConsent` is a mutable REST resource whose integrity depends on the repository that holds it. A Credara `AuthorizationGrant` is a signed event in an append-forward DAG (Section 7.2.2); its integrity is structural and independently verifiable.
+- **Verification at point of use.** FAST Consent has no normative point-of-use re-verification; once a repository discloses, the consent's continued validity is not checked downstream. Credara's Portable Authorization Artifact (Section 4.4) and Verifier (Section 4.5.2) re-verify locally at every point of use, including offline.
+- **Bounded revocation latency.** FAST repository sync is eventually consistent with no stated bound. Credara commits to measurable revocation-propagation bounds (Section 4.7).
+- **Non-repudiable disclosure chain.** `$record-disclosure` writes an AuditEvent at the disclosing repository. Credara's `ExportReceipt` is a signed event that both source and recipient can be bound to (Section 4.3.3), producing a two-sided chain of custody.
+- **No central or semi-central repository.** FAST presumes consent repositories (Admin Services) as holders of record. Credara has no holder of record; every peer that needs a Grant holds a verifiable copy.
 
-These should be stated to standards reviewers as **profile-compatible enhancements**, not deviations: a FAST Consent Client interacting with a Creda Admin Service gets everything the IG promises, plus signatures, portability, and bounded revocation it can ignore if it does not understand them — the same additive posture as the rest of the Creda IG (Section 8.4.3).
+These should be stated to standards reviewers as **profile-compatible enhancements**, not deviations: a FAST Consent Client interacting with a Credara Admin Service gets everything the IG promises, plus signatures, portability, and bounded revocation it can ignore if it does not understand them — the same additive posture as the rest of the Credara IG (Section 8.4.3).
 
 #### 8.5.5 Gaps and Divergences
 
 Honest accounting of what is not conformant today and what will not be made conformant by design:
 
 - **Bridge mappers are unbuilt (gap).** The FHIR↔CBOR mappers in the Bridge are stubs at M7 (see README milestone table). No FAST Consent operation can be served until the authorization-event mappers are real. This is the gating prerequisite.
-- **No FASTConsent profile yet (gap).** Creda profiles `CredaAuthorization` on the FHIR `Consent` base, not on `FASTConsent`. Conformance requires either deriving `CredaAuthorization` from `FASTConsent` or publishing a FASTConsent-conformant projection, including the `grantee` / `controller` / `manager` extensions and the `FASTReference` datatype.
-- **Operation signatures differ (gap, mechanical).** Creda exposes `$creda-authorize` / `$creda-revoke` / `$creda-export`; FAST expects `$file-consent` / `$revoke-consent` / `$record-disclosure`. The Bridge must advertise the FAST operation names and parameter profiles (it may keep the `$creda-*` aliases).
-- **Consent-ceremony artifacts (gap).** Creda records the directive but not the `DocumentReference` / `QuestionnaireResponse` evidence of the ceremony. Supporting `$file-consent`'s optional documentation means attaching a ceremony reference to the Grant — a Core schema consideration tracked as an open question (Section 13.6.3).
-- **Repository-subscription transport (divergence, intentional).** Creda will not replicate Grants between peers via FAST `SubscriptionTopic` notification; it replicates via the DAG. A Creda Admin Service may optionally *expose* a FAST Subscription face for non-Creda repositories that want notifications, but Creda-to-Creda consistency remains gossip/anti-entropy. This is a deliberate "substrate beneath FAST," not a conformance failure.
+- **No FASTConsent profile yet (gap).** Credara profiles `CredaAuthorization` on the FHIR `Consent` base, not on `FASTConsent`. Conformance requires either deriving `CredaAuthorization` from `FASTConsent` or publishing a FASTConsent-conformant projection, including the `grantee` / `controller` / `manager` extensions and the `FASTReference` datatype.
+- **Operation signatures differ (gap, mechanical).** Credara exposes `$creda-authorize` / `$creda-revoke` / `$creda-export`; FAST expects `$file-consent` / `$revoke-consent` / `$record-disclosure`. The Bridge must advertise the FAST operation names and parameter profiles (it may keep the `$creda-*` aliases).
+- **Consent-ceremony artifacts (gap).** Credara records the directive but not the `DocumentReference` / `QuestionnaireResponse` evidence of the ceremony. Supporting `$file-consent`'s optional documentation means attaching a ceremony reference to the Grant — a Core schema consideration tracked as an open question (Section 13.6.3).
+- **Repository-subscription transport (divergence, intentional).** Credara will not replicate Grants between peers via FAST `SubscriptionTopic` notification; it replicates via the DAG. A Credara Admin Service may optionally *expose* a FAST Subscription face for non-Credara repositories that want notifications, but Credara-to-Credara consistency remains gossip/anti-entropy. This is a deliberate "substrate beneath FAST," not a conformance failure.
 - **Moving target (caveat).** The IG is at STU 1 ballot; operation names, profiles, and especially any future decision/enforcement operations may change. Conformance claims must pin a specific IG version.
 
 #### 8.5.6 Implementation Plan: A Thin FAST Consent Face
 
-Per the scoping decision in Section 8.5, Creda implements a **thin FAST Consent face** — the `FASTConsent` profile shape and the three operation semantics, exposed at the Bridge over the existing authorization Core — and stops there by default. The committed scope is phases **F0–F2**. Phases F3–F5 are defined but **deferred**: they are built only when a concrete driver appears (a network mandate requiring federated conformance, or a legacy FAST-only counterparty), never speculatively. No phase, committed or deferred, alters the substrate: the DAG remains the source of truth, gossip/anti-entropy remains the replication fabric, and the seven-step evaluation and dual-control enforcement are untouched.
+Per the scoping decision in Section 8.5, Credara implements a **thin FAST Consent face** — the `FASTConsent` profile shape and the three operation semantics, exposed at the Bridge over the existing authorization Core — and stops there by default. The committed scope is phases **F0–F2**. Phases F3–F5 are defined but **deferred**: they are built only when a concrete driver appears (a network mandate requiring federated conformance, or a legacy FAST-only counterparty), never speculatively. No phase, committed or deferred, alters the substrate: the DAG remains the source of truth, gossip/anti-entropy remains the replication fabric, and the seven-step evaluation and dual-control enforcement are untouched.
 
 Committed scope (F0–F2):
 
@@ -1689,17 +1689,17 @@ Committed scope (F0–F2):
 
 **Phase F2 — FAST operation surface.** Add the `$file-consent`, `$revoke-consent`, and `$record-disclosure` operations to the Bridge as FAST-named entry points over the existing `$creda-authorize` / `$creda-revoke` / `$creda-export` logic, with the FAST operation-parameter profiles. Advertise the *Consent Administrative Server Capabilities* CapabilityStatement (and *Consent Client Capabilities* for the patient/institutional client). Extend Section 8.2.12 to list the FAST operations and the FAST CapabilityStatements.
 
-Phases F0–F2 deliver a usefully conformant Admin Service face — a non-Creda system can file, revoke, and disclosure-log consents against a Creda peer using standard FASTConsent shapes — while the substrate stays the DAG.
+Phases F0–F2 deliver a usefully conformant Admin Service face — a non-Credara system can file, revoke, and disclosure-log consents against a Credara peer using standard FASTConsent shapes — while the substrate stays the DAG.
 
 Deferred, demand-driven (F3–F5) — not in the default build:
 
 **Phase F3 — Consent ceremony capture.** Support the optional `DocumentReference` / `QuestionnaireResponse` on `$file-consent` by attaching a ceremony-evidence reference to the originating Grant. Deferred until a counterparty requires ceremony evidence; the attachment mechanism is an open question (Section 13.6.3) and should stay off the signed payload.
 
-**Phase F4 — Optional FAST Subscription edge adapter.** This is the part of FAST that is redundant with gossip and is therefore *not* part of the substrate. If interoperability with an external non-Creda consent repository is ever required, expose the `FASTConsentSubscriptionTopic` Subscription surface as an **opt-in edge adapter** at the Bridge, fed by the peer's gossip stream (reusing Section 8.2.13's Subscription bridging). Creda-to-Creda consistency always uses gossip/anti-entropy; this adapter exists solely to feed external FAST repositories and is never on the Creda-internal path.
+**Phase F4 — Optional FAST Subscription edge adapter.** This is the part of FAST that is redundant with gossip and is therefore *not* part of the substrate. If interoperability with an external non-Credara consent repository is ever required, expose the `FASTConsentSubscriptionTopic` Subscription surface as an **opt-in edge adapter** at the Bridge, fed by the peer's gossip stream (reusing Section 8.2.13's Subscription bridging). Credara-to-Credara consistency always uses gossip/anti-entropy; this adapter exists solely to feed external FAST repositories and is never on the Credara-internal path.
 
-**Phase F5 — Federated conformance and publication.** If a network mandate requires it, add federated FAST Consent conformance scenarios to the M9 suite and declare conformance to a specific Scalable Consent Management version in the published Creda IG and CapabilityStatement. Absent a mandate, the published conformance claim is scoped to the FASTConsent profile and the Administrative-Server operations (F0–F2), not the repository-federation model.
+**Phase F5 — Federated conformance and publication.** If a network mandate requires it, add federated FAST Consent conformance scenarios to the M9 suite and declare conformance to a specific Scalable Consent Management version in the published Credara IG and CapabilityStatement. Absent a mandate, the published conformance claim is scoped to the FASTConsent profile and the Administrative-Server operations (F0–F2), not the repository-federation model.
 
-This staging is what keeps the implementation evolvable rather than a Frankenstein: Creda commits only to the FAST data shape and operation surface, so when the IG advances — most likely adding a runtime decision/enforcement operation in a later edition — Creda maps its existing evaluator (Section 4.6) and Verifier (Section 4.5.2) onto the new operation rather than refactoring storage or replication.
+This staging is what keeps the implementation evolvable rather than a Frankenstein: Credara commits only to the FAST data shape and operation surface, so when the IG advances — most likely adding a runtime decision/enforcement operation in a later edition — Credara maps its existing evaluator (Section 4.6) and Verifier (Section 4.5.2) onto the new operation rather than refactoring storage or replication.
 
 ## 9. Security and Access Control
 
@@ -1707,7 +1707,7 @@ This staging is what keeps the implementation evolvable rather than a Frankenste
 
 #### 9.1.1 Threat Model
 
-The Creda security architecture is designed against an explicit threat model. Each threat is enumerated here with the section that addresses its mitigations.
+The Credara security architecture is designed against an explicit threat model. Each threat is enumerated here with the section that addresses its mitigations.
 
 | Threat | Description | Primary Mitigations |
 |---|---|---|
@@ -1721,34 +1721,34 @@ The Creda security architecture is designed against an explicit threat model. Ea
 
 #### 9.1.2 UDAP Certificate as Institutional Identity Anchor
 
-Every Creda institution authenticates with a UDAP-issued X.509 certificate. UDAP (Unified Data Access Profiles) is the existing US Health IT trust framework already in use for FHIR endpoint authentication, OAuth2 dynamic client registration, and TEFCA participant identity. Creda anchors into this framework rather than inventing a new one.
+Every Credara institution authenticates with a UDAP-issued X.509 certificate. UDAP (Unified Data Access Profiles) is the existing US Health IT trust framework already in use for FHIR endpoint authentication, OAuth2 dynamic client registration, and TEFCA participant identity. Credara anchors into this framework rather than inventing a new one.
 
 The institution's UDAP certificate carries:
 
 - **Subject DN**: includes the institution's organizational identifier (typically an OID-namespaced identifier registered in the DirectTrust bundle or equivalent).
 - **Subject Alternative Names**: include the institution's FHIR endpoint URLs and any associated organizational URIs.
-- **Issuer**: a CA in the DirectTrust bundle, or a Creda-recognized CA list maintained by the Participant Registry's legal coordinator (Section 6.1.3).
+- **Issuer**: a CA in the DirectTrust bundle, or a Credara-recognized CA list maintained by the Participant Registry's legal coordinator (Section 6.1.3).
 - **Public key**: used to verify event signatures.
 
 The certificate fingerprint (Blake3 hash of the DER-encoded certificate) is the `institution_id` recorded on every event the institution creates. This binds every signed event to a specific certificate, and through the certificate to a specific real-world institution.
 
-UDAP certificates are not Creda-specific. An institution that already has a UDAP certificate for FHIR endpoint authentication uses the same certificate (or a sibling certificate from the same CA) for Creda. This dramatically reduces onboarding cost — no new PKI infrastructure, no new trust framework registration.
+UDAP certificates are not Credara-specific. An institution that already has a UDAP certificate for FHIR endpoint authentication uses the same certificate (or a sibling certificate from the same CA) for Credara. This dramatically reduces onboarding cost — no new PKI infrastructure, no new trust framework registration.
 
 #### 9.1.3 SPIFFE ID for Workload Attestation
 
-While UDAP authenticates the institution, SPIFFE authenticates the running workload. Each Creda peer pod is issued a SPIFFE Verifiable Identity Document (SVID) by the institution's SPIRE server. The SVID is a short-lived X.509 certificate (default lifetime: 1 hour, rotated automatically by the SPIRE Workload API) scoped to the Creda workload identity.
+While UDAP authenticates the institution, SPIFFE authenticates the running workload. Each Credara peer pod is issued a SPIFFE Verifiable Identity Document (SVID) by the institution's SPIRE server. The SVID is a short-lived X.509 certificate (default lifetime: 1 hour, rotated automatically by the SPIRE Workload API) scoped to the Credara workload identity.
 
-The SVID proves: "This running process is a Creda peer, deployed in an authorized k8s cluster operated by Institution X, and the deployment is current and unrevoked." Without the SVID, even an attacker with a valid UDAP certificate cannot authenticate as a Creda peer — they would also need to be running in an authorized k8s cluster with a SPIRE registration entry for the Creda workload.
+The SVID proves: "This running process is a Credara peer, deployed in an authorized k8s cluster operated by Institution X, and the deployment is current and unrevoked." Without the SVID, even an attacker with a valid UDAP certificate cannot authenticate as a Credara peer — they would also need to be running in an authorized k8s cluster with a SPIRE registration entry for the Credara workload.
 
 SVIDs are used during the libp2p Noise handshake. The Noise XX pattern provides mutual authentication and forward secrecy. Once the secure channel is established, peers exchange UDAP certificates as application-layer evidence of institutional identity.
 
 #### 9.1.4 Two-Credential Binding
 
-Each Creda peer must present **both** a SPIFFE SVID and a UDAP certificate during the peer handshake protocol. A peer that presents only one is rejected. This two-credential binding is the architectural foundation against the malicious peer threat:
+Each Credara peer must present **both** a SPIFFE SVID and a UDAP certificate during the peer handshake protocol. A peer that presents only one is rejected. This two-credential binding is the architectural foundation against the malicious peer threat:
 
 - **SPIFFE SVID alone (no UDAP cert)**: the peer is a legitimate workload but has no institutional identity. Cannot create signed events. Rejected.
-- **UDAP cert alone (no SPIFFE SVID)**: the peer claims an institution but cannot prove it is a legitimate Creda workload. Could be a compromised process or an attacker with stolen credentials. Rejected.
-- **Both credentials, with UDAP cert linked to SPIRE registration**: the peer is verified as a legitimate Creda workload running with an authorized institutional identity. Accepted.
+- **UDAP cert alone (no SPIFFE SVID)**: the peer claims an institution but cannot prove it is a legitimate Credara workload. Could be a compromised process or an attacker with stolen credentials. Rejected.
+- **Both credentials, with UDAP cert linked to SPIRE registration**: the peer is verified as a legitimate Credara workload running with an authorized institutional identity. Accepted.
 
 The link between the SVID and the UDAP cert is established during peer registration. The institution's SPIRE server is configured to issue SVIDs only to workloads that present the institution's UDAP-bound identity, and the Participant Registry records the binding. A peer attempting to present a UDAP certificate that is not bound to its SVID is rejected at the libp2p layer.
 
@@ -1769,7 +1769,7 @@ cert-manager (Section 7.4.6) handles the operational mechanics of certificate ro
 
 Patients with their own keys (the patient-as-participant model from Section 3.1) use a separate key infrastructure. Patient keys are not UDAP certificates — they are typically issued by a patient-facing OIDC provider with WebAuthn/passkey backing.
 
-- **Issuance**: a patient registers with a Creda-aware patient portal or app, which provisions a key pair backed by the device's secure element (or a recoverable cloud-backed passkey).
+- **Issuance**: a patient registers with a Credara-aware patient portal or app, which provisions a key pair backed by the device's secure element (or a recoverable cloud-backed passkey).
 - **Identity binding**: the patient's public key is bound to an OIDC `sub` claim issued by an identity provider trusted by the network. The binding is recorded in the patient's own identity subgraph as a special Assert event with verification method `patient-self-attestation`.
 - **Trust weight**: patient keys carry weaker default trust weights than UDAP-anchored institutional keys. A patient's self-asserted address change is meaningful but should not override an insurance-card-verified address from an institution. Confidence scoring (Section 5.3) reflects this.
 - **Recovery**: patient key loss is a real operational concern. The IG supports key recovery via OIDC-mediated re-enrollment — the patient re-authenticates with their identity provider, and a new key is bound to the same subgraph. The old key is revoked but historical events signed by it remain valid.
@@ -1778,19 +1778,19 @@ Patient keys are the cryptographic substrate for `$creda-self-verify` (Section 8
 
 #### 9.1.7 Zero Trust Controls Against Insider Threat
 
-Compromised institution credentials — whether through insider threat, credential theft, or operational error — are the most difficult threat to defend against because the credentials are legitimate. Creda cannot prevent a rogue employee at a participating institution from misusing valid credentials. What Creda can do is **make misuse expensive, detectable, and bounded** by applying zero trust principles throughout the architecture.
+Compromised institution credentials — whether through insider threat, credential theft, or operational error — are the most difficult threat to defend against because the credentials are legitimate. Credara cannot prevent a rogue employee at a participating institution from misusing valid credentials. What Credara can do is **make misuse expensive, detectable, and bounded** by applying zero trust principles throughout the architecture.
 
-**Continuous verification, not perimeter trust.** No request is trusted by virtue of originating inside an institution's network. Every Creda operation, whether from a clinician, a registrar, or an automated system, is authenticated and authorized at the point of action — not at the institutional boundary. The Bridge enforces SMART on FHIR scopes per request; Creda Core enforces consent and party-of-the-subgraph constraints per operation; gossip propagation enforces signature verification per event. There is no "trusted internal network" that bypasses these checks.
+**Continuous verification, not perimeter trust.** No request is trusted by virtue of originating inside an institution's network. Every Credara operation, whether from a clinician, a registrar, or an automated system, is authenticated and authorized at the point of action — not at the institutional boundary. The Bridge enforces SMART on FHIR scopes per request; Credara Core enforces consent and party-of-the-subgraph constraints per operation; gossip propagation enforces signature verification per event. There is no "trusted internal network" that bypasses these checks.
 
 **Least privilege by default.** SMART on FHIR scopes are scoped narrowly. A registrar at a front desk has scopes for `Patient/$creda-disambiguate` and `Patient/$match` but not for `Patient/$creda-tombstone`. A clinician has scopes for read and `Patient/$creda-attest` for patients with whom they have a treatment relationship, not blanket read access. A privacy officer has elevated scopes for tombstoning. Each role has the minimum scopes needed for the role's function.
 
 **Per-operation auditing.** Every read, write, and operation generates an audit record with the authenticated user identity, the operation, the affected resources, and the SMART scopes presented. This is enforced at the Bridge level using HAPI's standard auditing infrastructure, with records flowing to the institution's SIEM. Audit records are themselves immutable and signed.
 
-**Anomaly detection signals.** Patterns indicative of credential misuse are surfaced as security signals: a registrar invoking `$creda-disambiguate` against many candidates outside their normal patient population, a clinician accessing patient subgraphs at a rate inconsistent with clinical workflow, bulk queries from accounts that historically issue single-patient lookups. The anomaly detection is not part of Creda itself — it is the institution's responsibility — but Creda's audit logs are designed to support the necessary signals.
+**Anomaly detection signals.** Patterns indicative of credential misuse are surfaced as security signals: a registrar invoking `$creda-disambiguate` against many candidates outside their normal patient population, a clinician accessing patient subgraphs at a rate inconsistent with clinical workflow, bulk queries from accounts that historically issue single-patient lookups. The anomaly detection is not part of Credara itself — it is the institution's responsibility — but Credara's audit logs are designed to support the necessary signals.
 
 **Bounded blast radius.** Even with valid credentials, an insider's blast radius is bounded by the architecture. They cannot tombstone events at other institutions (only the originating institution can amend or tombstone its own assertions, Section 3.1). They cannot retroactively modify history (the DAG is structurally append-forward, Section 7.2.2). They cannot impersonate other institutions (signatures bind events to the originating UDAP key). What they can do is misuse their own institution's authority — and that is auditable, attributable, and recoverable through Contest events (for fraudulent Links) and reputation downgrades.
 
-**Out-of-band controls.** Some operations require out-of-band confirmation regardless of credentials presented. Tombstone operations require a privacy officer's attested approval (a separate signature from a different role's key). Bulk export operations require operator approval recorded in the institution's change management system. These controls are enforced by the institution's Bridge configuration, not by Creda Core — Creda provides the hooks; the institution defines the policy.
+**Out-of-band controls.** Some operations require out-of-band confirmation regardless of credentials presented. Tombstone operations require a privacy officer's attested approval (a separate signature from a different role's key). Bulk export operations require operator approval recorded in the institution's change management system. These controls are enforced by the institution's Bridge configuration, not by Credara Core — Credara provides the hooks; the institution defines the policy.
 
 The honest framing: zero trust does not eliminate insider threat. It makes insider threat **expensive to execute, fast to detect, and bounded in damage**. Combined with the immutable audit trail (Section 9.4), the cost of insider misuse is high enough to deter most adversaries and the detection latency is short enough to limit harm.
 
@@ -1804,7 +1804,7 @@ The flow:
 2. The clinician's application requests a SMART access token with appropriate scopes (e.g., `patient/Patient.read`, `user/Patient.$creda-attest`).
 3. The application presents the access token to the Bridge.
 4. The Bridge validates the token using the institution's introspection endpoint, extracts the user identity and scopes, and authorizes the operation.
-5. For operations that need to create signed events, the Bridge calls Creda Core, which signs the event with the institution's UDAP key. The user identity is recorded in the event metadata for audit purposes but the cryptographic signature is institutional.
+5. For operations that need to create signed events, the Bridge calls Credara Core, which signs the event with the institution's UDAP key. The user identity is recorded in the event metadata for audit purposes but the cryptographic signature is institutional.
 
 This separation — user authentication via SMART, event signing via UDAP — reflects the reality that signed events represent institutional assertions, not individual ones. A clinician's order entry is an assertion *by the institution* that the clinician acted on its behalf. The clinician's identity is auditable; the cryptographic authority is institutional.
 
@@ -1816,7 +1816,7 @@ Distributed denial of service attacks on the network can take several forms, eac
 - **DHT query storms**: an attacker floods the DHT with `FIND_NODE` or `GET_PROVIDERS` queries. Mitigated by libp2p's Kademlia implementation rate limits and by reputation-aware query response (low-reputation peers get slower or rejected responses).
 - **Malformed event submissions**: an attacker submits events that fail validation (bad signatures, malformed CBOR, structural violations). Mitigated by validating cheap properties first — the receiving peer checks UDAP cert validity and signature before any expensive parsing or graph traversal — and by reputation downgrades for peers that consistently send malformed events.
 - **Connection exhaustion**: an attacker opens many connections to consume peer connection slots. Mitigated by libp2p's connection manager limits, per-source-IP connection caps, and prioritization of authenticated peers over pending handshakes.
-- **Bridge-level DDOS**: standard FHIR endpoint DDOS protections apply at the Bridge — WAF rules, rate limiting at the institution's ingress, request size limits. These are operational concerns not unique to Creda.
+- **Bridge-level DDOS**: standard FHIR endpoint DDOS protections apply at the Bridge — WAF rules, rate limiting at the institution's ingress, request size limits. These are operational concerns not unique to Credara.
 
 The design philosophy: shift validation cost to the attacker. Cheap signature verification rejects most fraudulent traffic before it reaches expensive graph operations. Reputation downgrades amplify the cost of sustained attacks. Rate limits cap the worst case.
 
@@ -1867,7 +1867,7 @@ The identity proofing level (NIST 800-63 IAL2 vs IAL3, AAL2 vs AAL3) required fo
 
 #### 9.2.1 Demographic Tokenization
 
-Cleartext demographics never traverse the Creda network. Each demographic field is tokenized using a deterministic hash function with a network-wide salt:
+Cleartext demographics never traverse the Credara network. Each demographic field is tokenized using a deterministic hash function with a network-wide salt:
 
 ```
 token = Blake3(network_salt || field_type || normalized(field_value))
@@ -1898,10 +1898,10 @@ Tokenization is only useful if the same logical input produces the same token ac
 - **Dates**: ISO 8601 date format (YYYY-MM-DD). Time components, if present, are dropped for DOB tokenization.
 - **Sex**: FHIR administrative gender code (`male`, `female`, `other`, `unknown`). Lowercased.
 - **Addresses**: USPS-standardized form using libpostal-equivalent normalization. Postal codes use ZIP+4 when available, ZIP-5 otherwise.
-- **SSN fragment**: digits only, no separators. Only last 4 digits are tokenized; full SSNs are never stored or tokenized in Creda.
+- **SSN fragment**: digits only, no separators. Only last 4 digits are tokenized; full SSNs are never stored or tokenized in Credara.
 - **Identifier strings (MRNs, member IDs)**: case-preserved (some MRN systems are case-sensitive), whitespace-trimmed, namespaced by `system` to prevent cross-system collisions.
 
-The reference normalization library is part of Creda Core, with bindings available for the HAPI Bridge. Institutions integrating their own systems must use the reference library; ad hoc normalization will produce inconsistent tokens and break matching.
+The reference normalization library is part of Credara Core, with bindings available for the HAPI Bridge. Institutions integrating their own systems must use the reference library; ad hoc normalization will produce inconsistent tokens and break matching.
 
 #### 9.2.4 Cleartext Retrieval Protocol
 
@@ -1916,11 +1916,11 @@ This cleartext retrieval is not part of the gossip flow. It is a synchronous, po
 
 #### 9.2.5 TEFCA IAS Tokenization Compatibility
 
-TEFCA's Individual Access Services specification includes a tokenization scheme for cross-network identity matching. Creda's tokenization must align with or interoperate with TEFCA's so that institutions don't need parallel tokenization implementations.
+TEFCA's Individual Access Services specification includes a tokenization scheme for cross-network identity matching. Credara's tokenization must align with or interoperate with TEFCA's so that institutions don't need parallel tokenization implementations.
 
-Where the schemes are identical (normalization rules for names and dates appear to align), Creda uses TEFCA's algorithm directly. Where they diverge, the IG documents the bridging logic — a translation layer in the Bridge that produces both Creda-flavored tokens (for Creda matching) and TEFCA-flavored tokens (for TEFCA $match calls) from the same input.
+Where the schemes are identical (normalization rules for names and dates appear to align), Credara uses TEFCA's algorithm directly. Where they diverge, the IG documents the bridging logic — a translation layer in the Bridge that produces both Credara-flavored tokens (for Credara matching) and TEFCA-flavored tokens (for TEFCA $match calls) from the same input.
 
-This is an ongoing alignment effort that should be tracked through the Sequoia Project and the TEFCA technical workgroup. Where Creda's tokenization is more privacy-preserving (e.g., due to network salt rotation, which TEFCA does not currently specify), Creda retains its scheme and provides bridge translation.
+This is an ongoing alignment effort that should be tracked through the Sequoia Project and the TEFCA technical workgroup. Where Credara's tokenization is more privacy-preserving (e.g., due to network salt rotation, which TEFCA does not currently specify), Credara retains its scheme and provides bridge translation.
 
 #### 9.2.6 Bloom Filter Optimizations
 
@@ -1936,7 +1936,7 @@ Every cross-institutional FHIR request specifies the minimum data needed:
 - **Profile-driven defaults**: per-institution policy can configure default minimum projections by SMART scope. A clinician with `patient/Patient.read` may receive a richer default projection than a researcher with `patient/Patient.read.summary`.
 - **Bulk export gates**: bulk export operations require explicit approval and a documented purpose. They are not available via standard FHIR scopes; a separate operator workflow is required.
 
-Minimum necessary is a HIPAA requirement and an architectural property in Creda. Defaulting to less data, with explicit opt-in for more, is the safer posture.
+Minimum necessary is a HIPAA requirement and an architectural property in Credara. Defaulting to less data, with explicit opt-in for more, is the safer posture.
 
 ### 9.3 Authorization Enforcement (Security View)
 
@@ -2005,7 +2005,7 @@ Because every event is signed and the graph topology is structurally append-forw
 - Based on what (the parent references).
 - With what verification (the verification_method on Assert events, the method on Link events, etc.).
 
-Compare to today's MPI audit logs: typically separate from the data, often stored in a relational database that an administrator could modify, sometimes incomplete due to logging failures. Creda's audit trail is intrinsic to the data — there is no separate logging system to fail or be tampered with.
+Compare to today's MPI audit logs: typically separate from the data, often stored in a relational database that an administrator could modify, sometimes incomplete due to logging failures. Credara's audit trail is intrinsic to the data — there is no separate logging system to fail or be tampered with.
 
 For tombstoned events, the audit trail preserves the structural record (this node existed, was tombstoned on this date by this party) while removing the PII payload. The audit trail of *what was forgotten* remains, even though *what was asserted* is gone.
 
@@ -2028,7 +2028,7 @@ The two together — DAG for write-side history, AuditEvent for read-side histor
 
 #### 9.4.3 HIPAA Accounting of Disclosures
 
-HIPAA requires covered entities to provide patients with an accounting of disclosures on request. Creda's audit infrastructure supports this natively:
+HIPAA requires covered entities to provide patients with an accounting of disclosures on request. Credara's audit infrastructure supports this natively:
 
 ```
 GET AuditEvent?patient=Patient/[id]&date=ge2024-01-01&category=disclosure
@@ -2038,47 +2038,47 @@ This query, against the institution's AuditEvent store, produces the accounting 
 
 #### 9.4.4 21st Century Cures Act Compliance
 
-The Cures Act prohibits practices that interfere with patient access to their data. Creda's design actively enables Cures Act compliance:
+The Cures Act prohibits practices that interfere with patient access to their data. Credara's design actively enables Cures Act compliance:
 
 - **Patient-side IAS**: patients can access their full identity provenance chain via standard FHIR operations.
 - **Native provenance access**: the chain is not a hidden internal structure; it is a first-class FHIR resource that patients can read.
 - **Patient-direct verification and contestation**: patients can contest incorrect links, request tombstoning of erroneous data, and verify their own identity through the network.
 - **No information blocking**: the architecture prevents an institution from withholding identity provenance from a patient — provenance is replicated across the network and accessible via the IAS.
 
-The Cures Act is, in many respects, a regulatory mandate for the kind of patient-empowered identity model Creda implements. Compliance is intrinsic to the design rather than a separate compliance layer.
+The Cures Act is, in many respects, a regulatory mandate for the kind of patient-empowered identity model Credara implements. Compliance is intrinsic to the design rather than a separate compliance layer.
 
 ### 9.5 Future Privacy Enhancements
 
 Several privacy enhancements are out of scope for v1 but should be tracked as future work, particularly to address the **curious peer** threat (peers that follow protocol but learn unintended information from network traffic patterns).
 
-- **Private Set Intersection (PSI) for matching.** Today's tokenization provides confidentiality of values but not query privacy — a peer that receives a token query learns that the requesting institution is interested in a patient with that token. PSI protocols allow two parties to compute the intersection of their respective sets without revealing the elements of the sets to each other. PSI for Creda matching would let an institution determine which patients are common with another institution without either party learning the other's full patient set.
+- **Private Set Intersection (PSI) for matching.** Today's tokenization provides confidentiality of values but not query privacy — a peer that receives a token query learns that the requesting institution is interested in a patient with that token. PSI protocols allow two parties to compute the intersection of their respective sets without revealing the elements of the sets to each other. PSI for Credara matching would let an institution determine which patients are common with another institution without either party learning the other's full patient set.
 - **Oblivious DHT lookups.** Today's DHT queries reveal the queried key to the responding peers. Oblivious DHT protocols (e.g., those built on private information retrieval) hide the queried key from the responder. This prevents network-wide patterns of who is interested in which patients from being observable by curious peers.
 - **Differential privacy for aggregate queries.** Population-level queries ("how many patients in this subgraph have insurance from Payer X?") can leak individual information when combined across queries. Differential privacy adds calibrated noise to aggregates, providing provable bounds on individual disclosure.
 - **Zero-knowledge proofs for identity assertions.** Some identity claims could be proved without revealing the underlying data — a patient could prove they are over 18 without revealing their DOB, or prove they have a relationship with a specific institution without revealing which. ZK proofs for these claims would be a significant privacy upgrade for patient-side workflows.
 
-These are research-active areas and their inclusion in Creda depends on the maturity of cryptographic libraries (particularly in Rust) and on institutional appetite for the operational complexity each adds. The architecture is designed to admit these enhancements without breaking changes — tokenization can be replaced with PSI tokens, DHT lookups can route through oblivious gateways, AuditEvent aggregation can incorporate differential privacy, and ZK-proof Assert events would be a new event type within the existing extensible enum.
+These are research-active areas and their inclusion in Credara depends on the maturity of cryptographic libraries (particularly in Rust) and on institutional appetite for the operational complexity each adds. The architecture is designed to admit these enhancements without breaking changes — tokenization can be replaced with PSI tokens, DHT lookups can route through oblivious gateways, AuditEvent aggregation can incorporate differential privacy, and ZK-proof Assert events would be a new event type within the existing extensible enum.
 
 ## 10. System Components
 
-This section defines the deployable artifacts that compose a Creda peer and the network-level services that govern admission. With Appendix C clarifying that most subsystems are assembled from existing components, this section focuses on how those parts compose: what processes run, in what containers, with what interfaces, and what configuration they require.
+This section defines the deployable artifacts that compose a Credara peer and the network-level services that govern admission. With Appendix C clarifying that most subsystems are assembled from existing components, this section focuses on how those parts compose: what processes run, in what containers, with what interfaces, and what configuration they require.
 
 ### 10.0 Admission Control vs. Runtime Coordination
 
-A clarifying distinction up front, because it affects how readers interpret the rest of this section: Creda has **admission control** but does not have a **runtime coordinator**. These are different things and the network needs the first while explicitly avoiding the second.
+A clarifying distinction up front, because it affects how readers interpret the rest of this section: Credara has **admission control** but does not have a **runtime coordinator**. These are different things and the network needs the first while explicitly avoiding the second.
 
 **Admission control** governs who may participate. Joining the network requires executing the Network Participation Agreement (NPA), having UDAP credentials registered in the Participant Registry, and being vetted by the legal coordinator (Section 6.1.3). This is gated, not open. Vetting is essential — under HIPAA, peers exchange Protected Health Information and must have BAA coverage in place before any traffic flows. Random providers cannot join.
 
-**Runtime coordination** governs how operations are routed during normal operation. Many federated systems have a runtime coordinator: a central broker through which queries are dispatched, where consensus is achieved, where writes are sequenced. Creda explicitly does not. Once admitted, peers operate peer-to-peer — events propagate via gossip, queries route via DHT, replication occurs via direct anti-entropy between peers. There is no central server through which traffic flows.
+**Runtime coordination** governs how operations are routed during normal operation. Many federated systems have a runtime coordinator: a central broker through which queries are dispatched, where consensus is achieved, where writes are sequenced. Credara explicitly does not. Once admitted, peers operate peer-to-peer — events propagate via gossip, queries route via DHT, replication occurs via direct anti-entropy between peers. There is no central server through which traffic flows.
 
 This is structurally similar to DirectTrust in the existing health IT ecosystem: a vetted trust framework with admission control, where admitted participants exchange messages directly without DirectTrust mediating each message. The trust framework administrator is essential; the runtime coordinator is unnecessary.
 
 The components in this section reflect this split: Sections 10.1-9.4 cover the per-peer components that every participating institution operates; Section 10.5 covers the network-level admission control service that the legal coordinator operates.
 
-### 10.1 Creda Core (Rust)
+### 10.1 Credara Core (Rust)
 
 #### 10.1.1 Process Architecture
 
-Creda Core is a single Rust binary, statically-linked, exposing a gRPC API on a Unix domain socket. One process per peer, one peer per pod. The binary supports two runtime modes:
+Credara Core is a single Rust binary, statically-linked, exposing a gRPC API on a Unix domain socket. One process per peer, one peer per pod. The binary supports two runtime modes:
 
 - **Daemon mode**: long-lived peer process. Listens on the libp2p port, serves gRPC, runs scheduled tasks, exposes Prometheus metrics. This is the default mode in production deployments.
 - **CLI mode**: one-shot administrative operations. Subcommands include `creda init` (generate keys, write initial config), `creda snapshot` (force a snapshot to object storage), `creda registry verify` (check Participant Registry health), `creda peer list` (show currently active peers), `creda event inspect` (debug a specific event by UUID).
@@ -2087,7 +2087,7 @@ The same binary supports both modes — there is no separate CLI tool. CLI mode 
 
 #### 10.1.2 Module Organization
 
-Creda Core is internally organized into modules with clear boundaries:
+Credara Core is internally organized into modules with clear boundaries:
 
 - **`events`**: identity event types, schema validation, signing, signature verification.
 - **`dag`**: DAG operations — likely libgit2-backed per Appendix C.7. Subgraph traversal, root discovery, fork/split semantics, parent reference management.
@@ -2102,7 +2102,7 @@ Each module has unit tests and well-defined interfaces. Integration tests exerci
 
 #### 10.1.3 gRPC API Surface
 
-The gRPC API is the contract between Creda Core and any client (the Bridge, the CLI, ops tooling). Major operations:
+The gRPC API is the contract between Credara Core and any client (the Bridge, the CLI, ops tooling). Major operations:
 
 - `CreateEvent(EventRequest) → Event`: create any of the nine event types after validation and signing.
 - `GetEvent(UUID) → Event`: retrieve a specific event.
@@ -2130,7 +2130,7 @@ The trait boundaries serve two purposes: they enable mocking in tests, and they 
 
 #### 10.1.5 Async Runtime and Concurrency
 
-Creda Core uses **tokio** as its async runtime. All I/O — gRPC, libp2p, storage — is async. The whole process runs on a single tokio runtime; there is no separate runtime per module. Long-running tasks (scheduled jobs, gossip handling, anti-entropy partners) run as tokio tasks; CPU-bound work (signature verification, hash computation) is dispatched to a thread pool via `tokio::task::spawn_blocking` to avoid blocking the async runtime.
+Credara Core uses **tokio** as its async runtime. All I/O — gRPC, libp2p, storage — is async. The whole process runs on a single tokio runtime; there is no separate runtime per module. Long-running tasks (scheduled jobs, gossip handling, anti-entropy partners) run as tokio tasks; CPU-bound work (signature verification, hash computation) is dispatched to a thread pool via `tokio::task::spawn_blocking` to avoid blocking the async runtime.
 
 #### 10.1.6 Configuration
 
@@ -2149,7 +2149,7 @@ The Export Gate is the source-side control point of the dual-control enforcement
 
 #### 10.2.1 Role and Placement
 
-The Export Gate runs at the data egress boundary — typically inside or adjacent to the institution's EHR, data warehouse, or FHIR endpoint, wherever clinical data actually leaves institutional control. It is a separate component from Creda Core precisely because of this placement: Core sits in the query/replication path for trust events, while the Export Gate sits in the clinical-data egress path. The two communicate (the Gate calls Core to validate authorization state and to emit the ExportReceipt) but are deployed at different points in the institution's architecture.
+The Export Gate runs at the data egress boundary — typically inside or adjacent to the institution's EHR, data warehouse, or FHIR endpoint, wherever clinical data actually leaves institutional control. It is a separate component from Credara Core precisely because of this placement: Core sits in the query/replication path for trust events, while the Export Gate sits in the clinical-data egress path. The two communicate (the Gate calls Core to validate authorization state and to emit the ExportReceipt) but are deployed at different points in the institution's architecture.
 
 #### 10.2.2 Validation Performed
 
@@ -2165,7 +2165,7 @@ If validation fails, data is not exported and the failure is logged. If validati
 
 #### 10.2.3 Implementation
 
-The Export Gate is a small library/service (reference implementation in Rust, with bindings for common EHR integration languages) that wraps Creda Core's authorization evaluation. It is intentionally thin: it does not reimplement authorization logic, it calls Core's `EvaluateAuthorization` and acts on the result. Institutions integrate it at their egress points — as a FHIR interceptor on their HAPI endpoint, as a pre-export hook in their data warehouse, or as a sidecar that the EHR's interface engine consults before transmitting.
+The Export Gate is a small library/service (reference implementation in Rust, with bindings for common EHR integration languages) that wraps Credara Core's authorization evaluation. It is intentionally thin: it does not reimplement authorization logic, it calls Core's `EvaluateAuthorization` and acts on the result. Institutions integrate it at their egress points — as a FHIR interceptor on their HAPI endpoint, as a pre-export hook in their data warehouse, or as a sidecar that the EHR's interface engine consults before transmitting.
 
 ### 10.3 Verifier (Relying-Side Enforcement)
 
@@ -2188,7 +2188,7 @@ For a given use, the Verifier confirms three things together:
 The Verifier operates against the relying institution's local synchronized DAG state. It does not require a callback to the source system for routine verification. This is a deliberate and important property:
 
 - **Resilience**: verification continues during network partitions, source-system outages, or degraded connectivity. The Verifier uses its most recent synchronized state and can flag staleness if its DAG view is older than a configurable threshold.
-- **Adoption**: a consuming system can embed the Verifier SDK and check authorization locally without operating a full Creda peer. This lowers the integration bar for EHRs, payer systems, and research platforms that want to verify but not necessarily to participate as full writers in the network.
+- **Adoption**: a consuming system can embed the Verifier SDK and check authorization locally without operating a full Credara peer. This lowers the integration bar for EHRs, payer systems, and research platforms that want to verify but not necessarily to participate as full writers in the network.
 
 When operating offline or against stale state, the Verifier reports its confidence level and the age of its DAG view, so the relying institution can decide whether stale-state verification is acceptable for the use at hand. For high-stakes uses (e.g., a fresh authorization check before a large data export), the institution can require a current DAG view; for routine reads, recent-but-not-instant state is typically acceptable.
 
@@ -2200,22 +2200,22 @@ The Verifier is delivered as an SDK/runtime with language bindings (reference im
 
 #### 10.4.1 Process Architecture
 
-The Bridge is a Spring Boot application embedding HAPI FHIR's `RestfulServer` in Plain Server mode (per Section 8.3.3). One process per peer, runs in a separate container in the same pod as Creda Core.
+The Bridge is a Spring Boot application embedding HAPI FHIR's `RestfulServer` in Plain Server mode (per Section 8.3.3). One process per peer, runs in a separate container in the same pod as Credara Core.
 
 #### 10.4.2 Resource Providers
 
-Custom `IResourceProvider` implementations for each FHIR resource Creda exposes:
+Custom `IResourceProvider` implementations for each FHIR resource Credara exposes:
 
-- **`PatientResourceProvider`**: read, search, history, and the custom Creda operations (`$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$match`, `$export`).
+- **`PatientResourceProvider`**: read, search, history, and the custom Credara operations (`$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$match`, `$export`).
 - **`ProvenanceResourceProvider`**: read, search, history, `$creda-contest`.
 - **`AuthorizationResourceProvider`**: create (as AuthorizationGrant), read, search, delete (as AuthorizationRevocation); plus the `$creda-authorize`, `$creda-revoke`, and `$creda-verify` operations.
 - **`AuditEventResourceProvider`**: read, search (read-side audit only; events from Core are projected as Provenance, not AuditEvent).
 
-Each provider delegates to Creda Core via gRPC. Providers contain no identity logic — they translate FHIR requests into gRPC calls and translate gRPC responses into FHIR resources.
+Each provider delegates to Credara Core via gRPC. Providers contain no identity logic — they translate FHIR requests into gRPC calls and translate gRPC responses into FHIR resources.
 
 #### 10.4.3 gRPC Client to Core
 
-The Bridge holds a long-lived gRPC connection to Creda Core over the shared Unix domain socket at `/var/run/creda/core.sock`. Connection management is handled by gRPC-Java's connection pooling. Reconnection is automatic on transient failures; sustained Core unavailability surfaces to the Bridge as 503 responses to FHIR clients.
+The Bridge holds a long-lived gRPC connection to Credara Core over the shared Unix domain socket at `/var/run/creda/core.sock`. Connection management is handled by gRPC-Java's connection pooling. Reconnection is automatic on transient failures; sustained Core unavailability surfaces to the Bridge as 503 responses to FHIR clients.
 
 #### 10.4.4 SMART on FHIR Enforcement
 
@@ -2232,13 +2232,13 @@ Core sees pre-authorized requests with the institution's identity and the user's
 
 #### 10.4.5 FHIR Validation
 
-Inbound FHIR resources are validated against the Creda IG profiles using HAPI's built-in validator. Resources that fail profile validation are rejected with FHIR `OperationOutcome` before reaching Core. This shifts validation cost to the Bridge, keeps Core's gRPC API focused on already-valid inputs, and gives FHIR clients standard FHIR error responses.
+Inbound FHIR resources are validated against the Credara IG profiles using HAPI's built-in validator. Resources that fail profile validation are rejected with FHIR `OperationOutcome` before reaching Core. This shifts validation cost to the Bridge, keeps Core's gRPC API focused on already-valid inputs, and gives FHIR clients standard FHIR error responses.
 
 The Bridge also handles US Core profile validation in the same pass — every CredaPatient must conform to US Core Patient (Section 8.2.1).
 
 ### 10.5 Peer Daemon (Runtime Composition)
 
-"Peer Daemon" is the colloquial name for the runtime composition of Creda Core in daemon mode plus the HAPI FHIR Bridge running in the same pod. It is not a separate component — it is what we call the deployed unit when describing operational behavior.
+"Peer Daemon" is the colloquial name for the runtime composition of Credara Core in daemon mode plus the HAPI FHIR Bridge running in the same pod. It is not a separate component — it is what we call the deployed unit when describing operational behavior.
 
 #### 10.5.1 In-Pod Communication
 
@@ -2246,7 +2246,7 @@ Core and Bridge communicate via gRPC over a Unix domain socket on a shared `empt
 
 #### 10.5.2 Scheduled Tasks Within the Daemon
 
-Several recurring tasks run as tokio tasks within Creda Core:
+Several recurring tasks run as tokio tasks within Credara Core:
 
 - **Snapshot generation**: every 6 hours by default, write a snapshot of the local store to object storage.
 - **Snapshot retention pruning**: daily, delete snapshots older than the configured retention window.
@@ -2283,7 +2283,7 @@ The two containers share an `emptyDir` volume at `/var/run/creda` for the Unix d
 
 #### 10.6.2 StatefulSet Deployment
 
-A Creda peer is deployed as a Kubernetes **StatefulSet**. The reasons:
+A Credara peer is deployed as a Kubernetes **StatefulSet**. The reasons:
 
 - Stable peer identity across pod restarts. The pod's hostname is consistent, which affects how the peer presents itself in the libp2p network.
 - Stable persistent volume claims. Each replica has its own PVC, retained across pod restarts.
@@ -2309,7 +2309,7 @@ These are starting points. Actual usage depends on patient volume, query rate, a
 
 #### 10.6.5 Helm Chart Structure
 
-The Creda Helm chart is the primary deployment artifact:
+The Credara Helm chart is the primary deployment artifact:
 
 - **`Chart.yaml`**: standard Helm metadata.
 - **`values.yaml`**: documented configuration options for institution operators. Every reasonable knob exposed without forcing users to template templates.
@@ -2326,19 +2326,19 @@ The Creda Helm chart is the primary deployment artifact:
   - `prometheus-exporter`: scraping configuration if the institution doesn't run Prometheus.
   - `cert-manager-issuer`: opinionated cert-manager configuration for UDAP certificate rotation.
 
-The chart is published to a public Helm repository and tagged per Creda release.
+The chart is published to a public Helm repository and tagged per Credara release.
 
 #### 10.6.6 Kubernetes Operator (Future)
 
-Once Creda has more than ~20 production deployments, a dedicated Kubernetes Operator should be developed to automate operational toil that the Helm chart cannot handle: snapshot scheduling that adapts to load, certificate rotation coordination across replicas, Participant Registry change propagation, automatic health-based scaling.
+Once Credara has more than ~20 production deployments, a dedicated Kubernetes Operator should be developed to automate operational toil that the Helm chart cannot handle: snapshot scheduling that adapts to load, certificate rotation coordination across replicas, Participant Registry change propagation, automatic health-based scaling.
 
 The Operator is deferred — the Helm chart is sufficient for early deployments. The trigger for building the Operator is operational evidence: when institutions repeatedly file the same operational toil tickets, those become Operator features.
 
 #### 10.6.7 Maintenance Windows and Rolling Upgrades
 
-Creda is designed to be upgraded without coordinated network downtime. Upgrades happen at two scopes — within an institution (replacing the binaries running a single institution's peers) and across the network (introducing a new protocol or IG version). Each scope has different mechanics and different risks.
+Credara is designed to be upgraded without coordinated network downtime. Upgrades happen at two scopes — within an institution (replacing the binaries running a single institution's peers) and across the network (introducing a new protocol or IG version). Each scope has different mechanics and different risks.
 
-**Within an institution.** A Creda StatefulSet uses the default `RollingUpdate` strategy with `podManagementPolicy: OrderedReady`. Replicas are rolled one at a time, oldest-to-newest, waiting for `/readyz` to return 200 before proceeding to the next. The `PodDisruptionBudget` (Section 10.6.5, `minAvailable: 1` by default) prevents the Kubernetes scheduler from evicting more replicas than the institution can tolerate during voluntary disruption — node drains, cluster upgrades, autoscaler scale-downs.
+**Within an institution.** A Credara StatefulSet uses the default `RollingUpdate` strategy with `podManagementPolicy: OrderedReady`. Replicas are rolled one at a time, oldest-to-newest, waiting for `/readyz` to return 200 before proceeding to the next. The `PodDisruptionBudget` (Section 10.6.5, `minAvailable: 1` by default) prevents the Kubernetes scheduler from evicting more replicas than the institution can tolerate during voluntary disruption — node drains, cluster upgrades, autoscaler scale-downs.
 
 For a multi-replica institution, a rolling Helm upgrade produces no externally-visible service interruption: surviving replicas continue accepting FHIR queries on the Bridge ClusterIP service and continue gossiping on the libp2p mesh. The rolled-out replica re-joins the mesh via the bootstrap flow (Section 11.1.2), catches up missed events via anti-entropy (Section 6.1.8) and, if absent for longer than the institutional snapshot interval, via snapshot bootstrap (Section 6.2.5).
 
@@ -2383,17 +2383,17 @@ The default Helm chart leaves `storageClass` empty so the cluster's default Stor
 
 **IOPS profile.** RocksDB compaction is bursty — long quiet periods punctuated by sustained 200-2000 IOPS bursts lasting tens of seconds. Storage classes with low IOPS baselines and burst tokens (AWS gp2, some on-prem thin-provisioned SANs) will produce visible query latency spikes during compaction. Provision for the burst, not the average. The default 50 GiB peer is comfortable on gp3 at 3000 IOPS (the gp3 baseline). Larger peers (200+ GiB) should provision proportionally.
 
-**Volume snapshots vs. application snapshots.** RocksDB tolerates CSI block-level snapshots most of the time because of WAL replay on restart, but tolerance is not a guarantee. The Creda peer ships an explicit application-aware snapshot mechanism (`creda snapshot`, Section 7.5, scheduled by default every 6 hours in the Helm chart). Operators should prefer the application snapshot for backups; reserve CSI volume snapshots for full-disaster restore scenarios where the peer is already offline.
+**Volume snapshots vs. application snapshots.** RocksDB tolerates CSI block-level snapshots most of the time because of WAL replay on restart, but tolerance is not a guarantee. The Credara peer ships an explicit application-aware snapshot mechanism (`creda snapshot`, Section 7.5, scheduled by default every 6 hours in the Helm chart). Operators should prefer the application snapshot for backups; reserve CSI volume snapshots for full-disaster restore scenarios where the peer is already offline.
 
 **Access mode.** RocksDB requires exclusive access to its data directory; the Helm chart sets `accessMode: ReadWriteOnce` accordingly. Do not change this to `ReadWriteMany`. A peer running with the same data directory mounted into two pods will corrupt the store.
 
-**Multi-AZ replication via storage** is not a substitute for running multiple peers. A multi-AZ EBS-replicated volume protects against AZ failure but does not protect against Creda-level data loss (e.g., a corrupt event accepted by the peer and committed to disk). Running multiple StatefulSet replicas — each with its own PV — is the architectural answer to peer-level durability.
+**Multi-AZ replication via storage** is not a substitute for running multiple peers. A multi-AZ EBS-replicated volume protects against AZ failure but does not protect against Credara-level data loss (e.g., a corrupt event accepted by the peer and committed to disk). Running multiple StatefulSet replicas — each with its own PV — is the architectural answer to peer-level durability.
 
 **Tested storage class matrix** (to be expanded as pilots report data) is maintained in the Helm chart `values.yaml` comments. As of v1.0, the matrix lists AWS gp3, OpenEBS LocalPV, and Longhorn as confirmed-working under the conformance suite's storage scenarios.
 
 ### 10.7 Participant Registry Service (Network-Level)
 
-The Participant Registry is a Creda subgraph (per Section 6.1.3 — the meta-DAG of who is in the network), but the *operational service* maintaining it is a real deployed component, separate from any participating institution's peer. This service is operated by the network's **legal coordinator** — typically an HIE, a nonprofit, or a multi-institution consortium.
+The Participant Registry is a Credara subgraph (per Section 6.1.3 — the meta-DAG of who is in the network), but the *operational service* maintaining it is a real deployed component, separate from any participating institution's peer. This service is operated by the network's **legal coordinator** — typically an HIE, a nonprofit, or a multi-institution consortium.
 
 #### 10.7.1 Role and Responsibilities
 
@@ -2401,7 +2401,7 @@ The legal coordinator's service handles:
 
 - **Membership applications.** Institutions wishing to join the network apply through this service. The application captures organizational identity, UDAP certificate fingerprint, BAA execution status, and points of contact.
 - **NPA execution workflow.** Coordinates the legal exchange of the Network Participation Agreement, providing a workflow that institutions can complete (e.g., DocuSign integration, manual review by counsel, etc.).
-- **Registry update publication.** Once an institution is admitted, the coordinator's service publishes a signed registry-addition event into the Participant Registry subgraph. The event is propagated via normal Creda gossip; existing peers learn of the new participant within seconds.
+- **Registry update publication.** Once an institution is admitted, the coordinator's service publishes a signed registry-addition event into the Participant Registry subgraph. The event is propagated via normal Credara gossip; existing peers learn of the new participant within seconds.
 - **Revocation.** When an institution leaves the network, has its UDAP certificate revoked, or is removed for cause (e.g., persistent misbehavior, BAA breach), the coordinator publishes a signed revocation event. Peers process the revocation and reject future connections from the revoked institution.
 - **Coordinator key management.** The coordinator's signing key is the trust anchor for the entire network. Compromise of this key would allow an attacker to add unauthorized institutions or revoke legitimate ones. The key must be operated with hardware-backed key storage (HSM or cloud KMS) and audit logging.
 
@@ -2422,7 +2422,7 @@ The Participant Registry service is small — likely a single Spring Boot or Rus
 
 - **Web frontend** for institutions to apply for membership and check application status.
 - **Admin interface** for the coordinator's staff to review applications, execute NPAs, and manage revocations.
-- **Backend** that publishes signed registry events into the Creda network. The backend itself runs a Creda peer (a special-purpose peer authorized to publish to the Participant Registry subgraph).
+- **Backend** that publishes signed registry events into the Credara network. The backend itself runs a Credara peer (a special-purpose peer authorized to publish to the Participant Registry subgraph).
 - **HSM or KMS integration** for the coordinator's signing key.
 - **Audit log** of all administrative actions, retained per the coordinator's policies and made available to participating institutions on request.
 
@@ -2430,7 +2430,7 @@ The service is not high-traffic — registry updates are infrequent (a few per w
 
 #### 10.7.4 Coordinator Governance and Succession
 
-The coordinator role is not technically privileged within Creda — it is a designated role with a registered signing key. The network's governance body (the consortium of participating institutions, or a designated nonprofit board) can update the coordinator role through a coordinated key transition:
+The coordinator role is not technically privileged within Credara — it is a designated role with a registered signing key. The network's governance body (the consortium of participating institutions, or a designated nonprofit board) can update the coordinator role through a coordinated key transition:
 
 1. The current coordinator publishes a coordinator-transition event signed by their key, naming the new coordinator's public key.
 2. After a transition window, the new coordinator's key becomes the authoritative signer for registry updates.
@@ -2440,11 +2440,11 @@ This makes the coordinator role recoverable — if the current coordinator becom
 
 ### 10.8 Protocol Versioning and Capability Negotiation
 
-Creda is designed to outlive its founding cryptographic primitives, FHIR Implementation Guide versions, and protocol decisions. That commitment requires explicit mechanisms for peers running different versions to coexist, advertise what they support, and gracefully degrade when they encounter messages they don't understand. This section specifies the versioning surface and the negotiation handshake. **Note:** the design space is partially open per Section 13.6.2; this section captures the design direction so implementation can begin, with the closure deliverable refining the details.
+Credara is designed to outlive its founding cryptographic primitives, FHIR Implementation Guide versions, and protocol decisions. That commitment requires explicit mechanisms for peers running different versions to coexist, advertise what they support, and gracefully degrade when they encounter messages they don't understand. This section specifies the versioning surface and the negotiation handshake. **Note:** the design space is partially open per Section 13.6.2; this section captures the design direction so implementation can begin, with the closure deliverable refining the details.
 
 #### 10.8.1 Versioning Surfaces
 
-Creda has three independent versioning surfaces, each with its own evolution rate:
+Credara has three independent versioning surfaces, each with its own evolution rate:
 
 - **Protocol version**: the wire format and behavioral contract of peer-to-peer messages (gossip batches, request-response payloads, DHT records). Bumped on breaking changes to the wire format. Expected to evolve slowly — months to years between bumps.
 - **Event schema version**: the canonical-CBOR schema of `IdentityEventNode` and the `EventPayload` enum. Bumped when adding new event types (additive, minor bump) or changing existing payload structure (breaking, major bump). The event-type enum is extensible by design (Section 3.4); new types are minor bumps.
@@ -2456,7 +2456,7 @@ Each surface uses semantic versioning. Bumps to one surface are independent of b
 
 A peer advertises its capability profile in three places:
 
-1. **libp2p identify protocol** — on every new connection, peers exchange identify payloads. Creda extends the standard identify with a CBOR-encoded `CredaCapabilityProfile`:
+1. **libp2p identify protocol** — on every new connection, peers exchange identify payloads. Credara extends the standard identify with a CBOR-encoded `CredaCapabilityProfile`:
 
 ```
 struct CredaCapabilityProfile {
@@ -2508,7 +2508,7 @@ This section partially closes the design surface of **open question 13.6.2**. Th
 
 ## 11. Operations
 
-This section covers the runbook-level details for operating Creda peers in production. Earlier sections (5, 6, 9) established the architecture; this section is for the operators who deploy, monitor, and recover the system. It assumes basic familiarity with k8s operations and focuses on what is Creda-specific.
+This section covers the runbook-level details for operating Credara peers in production. Earlier sections (5, 6, 9) established the architecture; this section is for the operators who deploy, monitor, and recover the system. It assumes basic familiarity with k8s operations and focuses on what is Credara-specific.
 
 Capacity planning guidance — sizing recommendations based on patient volume, query rates, and attestation patterns — is deferred to a separate operations guide that will be published after sufficient real-world deployment data exists to make non-speculative recommendations.
 
@@ -2521,7 +2521,7 @@ The very first peer in the network is a special case — there are no existing p
 1. Generate the coordinator's signing key in an HSM or cloud KMS. This key is the network's trust anchor and must never leave hardware-backed storage.
 2. Create the **genesis Participant Registry event** — a signed event that establishes the initial registry state, including the coordinator's own public key and any founding institutions. Sign it with the coordinator's key.
 3. Publish the genesis event and the coordinator's public key out-of-band to founding institutions. This is the only out-of-band trust anchor in the network; everything else flows from it.
-4. Deploy the coordinator's own Creda peer with the genesis state pre-loaded.
+4. Deploy the coordinator's own Credara peer with the genesis state pre-loaded.
 5. Founding institutions deploy their peers, configured with the coordinator's public key as the trust anchor and the coordinator's peer as their initial bootstrap peer. They sync the genesis Participant Registry event and verify it against the published trust anchor.
 
 This is documented as a one-time procedure in the operator runbook (Section 11.5). It happens once in the lifetime of the network — successor coordinators inherit the network through key transitions (Section 10.5.4), not through new genesis events.
@@ -2593,7 +2593,7 @@ The `Degraded` state is for cases where the peer is operational but with caveats
 
 #### 11.2.1 Golden Signals
 
-Following Google SRE's golden signals, adapted for Creda:
+Following Google SRE's golden signals, adapted for Credara:
 
 **Latency:**
 
@@ -2663,7 +2663,7 @@ The Helm chart bundles a set of default Grafana dashboards:
 - **Security**: signature failures over time, consent denial rate, break-the-glass events, reputation downgrade events, unusual access patterns.
 - **Storage**: persistent volume utilization, snapshot generation history, retention pruning activity, libgit2 (or RocksDB) operational metrics.
 
-Each dashboard includes documentation on what to look for and which alerts correspond to which panels. Dashboards are designed for operators who are not Creda specialists — labels and tooltips explain the metrics in operational terms.
+Each dashboard includes documentation on what to look for and which alerts correspond to which panels. Dashboards are designed for operators who are not Credara specialists — labels and tooltips explain the metrics in operational terms.
 
 #### 11.2.5 Distributed Tracing
 
@@ -2679,7 +2679,7 @@ AuditEvent resources generated by the Bridge route to the institution's SIEM via
 - **Syslog export** in CEF or LEEF format for SIEM ingestion.
 - **NDJSON file output** to a mounted volume that the institution's log shipper can read.
 
-Creda does not host the institution's audit log. It produces audit records in standard formats and routes them to existing infrastructure. This avoids creating a new compliance surface that the institution has to integrate into their existing audit workflows.
+Credara does not host the institution's audit log. It produces audit records in standard formats and routes them to existing infrastructure. This avoids creating a new compliance surface that the institution has to integrate into their existing audit workflows.
 
 ### 11.3 Failure Modes and Recovery
 
@@ -2788,7 +2788,7 @@ Drill outcomes feed into operational confidence and reveal gaps before real inci
 
 ### 11.4 Integration Testing in Production
 
-Verifying that a new peer is functioning correctly without affecting real patients requires a separate testing surface. Creda supports this via **test patient subgraphs** containing synthetic data that propagate normally through the network.
+Verifying that a new peer is functioning correctly without affecting real patients requires a separate testing surface. Credara supports this via **test patient subgraphs** containing synthetic data that propagate normally through the network.
 
 #### 11.4.1 Test Patient Subgraphs
 
@@ -2818,7 +2818,7 @@ Test events are **fully visible** in:
 
 #### 11.4.2 Synthetic Data Generation
 
-The reference test data generator is published alongside Creda Core. It generates synthetic patient subgraphs with:
+The reference test data generator is published alongside Credara Core. It generates synthetic patient subgraphs with:
 
 - **Realistic demographics** drawn from public-domain name lists, randomly-generated DOBs in plausible distributions, fictional addresses.
 - **Realistic event chains** simulating typical patient journeys: registration at one institution, referral to another, insurance card update, periodic attestations.
@@ -2864,7 +2864,7 @@ The coordinator role is critical to network trust; the runbook should be develop
 
 ### 11.6 Cryptographic Algorithm Migration
 
-Creda is designed to outlive its founding cryptographic primitives (Section 2.2, Section 5.1.2). This section specifies the operational workflow for rotating to a new signature algorithm or content-hash algorithm without disrupting the network and without invalidating historical events. The mechanism is mechanically supported by the algorithm-agile signature and hash types — this section is the operational runbook layered on top.
+Credara is designed to outlive its founding cryptographic primitives (Section 2.2, Section 5.1.2). This section specifies the operational workflow for rotating to a new signature algorithm or content-hash algorithm without disrupting the network and without invalidating historical events. The mechanism is mechanically supported by the algorithm-agile signature and hash types — this section is the operational runbook layered on top.
 
 #### 11.6.1 Why Algorithm Migration Is Not a Schema Migration
 
@@ -2874,7 +2874,7 @@ A key architectural property earned in Section 5.1: events are addressed by `UUI
 - **Signature algorithm rotation does not require re-signing existing events.** Old signatures remain valid under the algorithm that produced them. New events are signed under the new algorithm. Verifiers walk both.
 - **There is no schema migration step.** No event is rewritten in place. Algorithm rotation is purely additive: new events use the new algorithm, optionally accompanied by `Attest` events that add a new-algorithm signature layer over historical events.
 
-This is why Creda can commit to PQC readiness "from day one, not a future migration" (Section 5.1.2 line 383) — the migration is workflow, not schema surgery.
+This is why Credara can commit to PQC readiness "from day one, not a future migration" (Section 5.1.2 line 383) — the migration is workflow, not schema surgery.
 
 #### 11.6.2 Hash Algorithm Rotation
 
@@ -2915,7 +2915,7 @@ Operational guidance:
 - **Coordinator coordination optional.** Unlike tombstone waves, bulk Attest does not affect other institutions' operational state (Attest events are additive, not destructive), so coordinator awareness is optional rather than required.
 - **Per-event throttle.** Each generated `Attest` carries `target_event_ids: Vec<UUIDv7>` (Section 5.1.3) and can attest up to several thousand events per Attest. Batching reduces gossip overhead but increases the blast radius if a single Attest is malformed.
 
-The reference Attest-resign tool is published alongside Creda Core as `creda attest --algorithm ml-dsa-65 --scope <selector>`. It is idempotent: re-running the tool over the same scope does not produce duplicate Attests if the events have already been attested under the target algorithm.
+The reference Attest-resign tool is published alongside Credara Core as `creda attest --algorithm ml-dsa-65 --scope <selector>`. It is idempotent: re-running the tool over the same scope does not produce duplicate Attests if the events have already been attested under the target algorithm.
 
 #### 11.6.5 Metrics and Monitoring
 
@@ -2935,7 +2935,7 @@ This section closes the *operational* portion of Section 5.1.2's PQC commitment.
 
 ## 12. Migration and Adoption Path
 
-The previous sections answer how Creda works. This section answers how it becomes real — how a network of vetted, peer-to-peer institutional participants grows from zero to nationally significant scale, what existing alternatives the architecture must demonstrate value against, and what the realistic timeline looks like.
+The previous sections answer how Credara works. This section answers how it becomes real — how a network of vetted, peer-to-peer institutional participants grows from zero to nationally significant scale, what existing alternatives the architecture must demonstrate value against, and what the realistic timeline looks like.
 
 The audience for this section is broader than the engineering team. HIE leadership, standards body participants, executive sponsors, and institutions evaluating adoption all have legitimate questions about strategy, sequencing, and risk. The technical specification is the foundation; this section translates the foundation into a path forward.
 
@@ -2943,22 +2943,22 @@ The audience for this section is broader than the engineering team. HIE leadersh
 
 #### 12.1.1 Bottom-Up, Not Top-Down
 
-Creda spreads through voluntary institutional adoption, not regulatory mandate. Each institution that joins improves the network for everyone, but no institution is forced to participate. This is structurally similar to how DirectTrust adoption progressed in the early 2010s: a vetted trust framework that institutions joined when the value proposition was clear, growing organically until participation became the de facto standard for clinical messaging.
+Credara spreads through voluntary institutional adoption, not regulatory mandate. Each institution that joins improves the network for everyone, but no institution is forced to participate. This is structurally similar to how DirectTrust adoption progressed in the early 2010s: a vetted trust framework that institutions joined when the value proposition was clear, growing organically until participation became the de facto standard for clinical messaging.
 
 The alternative — top-down adoption driven by federal mandate — has been tried repeatedly for patient identity (most prominently the perpetually-debated National Patient Identifier) and has consistently failed for political and constituent-pressure reasons. A bottom-up approach sidesteps this by not requiring federal intervention to begin functioning.
 
 #### 12.1.2 Additive, Not Replacing
 
-Institutions do not rip out their existing MPI to adopt Creda. They add Creda alongside their MPI as a second source of identity provenance for cross-institutional cases. The MPI remains authoritative for the institution's own patient population; Creda becomes authoritative for cross-institutional identity resolution. Over time, as Creda accumulates richer provenance and broader coverage, it may subsume more of the MPI's function — but this is a multi-year evolution, not a forklift upgrade.
+Institutions do not rip out their existing MPI to adopt Credara. They add Credara alongside their MPI as a second source of identity provenance for cross-institutional cases. The MPI remains authoritative for the institution's own patient population; Credara becomes authoritative for cross-institutional identity resolution. Over time, as Credara accumulates richer provenance and broader coverage, it may subsume more of the MPI's function — but this is a multi-year evolution, not a forklift upgrade.
 
-This staging matters operationally. A health system CIO is not going to schedule a downtime window to replace their MPI with Creda. They will, however, deploy a Creda peer alongside the MPI if the integration is straightforward, the marginal value is clear, and the operational risk is bounded. The architecture is designed to support this co-existence indefinitely.
+This staging matters operationally. A health system CIO is not going to schedule a downtime window to replace their MPI with Credara. They will, however, deploy a Credara peer alongside the MPI if the integration is straightforward, the marginal value is clear, and the operational risk is bounded. The architecture is designed to support this co-existence indefinitely.
 
 #### 12.1.3 Three Adoption Tiers
 
 Institutions can engage at different levels:
 
-- **Observer**: consumes Creda data through a QHIN that participates in the network. No direct integration. Benefits from improved match rates and provenance access via existing QHIN-mediated workflows. Most institutions will start here.
-- **Light participant**: institution runs a Creda peer, reads from the network, and makes limited writes — typically Attest events on existing identity matches. Useful when an institution wants direct provenance access without taking on the operational complexity of being a primary identity writer.
+- **Observer**: consumes Credara data through a QHIN that participates in the network. No direct integration. Benefits from improved match rates and provenance access via existing QHIN-mediated workflows. Most institutions will start here.
+- **Light participant**: institution runs a Credara peer, reads from the network, and makes limited writes — typically Attest events on existing identity matches. Useful when an institution wants direct provenance access without taking on the operational complexity of being a primary identity writer.
 - **Full participant**: institution is a primary writer for its own patients, creating Assert events at registration, Link events when matches are confirmed, and the full range of identity events through clinical workflows. This tier provides the most value to the network and the most direct value to the institution.
 
 Different tiers allow institutions to start small and grow into deeper participation. An institution can begin as an Observer through their QHIN, become a Light participant within a year as integration capacity allows, and graduate to Full participant over multi-year integration projects. The network's value scales as participants graduate to higher tiers.
@@ -2967,7 +2967,7 @@ Different tiers allow institutions to start small and grow into deeper participa
 
 Each institution that joins increases the value for all participants — more patients with provenance chains, more attestations, more matching candidates. A network of three institutions provides limited value compared to one of three hundred. Adoption strategy must address this chicken-and-egg problem directly: how does the network reach critical mass when early participants face the worst value proposition?
 
-The answer in this design is **leverage QHINs as multipliers**. A QHIN that becomes a Creda peer instantly contributes its full participant network as Observer-tier members. A single QHIN integration can move the network from "interesting pilot" to "covers half the country" in one onboarding cycle. This is why the Phase 2 strategy concentrates on QHIN recruitment rather than direct institution-by-institution adoption.
+The answer in this design is **leverage QHINs as multipliers**. A QHIN that becomes a Credara peer instantly contributes its full participant network as Observer-tier members. A single QHIN integration can move the network from "interesting pilot" to "covers half the country" in one onboarding cycle. This is why the Phase 2 strategy concentrates on QHIN recruitment rather than direct institution-by-institution adoption.
 
 ### 12.2 Phase 1: Foundation
 
@@ -2981,22 +2981,22 @@ The network launches with 3-5 founding institutions:
 - **Two large health systems as primary writers** — providing realistic data volume, integration challenges, and the institutional credibility needed to recruit later participants.
 - **A payer as an early attestation source** — adding non-provider perspective and demonstrating the multi-stakeholder value proposition.
 
-Founding institutions invest more (debugging time, feedback cycles, governance contribution, willingness to operate against rough edges) and gain reputation as Creda pioneers. Their commitment is encoded in their NPA terms — they accept higher operational risk in exchange for governance influence and early adopter recognition.
+Founding institutions invest more (debugging time, feedback cycles, governance contribution, willingness to operate against rough edges) and gain reputation as Credara pioneers. Their commitment is encoded in their NPA terms — they accept higher operational risk in exchange for governance influence and early adopter recognition.
 
 #### 12.2.2 Open-Source Reference Implementations
 
-The Creda FHIR IG, Creda Core source code, and HAPI Bridge source code are published under an OSI-approved license (Apache 2.0 recommended) from day one. Open source is not optional for this project — it is a precondition for:
+The Credara FHIR IG, Credara Core source code, and HAPI Bridge source code are published under an OSI-approved license (Apache 2.0 recommended) from day one. Open source is not optional for this project — it is a precondition for:
 
 - **Security review confidence**. Institutions cannot adopt closed-source identity infrastructure for critical workflows. Public review by security researchers is a prerequisite for institutional trust.
 - **Standards body acceptance**. HL7, ONC, and Sequoia are unlikely to recognize a vendor-controlled IG. Open governance models are a baseline requirement.
 - **External contribution**. The network benefits from contributions beyond the founding team — bug reports, integration tooling, language bindings, deployment patterns. Closed source forecloses this.
-- **Avoiding vendor lock-in concerns**. Institutions adopting Creda need confidence that they can operate the system independently of the original developers if necessary.
+- **Avoiding vendor lock-in concerns**. Institutions adopting Credara need confidence that they can operate the system independently of the original developers if necessary.
 
 The license choice is Apache 2.0 (permissive, patent grant, broadly compatible) over GPL variants (which create distribution complications with HAPI FHIR, which is Apache 2.0).
 
 #### 12.2.3 HL7 FHIR Engagement
 
-The Creda IG is published through HL7's standard process. The path:
+The Credara IG is published through HL7's standard process. The path:
 
 1. **Initial draft** published as a public IG on `http://credara.network/fhir/ig/v1` with full source.
 2. **HL7 FHIR Foundation IG submission** — the first level of HL7 recognition, providing standards namespace and balloting infrastructure.
@@ -3004,44 +3004,44 @@ The Creda IG is published through HL7's standard process. The path:
 4. **STU (Standard for Trial Use)** — HL7's recognition tier for IGs in production use but not yet final.
 5. **Normative** — final standards status, achieved after multiple years of trial use and balloting.
 
-Engagement should begin during the IG's draft phase, not after publication. Active participation in the HL7 Patient Administration work group, the Security work group, and the FHIR Infrastructure work group ensures Creda is informed by ongoing FHIR evolution and that FHIR contributors see Creda as a collaborator rather than a competitor.
+Engagement should begin during the IG's draft phase, not after publication. Active participation in the HL7 Patient Administration work group, the Security work group, and the FHIR Infrastructure work group ensures Credara is informed by ongoing FHIR evolution and that FHIR contributors see Credara as a collaborator rather than a competitor.
 
 #### 12.2.4 Sequoia and TEFCA Alignment
 
-Creda's tokenization aligns with or extends TEFCA Individual Access Services tokens (Section 9.2.5). The Sequoia Project — which administers TEFCA's Common Agreement — is the appropriate engagement venue for tokenization compatibility, QHIN integration patterns, and eventual TEFCA recognition.
+Credara's tokenization aligns with or extends TEFCA Individual Access Services tokens (Section 9.2.5). The Sequoia Project — which administers TEFCA's Common Agreement — is the appropriate engagement venue for tokenization compatibility, QHIN integration patterns, and eventual TEFCA recognition.
 
 Engagement during Phase 1 should focus on:
 
-- Ensuring Creda's tokenization extensions are compatible with TEFCA's reference implementation.
-- Identifying any TEFCA Common Agreement provisions that interact with Creda's consent model.
+- Ensuring Credara's tokenization extensions are compatible with TEFCA's reference implementation.
+- Identifying any TEFCA Common Agreement provisions that interact with Credara's consent model.
 - Building relationships with Sequoia's technical workgroup leadership for Phase 2 QHIN recruitment.
 
 ### 12.3 Phase 2: First QHIN Integration
 
-The single highest-leverage adoption moment is when a QHIN becomes a Creda peer.
+The single highest-leverage adoption moment is when a QHIN becomes a Credara peer.
 
 #### 12.3.1 Why QHINs Are the Multiplier
 
-Every covered entity in a QHIN's network instantly benefits from Creda's improved matching and provenance, without those institutions having to do anything beyond their existing QHIN integration. A single QHIN onboarding can scale the network's effective coverage by orders of magnitude.
+Every covered entity in a QHIN's network instantly benefits from Credara's improved matching and provenance, without those institutions having to do anything beyond their existing QHIN integration. A single QHIN onboarding can scale the network's effective coverage by orders of magnitude.
 
-The QHIN does not need to deploy Creda peers at every participant — only the QHIN itself runs a Creda peer, integrated with its existing identity resolution infrastructure. Participants continue using standard QHIN APIs; the QHIN's matching backend now consults Creda's provenance graph alongside its existing logic.
+The QHIN does not need to deploy Credara peers at every participant — only the QHIN itself runs a Credara peer, integrated with its existing identity resolution infrastructure. Participants continue using standard QHIN APIs; the QHIN's matching backend now consults Credara's provenance graph alongside its existing logic.
 
 #### 12.3.2 QHIN Recruitment Strategy
 
 Identify QHINs facing matching pain:
 
 - Smaller or regional QHINs are often more agile than the large ones and feel match rate problems more acutely (less data to work with, less existing infrastructure to defend).
-- Specialty-focused QHINs (e.g., behavioral health networks under TEFCA) face particularly hard matching cases that Creda's provenance approach addresses well.
-- Newer QHINs without legacy MPI investments may find Creda integration easier than mature QHINs with deeply-embedded existing systems.
+- Specialty-focused QHINs (e.g., behavioral health networks under TEFCA) face particularly hard matching cases that Credara's provenance approach addresses well.
+- Newer QHINs without legacy MPI investments may find Credara integration easier than mature QHINs with deeply-embedded existing systems.
 
 Pilot proposal structure:
 
 1. **Baseline measurement**: measure the QHIN's current match rate against a representative test cohort (synthetic patients or anonymized real cases).
-2. **Pilot deployment**: integrate Creda alongside the QHIN's existing MPI for a defined cohort or duration.
-3. **Comparative measurement**: measure match rate against the same cohort with Creda available.
-4. **Decision point**: if Creda demonstrably improves match rate (target: 5+ percentage points improvement on cross-institutional matches), the QHIN converts the pilot to production. If not, the pilot ends without commitment.
+2. **Pilot deployment**: integrate Credara alongside the QHIN's existing MPI for a defined cohort or duration.
+3. **Comparative measurement**: measure match rate against the same cohort with Credara available.
+4. **Decision point**: if Credara demonstrably improves match rate (target: 5+ percentage points improvement on cross-institutional matches), the QHIN converts the pilot to production. If not, the pilot ends without commitment.
 
-This structure is honest about the value proposition. Creda either delivers measurable improvement or it doesn't. Pilots that fail are useful — they reveal what needs to improve before broader adoption.
+This structure is honest about the value proposition. Credara either delivers measurable improvement or it doesn't. Pilots that fail are useful — they reveal what needs to improve before broader adoption.
 
 #### 12.3.3 Regional HIE Pilot (Parallel Track)
 
@@ -3053,7 +3053,7 @@ A regional HIE has:
 - More cohesive governance (often a single state or multi-state board).
 - Existing operational discipline for cross-institutional workflows.
 
-The HIE can serve as the legal coordinator for its regional Creda deployment. Regional pilots can later federate into the national network through coordinator transition (Section 10.5.4), or remain regionally scoped indefinitely if the participants prefer.
+The HIE can serve as the legal coordinator for its regional Credara deployment. Regional pilots can later federate into the national network through coordinator transition (Section 10.5.4), or remain regionally scoped indefinitely if the participants prefer.
 
 #### 12.3.4 Pilot Success Metrics
 
@@ -3079,12 +3079,12 @@ The ideal cadence: 2-3 additional QHIN onboardings in Year 2 of the network's ex
 
 #### 12.4.2 EHR Vendor Integration
 
-Major EHR vendors integrating Creda support into their patient registration and identity management workflows is a multi-year arc but high-leverage. Once Epic, Oracle Health (Cerner), Athenahealth, or other major vendors offer Creda integration as a built-in capability, individual institutions get Creda by upgrading their EHR — they do not deploy additional infrastructure.
+Major EHR vendors integrating Credara support into their patient registration and identity management workflows is a multi-year arc but high-leverage. Once Epic, Oracle Health (Cerner), Athenahealth, or other major vendors offer Credara integration as a built-in capability, individual institutions get Credara by upgrading their EHR — they do not deploy additional infrastructure.
 
 Vendor integration motion:
 
 - **Reference integration with one vendor first** — likely a smaller or more agile vendor where decision cycles are shorter.
-- **Demonstrable customer demand** — institutions referencing Creda in their RFPs and contract renewals.
+- **Demonstrable customer demand** — institutions referencing Credara in their RFPs and contract renewals.
 - **Standards body recognition** — HL7 IG status, TEFCA endorsement — provides political cover for vendor integration decisions.
 - **Open-source SDK and reference adapters** — making vendor integration low-cost in engineering effort.
 
@@ -3099,7 +3099,7 @@ Some specialties have particularly acute identity problems:
 - **Pediatrics**: linking to maternal records, custody/guardianship complications, pediatric-to-adult provider transitions that span identity changes.
 - **Rare disease care**: small patient populations, multi-institutional consultations are routine, identity errors have outsized clinical impact.
 
-Specialty networks may adopt Creda earlier than general medical networks because the pain is more acute and the cost of identity errors is higher. Specialty-focused pilots in Phase 3 can produce strong value demonstrations and serve as advocates for broader adoption.
+Specialty networks may adopt Credara earlier than general medical networks because the pain is more acute and the cost of identity errors is higher. Specialty-focused pilots in Phase 3 can produce strong value demonstrations and serve as advocates for broader adoption.
 
 ### 12.5 Phase 4: Patient-Side Adoption
 
@@ -3107,13 +3107,13 @@ Patient signing keys (Section 9.1.6) become useful only when patients can actual
 
 #### 12.5.1 Patient Keys via Existing Patient-Facing Infrastructure
 
-Patients do not install a "Creda app." They get a Creda key as part of their normal patient portal sign-up. Strategy:
+Patients do not install a "Credara app." They get a Credara key as part of their normal patient portal sign-up. Strategy:
 
-- **Integrate patient key generation into patient portals** (MyChart, FollowMyHealth, athenaPatient, etc.) so that patients receive a Creda-compatible key when they create their portal account.
+- **Integrate patient key generation into patient portals** (MyChart, FollowMyHealth, athenaPatient, etc.) so that patients receive a Credara-compatible key when they create their portal account.
 - **Use TEFCA IAS infrastructure** as the standardization point. Patient keys issued through IAS workflows benefit from TEFCA's existing patient identity verification standards.
-- **Anchor on WebAuthn / passkeys**, which are increasingly device-native (Apple, Google, Microsoft all support passkeys as of 2024-2025). A passkey on the patient's phone can serve as their Creda key, with no separate hardware or app required.
+- **Anchor on WebAuthn / passkeys**, which are increasingly device-native (Apple, Google, Microsoft all support passkeys as of 2024-2025). A passkey on the patient's phone can serve as their Credara key, with no separate hardware or app required.
 
-Patient key adoption follows portal adoption. Patient portal coverage is already 60%+ of insured patients in the US; Creda key coverage trails this and grows as portals integrate the feature.
+Patient key adoption follows portal adoption. Patient portal coverage is already 60%+ of insured patients in the US; Credara key coverage trails this and grows as portals integrate the feature.
 
 #### 12.5.2 `$creda-self-verify` Rollout
 
@@ -3137,24 +3137,24 @@ The architecture supports this migration without breaking changes:
 - Pure PQC signatures (`MlDsa65`) become the default once libraries and HSMs broadly support FIPS 204.
 - The deprecation cutoff is published as a future-dated network-level policy update; institutions have years to migrate.
 
-This is the longest-arc item in Creda's roadmap — likely 10+ years from network launch to full classical-signature retirement.
+This is the longest-arc item in Credara's roadmap — likely 10+ years from network launch to full classical-signature retirement.
 
 #### 12.6.2 Becoming the Default
 
-The success criterion for Creda is not "adoption rate" but "assumed substrate." At network maturity, Creda is the assumed substrate for cross-institutional patient identity, with traditional MPIs serving local-only roles. Institutions plan new health IT projects on the assumption that Creda exists, the way they currently assume FHIR exists.
+The success criterion for Credara is not "adoption rate" but "assumed substrate." At network maturity, Credara is the assumed substrate for cross-institutional patient identity, with traditional MPIs serving local-only roles. Institutions plan new health IT projects on the assumption that Credara exists, the way they currently assume FHIR exists.
 
 This may take a decade. The migration is not done until:
 
-- TEFCA Common Agreement references Creda directly (not just compatible tokenization).
-- Major EHR vendors ship Creda as a default integrated capability.
-- Patient-facing apps ship Creda key support as an expected feature.
-- Regulatory standards (ONC certification, CMS reporting) reference Creda's provenance model.
+- TEFCA Common Agreement references Credara directly (not just compatible tokenization).
+- Major EHR vendors ship Credara as a default integrated capability.
+- Patient-facing apps ship Credara key support as an expected feature.
+- Regulatory standards (ONC certification, CMS reporting) reference Credara's provenance model.
 
 These are years away. The architecture is designed to remain stable across the transition, so that institutions adopting in Year 2 are not stranded when the network reaches Year 10.
 
 ### 12.7 Critique of Existing Alternatives
 
-Stakeholders evaluating Creda will compare it against existing alternatives. Honest engagement with those alternatives — what they offer, where they fall short for the cross-institutional decentralized identity problem — is essential to making the case for Creda. This section addresses the most commonly proposed alternatives directly.
+Stakeholders evaluating Credara will compare it against existing alternatives. Honest engagement with those alternatives — what they offer, where they fall short for the cross-institutional decentralized identity problem — is essential to making the case for Credara. This section addresses the most commonly proposed alternatives directly.
 
 #### 12.7.1 National Patient Identifier
 
@@ -3168,7 +3168,7 @@ The National Patient Identifier (NPI for patients, not to be confused with the p
 - **Doesn't solve the actual problem.** Even if every patient had a federal identifier, they would not always present it correctly. Misspellings, transposed digits, fraudulent presentation, and unavailable identifiers (unconscious patients, pediatric cases, undocumented patients) would still require demographic-based matching.
 - **Creates a single point of failure.** A federal patient identifier registry would be the highest-value target for state-level adversaries and insider threats.
 
-Creda's approach: identity provenance does not require a single identifier. It requires a way to recognize that two assertions refer to the same person, with cryptographic accountability. The network functions without any federal registry.
+Credara's approach: identity provenance does not require a single identifier. It requires a way to recognize that two assertions refer to the same person, with cryptographic accountability. The network functions without any federal registry.
 
 #### 12.7.2 Centralized Federal MPI
 
@@ -3183,26 +3183,26 @@ A variant of the NPI proposal: a central federal MPI that institutions query, wh
 - **Concentrates patient data.** A central MPI must hold demographic data for matching; this data becomes a high-value target.
 - **Slow to evolve.** Centrally-administered systems improve at the speed of the central administrator's roadmap, not at the speed of participant innovation.
 
-Creda's approach: vetted decentralization. Admission control via the legal coordinator (Section 10.5) provides the trust framework benefits of a centralized model; peer-to-peer operations provide the resilience and innovation benefits of a decentralized one.
+Credara's approach: vetted decentralization. Admission control via the legal coordinator (Section 10.5) provides the trust framework benefits of a centralized model; peer-to-peer operations provide the resilience and innovation benefits of a decentralized one.
 
 #### 12.7.3 Blockchain-Based Patient Identity
 
-Various proposals have been made to put patient identity on a public blockchain (Ethereum, Bitcoin) or on a permissioned blockchain platform (Hyperledger Fabric, R3 Corda). Some of these proposals share genuine architectural insights with Creda — Merkle DAGs, signed assertions, distributed trust.
+Various proposals have been made to put patient identity on a public blockchain (Ethereum, Bitcoin) or on a permissioned blockchain platform (Hyperledger Fabric, R3 Corda). Some of these proposals share genuine architectural insights with Credara — Merkle DAGs, signed assertions, distributed trust.
 
 **What blockchain approaches offer**:
 
-- Tamper-evidence (which Creda also provides).
-- Decentralization (which Creda also provides).
-- Cryptographic accountability (which Creda also provides).
+- Tamper-evidence (which Credara also provides).
+- Decentralization (which Credara also provides).
+- Cryptographic accountability (which Credara also provides).
 
 **Where they fall short for healthcare identity specifically**:
 
 - **Public blockchains are wrong for PHI.** Even tokenized PHI on a public blockchain is inappropriate — the immutability that blockchains tout becomes a liability when right-to-be-forgotten requirements apply. Tombstoning conflicts with public blockchain's foundational immutability.
-- **Permissioned blockchains add overhead without proportional value.** Hyperledger Fabric et al. provide Byzantine fault tolerance via consensus protocols (PBFT, Raft) — but Creda doesn't need consensus, only eventual consistency. The consensus overhead of permissioned blockchains is wasted work for Creda's use case.
+- **Permissioned blockchains add overhead without proportional value.** Hyperledger Fabric et al. provide Byzantine fault tolerance via consensus protocols (PBFT, Raft) — but Credara doesn't need consensus, only eventual consistency. The consensus overhead of permissioned blockchains is wasted work for Credara's use case.
 - **Cryptocurrency-adjacent design baggage.** Many blockchain frameworks bring cryptocurrency-related concepts (gas, tokens, mining/validator economics) that have no place in healthcare and complicate operational deployment.
 - **Limited FHIR/Health IT integration.** Blockchain approaches typically require greenfield infrastructure and have not integrated with the existing FHIR/UDAP/SMART/TEFCA ecosystem that institutions actually operate.
 
-Creda's approach: take the genuine insights from blockchain (Merkle DAGs, signed assertions, append-forward semantics, content addressing where appropriate) and apply them to the specific shape of healthcare identity, while explicitly avoiding consensus overhead, immutability conflicts with right-to-be-forgotten, and cryptocurrency baggage. The result is "blockchain-inspired" but not blockchain.
+Credara's approach: take the genuine insights from blockchain (Merkle DAGs, signed assertions, append-forward semantics, content addressing where appropriate) and apply them to the specific shape of healthcare identity, while explicitly avoiding consensus overhead, immutability conflicts with right-to-be-forgotten, and cryptocurrency baggage. The result is "blockchain-inspired" but not blockchain.
 
 #### 12.7.4 Improved Existing MPIs
 
@@ -3221,7 +3221,7 @@ Vendors like Verato, NextGate, and Health Catalyst offer increasingly sophistica
 - **No provenance.** Even the best MPIs return match scores without provenance. There is no way to inspect why a match was made or to dispute it through evidence-based contestation.
 - **Vendor concentration risk.** A small number of MPI vendors hold a disproportionate share of identity matching for US healthcare. Compromise of any one vendor is a national-scale incident.
 
-Creda's approach: Creda is not a competitor to improved MPIs at the institutional level. Institutions can continue running Verato or NextGate for their internal MPI needs. Creda complements them at the cross-institutional layer — providing the provenance, decentralization, and disagreement-tolerance that improved MPIs lack. In the long arc, MPIs may become local-only systems with Creda providing the cross-institutional substrate; in the medium term, they coexist.
+Credara's approach: Credara is not a competitor to improved MPIs at the institutional level. Institutions can continue running Verato or NextGate for their internal MPI needs. Credara complements them at the cross-institutional layer — providing the provenance, decentralization, and disagreement-tolerance that improved MPIs lack. In the long arc, MPIs may become local-only systems with Credara providing the cross-institutional substrate; in the medium term, they coexist.
 
 #### 12.7.5 Vendor-Controlled Identity (Epic Care Everywhere etc.)
 
@@ -3239,22 +3239,22 @@ The dominant EHR vendor — Epic — provides cross-institutional identity throu
 - **No patient agency.** Patients cannot inspect, dispute, or participate in their identity provenance through Care Everywhere.
 - **Not interoperable beyond Epic's ecosystem.** Care Everywhere is fundamentally an Epic-internal capability, not an industry standard.
 
-Creda's approach: Creda is vendor-neutral by design. Open-source reference implementations, FHIR-based interfaces, and bottom-up adoption mean that Creda works the same regardless of which EHR an institution runs. Epic, Oracle Health, athenahealth, and smaller vendors can all integrate Creda — and once they do, their institutional customers benefit from a common substrate rather than vendor-fragmented islands.
+Credara's approach: Credara is vendor-neutral by design. Open-source reference implementations, FHIR-based interfaces, and bottom-up adoption mean that Credara works the same regardless of which EHR an institution runs. Epic, Oracle Health, athenahealth, and smaller vendors can all integrate Credara — and once they do, their institutional customers benefit from a common substrate rather than vendor-fragmented islands.
 
 #### 12.7.6 The Honest Comparison
 
-The above alternatives are not strawmen. Each represents real work by serious people addressing real problems. The case for Creda is not that these alternatives are bad — many of them are genuinely good — but that they each address only part of the problem space:
+The above alternatives are not strawmen. Each represents real work by serious people addressing real problems. The case for Credara is not that these alternatives are bad — many of them are genuinely good — but that they each address only part of the problem space:
 
 - NPI/centralized federal MPI: politically infeasible and architecturally fragile.
 - Blockchain: right insights, wrong overhead, conflicts with regulatory requirements.
 - Improved MPIs: solve institutional matching but not cross-institutional fragmentation.
 - Vendor-controlled identity: works for one ecosystem but excludes the rest.
 
-Creda occupies the niche that none of these address: a vendor-neutral, decentralized, FHIR-aligned, regulation-compatible substrate for cross-institutional patient identity provenance. It is complementary to most existing approaches (institutions can keep their MPIs) and explicitly competes only with the centralized federal alternatives that have failed politically for three decades.
+Credara occupies the niche that none of these address: a vendor-neutral, decentralized, FHIR-aligned, regulation-compatible substrate for cross-institutional patient identity provenance. It is complementary to most existing approaches (institutions can keep their MPIs) and explicitly competes only with the centralized federal alternatives that have failed politically for three decades.
 
 ### 12.8 International Adaptation
 
-Creda is **US-first by design**. Several architectural decisions are tightly coupled to US healthcare infrastructure:
+Credara is **US-first by design**. Several architectural decisions are tightly coupled to US healthcare infrastructure:
 
 - **UDAP authentication** is a US Health IT trust framework. Other jurisdictions have different institutional PKI standards (e.g., the EU's eIDAS framework, the UK's Spine framework).
 - **TEFCA / QHIN integration** is US-specific. Other jurisdictions have their own cross-institutional exchange frameworks.
@@ -3280,7 +3280,7 @@ A summary of the phases and expected duration:
 | Phase 2 | First QHIN integration, regional HIE pilot | Year 2 | First QHIN converts pilot to production |
 | Phase 3 | Network growth via QHIN-to-QHIN adoption, EHR vendor integrations begin, specialty network adoption | Years 2-5 | Coverage of >50% of US insured population through QHIN participation |
 | Phase 4 | Patient-side adoption: keys integrated into patient portals, self-verify rollout | Years 3-7 | Patient key coverage reaches plurality of insured patients |
-| Phase 5 | Maturity: PQC migration, "default substrate" status | Years 7-12+ | Creda referenced in TEFCA Common Agreement, major EHR vendor default integration |
+| Phase 5 | Maturity: PQC migration, "default substrate" status | Years 7-12+ | Credara referenced in TEFCA Common Agreement, major EHR vendor default integration |
 
 These are honest projections, not aspirations. The 12-year horizon for full maturity reflects the historical pace of US Health IT infrastructure transitions (FHIR's adoption from publication to ubiquity took ~10 years). Earlier phases can move faster if reference implementations are strong and pilots produce clear value; later phases depend on multi-institutional and multi-vendor coordination that does not accelerate easily.
 
@@ -3298,11 +3298,11 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Reference:** Appendix C.7
 
-**The question:** Should Creda Core's DAG and storage layer be built on libgit2 (using Git's data model directly) or on RocksDB with a custom Merkle-DAG implementation?
+**The question:** Should Credara Core's DAG and storage layer be built on libgit2 (using Git's data model directly) or on RocksDB with a custom Merkle-DAG implementation?
 
 **Why it's open:** libgit2 offers significant code reduction and inherits decades of Git hardening, but it requires reconciling UUID-based addressing with Git's content-addressing and adapting Git's repository organization to handle millions of patient subgraphs. RocksDB offers more flexibility but requires building DAG primitives ourselves. Until parallel prototypes are built and compared on lines of code, performance, and operational characteristics, both options remain live.
 
-**Closure condition:** Build prototype implementations of Creda Core on both backends with equivalent functionality (event creation, retrieval, subgraph traversal, signature verification, anti-entropy). Compare on: total lines of Creda-specific code, throughput for representative workloads, recovery time after PV loss, debugging tooling availability. Decide before locking in production architecture. Estimated effort: 2-4 engineer-weeks per prototype.
+**Closure condition:** Build prototype implementations of Credara Core on both backends with equivalent functionality (event creation, retrieval, subgraph traversal, signature verification, anti-entropy). Compare on: total lines of Credara-specific code, throughput for representative workloads, recovery time after PV loss, debugging tooling availability. Decide before locking in production architecture. Estimated effort: 2-4 engineer-weeks per prototype.
 
 #### 13.1.2 Tombstone Integrity Tradeoff
 
@@ -3318,7 +3318,7 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Reference:** Section 6.2.4
 
-**The question:** Creda specifies 1,024 topic buckets for gossipsub subscription, hashing patient subgraphs into buckets to limit topic cardinality. The right number depends on traffic patterns we don't have yet — too few and per-bucket traffic is excessive; too many and gossipsub overhead dominates.
+**The question:** Credara specifies 1,024 topic buckets for gossipsub subscription, hashing patient subgraphs into buckets to limit topic cardinality. The right number depends on traffic patterns we don't have yet — too few and per-bucket traffic is excessive; too many and gossipsub overhead dominates.
 
 **Why it's open:** Optimal bucket count is a function of patient population per institution, write rate per patient, and desired ratio of "events received but not relevant to me" overhead. Without real traffic data, 1,024 is an educated guess.
 
@@ -3332,9 +3332,9 @@ Each question includes the relevant section, a description of what is unresolved
 
 **The question:** Section 9.2.5 commits to "align with or extend TEFCA IAS tokenization." The actual technical alignment requires reviewing TEFCA's reference implementation in detail and identifying every divergence in normalization rules, salt management, and field tokenization scope.
 
-**Why it's open:** TEFCA's tokenization specification has been evolving. We have not yet performed a line-by-line comparison between Creda's tokenization rules (Section 9.2.3) and the current TEFCA reference implementation. Until that comparison is done, we cannot claim full TEFCA compatibility, only a stated intent.
+**Why it's open:** TEFCA's tokenization specification has been evolving. We have not yet performed a line-by-line comparison between Credara's tokenization rules (Section 9.2.3) and the current TEFCA reference implementation. Until that comparison is done, we cannot claim full TEFCA compatibility, only a stated intent.
 
-**Closure condition:** Engagement with the Sequoia Project's technical workgroup, formal review of TEFCA's published tokenization specifications, and a documented compatibility matrix listing every alignment and every divergence. Where Creda diverges, the IG documents the bridging logic for translation between formats.
+**Closure condition:** Engagement with the Sequoia Project's technical workgroup, formal review of TEFCA's published tokenization specifications, and a documented compatibility matrix listing every alignment and every divergence. Where Credara diverges, the IG documents the bridging logic for translation between formats.
 
 #### 13.2.2 Confidence Scoring Calibration
 
@@ -3352,7 +3352,7 @@ Each question includes the relevant section, a description of what is unresolved
 
 **The question:** Section 8.2.9.2 describes the criteria for question selection (differentiating between candidates, avoiding PHI leakage, accommodating cognitive load) but does not specify the algorithm. Selecting good questions is a research-grade problem — it requires understanding which facts are memorable to patients, which differ reliably between candidates, and how to construct multiple-choice distractors that don't leak other candidates' data.
 
-**Why it's open:** This is a novel application — no existing system has done provenance-grounded patient disambiguation at the level of granularity Creda requires. Implementation requires prototyping and iteration.
+**Why it's open:** This is a novel application — no existing system has done provenance-grounded patient disambiguation at the level of granularity Credara requires. Implementation requires prototyping and iteration.
 
 **Closure condition:** Prototype the question selection algorithm against synthetic test cases. Validate that questions: (a) actually differentiate candidates in the test set, (b) do not leak demographic data through distractor selection, (c) are answerable by patients with realistic memory (validated through user testing with synthetic patient personas). Iterate until the algorithm meets quality thresholds, document the algorithm in a separate design note, and publish reference implementation.
 
@@ -3412,7 +3412,7 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Reference:** Section 6.1.5
 
-**The question:** Each patient subgraph announcement is held at how many DHT nodes? Kademlia's default replication factor is k=20, but Creda's traffic patterns may suggest a different value. Higher k provides more resilience to peer churn; lower k reduces network overhead.
+**The question:** Each patient subgraph announcement is held at how many DHT nodes? Kademlia's default replication factor is k=20, but Credara's traffic patterns may suggest a different value. Higher k provides more resilience to peer churn; lower k reduces network overhead.
 
 **Why it's open:** The right value depends on peer churn rates (how often peers join and leave) and DHT query rates (how often subgraph lookups happen). We don't have this data yet.
 
@@ -3510,15 +3510,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 **The question:** Section 8.2 commits to FHIR R4 with R5 conformance planned for v1.1. The actual timing depends on US Core's R5 baseline maturity and broad ecosystem adoption.
 
-**Why it's open:** US Core 7.0+ is moving to R5 but adoption is still mixed across the US Health IT ecosystem. Releasing an R5-only Creda IG too early would alienate institutions still on R4. Releasing too late means the IG lags behind FHIR's evolution.
+**Why it's open:** US Core 7.0+ is moving to R5 but adoption is still mixed across the US Health IT ecosystem. Releasing an R5-only Credara IG too early would alienate institutions still on R4. Releasing too late means the IG lags behind FHIR's evolution.
 
-**Closure condition:** Track US Core R5 adoption metrics through HL7 and ONC reporting. When R5 reaches majority adoption among US Core implementers (target: 50%+), publish Creda IG v1.1 with R5 conformance, supporting both R4 and R5 during a transition window.
+**Closure condition:** Track US Core R5 adoption metrics through HL7 and ONC reporting. When R5 reaches majority adoption among US Core implementers (target: 50%+), publish Credara IG v1.1 with R5 conformance, supporting both R4 and R5 during a transition window.
 
 #### 13.6.2 CapabilityStatement Evolution
 
 **Reference:** Section 8.2.11
 
-**The question:** As new event types and operations are added (event types are extensible per Section 3.4), the CapabilityStatement must evolve. The mechanics of capability negotiation — how a Creda v1.0 peer interacts with a v1.1 peer that supports new operations — needs more specification.
+**The question:** As new event types and operations are added (event types are extensible per Section 3.4), the CapabilityStatement must evolve. The mechanics of capability negotiation — how a Credara v1.0 peer interacts with a v1.1 peer that supports new operations — needs more specification.
 
 **Why it's open:** We have not yet versioned the protocol or the IG. Versioning conventions, backward compatibility guarantees, and capability negotiation patterns need explicit design.
 
@@ -3530,9 +3530,9 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Reference:** Section 8.5
 
-**The question:** Section 8.5 commits Creda to a *thin* FAST Consent face — the committed scope is phases F0–F2 (FASTConsent projection plus the Administrative-Server operations), with repository federation (F4) and ceremony capture (F3) deferred and demand-driven. Two sub-questions remain open within even that thin scope: (a) whether `CredaAuthorization` should be *derived from* `FASTConsent` or published as a separate FASTConsent-conformant projection, and (b) if and when ceremony capture (F3) is triggered, how to attach consent-ceremony evidence (`DocumentReference` / `QuestionnaireResponse` from `$file-consent`) to an `AuthorizationGrant` — whether by a new optional payload field, a paired event, or a Bridge-side association outside the signed event.
+**The question:** Section 8.5 commits Credara to a *thin* FAST Consent face — the committed scope is phases F0–F2 (FASTConsent projection plus the Administrative-Server operations), with repository federation (F4) and ceremony capture (F3) deferred and demand-driven. Two sub-questions remain open within even that thin scope: (a) whether `CredaAuthorization` should be *derived from* `FASTConsent` or published as a separate FASTConsent-conformant projection, and (b) if and when ceremony capture (F3) is triggered, how to attach consent-ceremony evidence (`DocumentReference` / `QuestionnaireResponse` from `$file-consent`) to an `AuthorizationGrant` — whether by a new optional payload field, a paired event, or a Bridge-side association outside the signed event.
 
-**Why it's open:** The FAST Consent IG is at STU 1 ballot (FHIR R4, US Realm) and its profiles, operation signatures, and any future runtime decision/enforcement operations may change before publication. Pinning Creda's projection design to a moving target risks rework. The ceremony-attachment question touches the signed event schema (Section 5.1), so it should not be decided casually — adding fields to the signed payload has cryptographic and canonicalization consequences (Section 5.1.1).
+**Why it's open:** The FAST Consent IG is at STU 1 ballot (FHIR R4, US Realm) and its profiles, operation signatures, and any future runtime decision/enforcement operations may change before publication. Pinning Credara's projection design to a moving target risks rework. The ceremony-attachment question touches the signed event schema (Section 5.1), so it should not be decided casually — adding fields to the signed payload has cryptographic and canonicalization consequences (Section 5.1.1).
 
 **Closure condition:** Pin a specific Scalable Consent Management version, decide the `FASTConsent` derivation-vs-projection question against that version, and specify the ceremony-attachment mechanism (preferring a Bridge-side association or paired event over expanding the signed Grant payload, unless ceremony evidence must itself be signed and replicated). Validate with FAST Consent conformance scenarios in the M9 suite (Phase F5). Track IG ballot progress and re-pin on each substantive IG revision.
 
@@ -3578,7 +3578,7 @@ Each question includes the relevant section, a description of what is unresolved
 
 - Minor patients aging into adulthood (consent transfer, parental access termination).
 - Divorce, remarriage, custody changes affecting consent inheritance.
-- Deceased patient family access (HIPAA permits limited family disclosure of deceased patient information; Creda's consent model needs to handle this).
+- Deceased patient family access (HIPAA permits limited family disclosure of deceased patient information; Credara's consent model needs to handle this).
 - Emancipated minors (jurisdiction-specific rules for adolescent consent).
 - 42 CFR Part 2 substance use treatment records (stricter consent than general HIPAA).
 - Court-ordered access (e.g., custody disputes, criminal investigations).
@@ -3625,13 +3625,13 @@ Open questions are not failures. They are the work that remains. Naming them hon
 
 ## Appendix B: Glossary
 
-[To be written — Creda-specific terminology definitions]
+[To be written — Credara-specific terminology definitions]
 
 ## Appendix C: Build vs. Buy — Existing Components for Each Technical Decision
 
-This appendix annotates every significant technical decision in the spec with the existing library, standard, or service that should be used to implement it. The goal is to minimize code Creda has to write, maintain, and secure. Each entry identifies the spec section, the decision, the recommended existing component, and any adaptation required.
+This appendix annotates every significant technical decision in the spec with the existing library, standard, or service that should be used to implement it. The goal is to minimize code Credara has to write, maintain, and secure. Each entry identifies the spec section, the decision, the recommended existing component, and any adaptation required.
 
-The principle: if a section of the spec describes building something that already exists in a mature, maintained, and appropriately-licensed form, we should use that thing. New code should be reserved for what is genuinely Creda-specific: the healthcare-specific event semantics, the consent model, the disambiguation operations, and the integration glue.
+The principle: if a section of the spec describes building something that already exists in a mature, maintained, and appropriately-licensed form, we should use that thing. New code should be reserved for what is genuinely Credara-specific: the healthcare-specific event semantics, the consent model, the disambiguation operations, and the integration glue.
 
 ### C.1 DAG, Storage, and Cryptographic Primitives
 
@@ -3643,7 +3643,7 @@ The principle: if a section of the spec describes building something that alread
 | 4.1.2 (Hash function) | Blake3 with PQC margin | **`blake3` crate** | Official Rust implementation, well-maintained, hardware-accelerated. |
 | 4.1.4 (UUIDv7) | Time-ordered UUIDs | **`uuid` crate with `v7` feature** | Don't roll your own. The crate handles the timestamp encoding and randomness correctly. |
 | 4.2.5 (Index structures) | Secondary indexes | **RocksDB column families** | If using RocksDB directly, column families provide native secondary index support. If using libgit2, consider supplemental indexes via `redb` (pure Rust, embedded). |
-| 4.3.1 (Demographics struct) | Tokenized demographics | **TEFCA IAS tokenization reference implementation** | Don't invent tokenization. Adopt TEFCA's scheme (or extend it where it lacks something Creda needs) so institutions don't run parallel tokenizers. |
+| 4.3.1 (Demographics struct) | Tokenized demographics | **TEFCA IAS tokenization reference implementation** | Don't invent tokenization. Adopt TEFCA's scheme (or extend it where it lacks something Credara needs) so institutions don't run parallel tokenizers. |
 | 4.3 (Confidence scoring) | Per-field confidence model | **Fellegi-Sunter probabilistic record linkage** | The math has been settled since 1969. Reference implementations exist in `splink` (Python) and various MPI vendors. Port the algorithm; don't reinvent it. |
 
 ### C.2 Networking and Replication
@@ -3676,11 +3676,11 @@ The principle: if a section of the spec describes building something that alread
 | Spec Section | Decision | Use This | Notes |
 |---|---|---|---|
 | 7.3 (HAPI FHIR Bridge) | FHIR server | **HAPI FHIR (Java)** | Already chosen. Plain Server mode with custom resource providers. |
-| 7.2.1 (US Core conformance) | US Core profiles | **US Core IG (HL7)** | Don't redefine Patient profiles. Inherit from US Core; layer Creda extensions. |
+| 7.2.1 (US Core conformance) | US Core profiles | **US Core IG (HL7)** | Don't redefine Patient profiles. Inherit from US Core; layer Credara extensions. |
 | 7.2.3 (CredaProvenance profile) | Provenance resource | **FHIR Provenance + US Core Provenance** | Already aligned. |
 | 7.2.7 (`$creda-link`, etc.) | FHIR Operations | **HAPI's `@Operation` annotation framework** | Standard HAPI mechanism for custom operations. |
 | 7.2.9 (Disambiguation Q&A) | Multi-stage operation flow | **FHIR Parameters + session token pattern** | Idiomatic FHIR. |
-| 7.2.11 (CapabilityStatement) | Capability advertisement | **HAPI's auto-generated CapabilityStatement** | Customized for Creda extensions but built on HAPI's generator. |
+| 7.2.11 (CapabilityStatement) | Capability advertisement | **HAPI's auto-generated CapabilityStatement** | Customized for Credara extensions but built on HAPI's generator. |
 | 7.2.12 (Subscription) | Real-time notifications | **HAPI's Subscription support** + **FHIR R5 SubscriptionTopic when we move to R5** | Don't write a notification service. |
 | 7.2.13 (Bulk Data export) | $export operation | **HAPI's Bulk Data implementation** | NDJSON output, async job tracking — all built in. |
 | 7.4.1 (QHIN integration) | TEFCA participation | **Existing QHIN SDK / Sequoia Project tooling** | Whatever Sequoia publishes. Don't fork the QHIN-to-QHIN protocol. |
@@ -3703,11 +3703,11 @@ The principle: if a section of the spec describes building something that alread
 | 8.5 (PSI for matching) | Privacy-preserving matching | **Microsoft APSI**, **Google's Private Join and Compute** | Research-grade libraries exist. When this becomes scope, don't implement PSI from papers. |
 | 8.5 (ZK proofs) | Zero-knowledge identity claims | **`arkworks-rs` ecosystem** or **`bellman`** | When in scope, use established Rust ZK libraries. |
 
-### C.6 What Creda Genuinely Has to Build
+### C.6 What Credara Genuinely Has to Build
 
-After applying the above, what's left for Creda's engineering team to write:
+After applying the above, what's left for Credara's engineering team to write:
 
-**Creda-specific event semantics layer:**
+**Credara-specific event semantics layer:**
 
 - The `IdentityEventType` enum and per-type payload schemas (Section 3.4) — the healthcare-specific event types and their semantics.
 - Validation logic for each event type (party-of-the-subgraphs constraint for Contest, signature-by-originating-institution for Amend, etc.).
@@ -3715,7 +3715,7 @@ After applying the above, what's left for Creda's engineering team to write:
 
 **Confidence scoring engine:**
 
-- Per-field confidence computation (Section 5.3.2) implementing Fellegi-Sunter math adapted to the per-field and per-attestation model. The math is borrowed; the application to Creda's event model is new.
+- Per-field confidence computation (Section 5.3.2) implementing Fellegi-Sunter math adapted to the per-field and per-attestation model. The math is borrowed; the application to Credara's event model is new.
 - Temporal decay (Section 5.3.3) and disagreement flagging (Section 5.3.4) — orchestration over the confidence inputs.
 
 **Disambiguation logic:**
@@ -3725,17 +3725,17 @@ After applying the above, what's left for Creda's engineering team to write:
 
 **Consent enforcement:**
 
-- The authorization evaluation algorithm (Section 4.6) — the seven-step evaluation over AuthorizationGrant and AuthorizationRevocation events, plus the Export Gate and Verifier enforcement points. The data model uses FHIR Consent; the evaluation and dual-control logic is Creda-specific.
+- The authorization evaluation algorithm (Section 4.6) — the seven-step evaluation over AuthorizationGrant and AuthorizationRevocation events, plus the Export Gate and Verifier enforcement points. The data model uses FHIR Consent; the evaluation and dual-control logic is Credara-specific.
 
 **Integration glue:**
 
 - The Bridge's translation layer between FHIR resources and DAG events (most of Section 8).
-- Translating SMART scopes to Creda operation authorizations.
-- Bridging TEFCA IAS tokens and Creda's tokenization where they diverge.
+- Translating SMART scopes to Credara operation authorizations.
+- Bridging TEFCA IAS tokens and Credara's tokenization where they diverge.
 
 **Bootstrapping and registry:**
 
-- The Participant Registry as a Creda subgraph — the meta-DAG of who is in the network. The DAG mechanics are libgit2; the participant lifecycle (NPA execution, certificate registration, revocation) is Creda-specific.
+- The Participant Registry as a Credara subgraph — the meta-DAG of who is in the network. The DAG mechanics are libgit2; the participant lifecycle (NPA execution, certificate registration, revocation) is Credara-specific.
 
 **Operational integration:**
 
@@ -3757,18 +3757,18 @@ The single largest "don't reinvent" opportunity is using libgit2 as the storage 
 - Sync protocol — Git's pack-negotiation is exactly our anti-entropy protocol.
 - Bundles as snapshots — `git bundle` is our snapshot format.
 - Decades of hardening — security review, performance optimization, edge case handling.
-- Existing tooling and developer familiarity — anyone who knows Git can reason about Creda's storage.
+- Existing tooling and developer familiarity — anyone who knows Git can reason about Credara's storage.
 
 **Tensions to resolve:**
 
-- **UUID addressing vs. content addressing.** Creda uses UUIDs for tombstone compatibility. Git uses content hashes. The reconciliation: store events as Git objects (commits or blobs), and maintain a Git ref namespace mapping UUIDs to content hashes. UUID→hash lookup is one ref read. Tombstoning replaces the object content; the ref is updated to point to the new (scrubbed) object. This loses Git's content-addressing integrity for tombstoned objects, exactly as our spec already accepts in Section 7.2.2.
+- **UUID addressing vs. content addressing.** Credara uses UUIDs for tombstone compatibility. Git uses content hashes. The reconciliation: store events as Git objects (commits or blobs), and maintain a Git ref namespace mapping UUIDs to content hashes. UUID→hash lookup is one ref read. Tombstoning replaces the object content; the ref is updated to point to the new (scrubbed) object. This loses Git's content-addressing integrity for tombstoned objects, exactly as our spec already accepts in Section 7.2.2.
 - **Multiple roots per patient.** Git supports multiple roots in a single repository (orphan branches). A patient subgraph with multiple independent roots is a set of orphan branches connected by Link events expressed as merge commits.
 - **Repository organization.** One Git repo per patient is impractical at millions of patients. One Git repo per institution, with each patient's subgraph as a ref namespace (e.g., `refs/creda/patient/[uuid]/heads/main`), works at scale and is how GitHub manages billions of refs across far fewer repositories.
 - **Signature model.** Git supports GPG and SSH commit signing. UDAP X.509 certificates are not directly supported. Either extend libgit2's signing interface or sign at the application layer and store the signature as a commit trailer (already a Git convention).
 
-**Recommended action:** Build a small libgit2-backed prototype of Creda Core in parallel with the v1 implementation. Compare it against the RocksDB-backed approach on:
+**Recommended action:** Build a small libgit2-backed prototype of Credara Core in parallel with the v1 implementation. Compare it against the RocksDB-backed approach on:
 
-- Lines of code in Creda Core.
+- Lines of code in Credara Core.
 - Performance for representative read/write/sync workloads.
 - Operational characteristics (backup, restore, debugging).
 - Integration complexity with the rest of the stack.
@@ -3788,7 +3788,7 @@ The honest accounting:
 - **Observability, deployment, operations**: 100% existing tooling (Prometheus, Grafana, OTel, Helm, k8s, Argo, MinIO, cert-manager).
 - **Audit trail**: Pattern from sigstore Rekor; resource format from FHIR.
 
-What Creda actually writes from scratch:
+What Credara actually writes from scratch:
 
 - Healthcare-specific event semantics (~200-500 lines per event type).
 - Confidence scoring engine adapting Fellegi-Sunter to per-field model (~1,000-2,000 lines).

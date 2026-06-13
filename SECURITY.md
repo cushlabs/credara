@@ -34,7 +34,7 @@ Please give us a reasonable opportunity to remediate before any public disclosur
 
 In scope: the Credara Core, Export Gate, Verifier, FHIR Bridge, deployment artifacts, and
 the cryptographic, networking, and authorization logic described in the
-[technical specification](docs/creda-technical-spec.md) §9 (Security and Access Control).
+[technical specification](docs/credara-technical-spec.md) §9 (Security and Access Control).
 
 The security model — UDAP + SPIFFE dual credentials, mandatory signature verification on
 replication, authorization enforcement at the responding peer, and dual-control
