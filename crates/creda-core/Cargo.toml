@@ -36,7 +36,7 @@ time = { version = "0.3", features = ["formatting"] }
 # gRPC server (feature = "grpc"). tonic/prost are the heavy, codegen-coupled deps; optional so
 # they are absent from the default build.
 tonic = { version = "0.12", optional = true }
-prost = { version = "0.13", optional = true }
+prost = { version = "0.14", optional = true }
 # Async runtime, needed by both the gRPC server and the libp2p transport.
 tokio = { version = "1", optional = true, features = ["rt-multi-thread", "macros", "net", "sync", "signal", "time"] }
 # Wraps a tokio UnixListener as a Stream for tonic's `serve_with_incoming_shutdown` (gRPC UDS).
