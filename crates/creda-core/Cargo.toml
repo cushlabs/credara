@@ -29,7 +29,7 @@ creda-graph = { path = "../creda-graph" }
 creda-net = { path = "../creda-net", default-features = false }
 thiserror = "1"
 serde = { version = "1", features = ["derive"] }
-toml = "0.8"
+toml = "1.1"
 clap = { version = "4", features = ["derive"] }
 time = { version = "0.3", features = ["formatting"] }
 
