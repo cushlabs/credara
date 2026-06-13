@@ -7,7 +7,8 @@
   distroless base images (FIPS variants by default, DQ-4): Hummingbird Rust image (builder) →
   Hummingbird distroless **nonroot** runtime for Core/Export Gate/Verifier; Hummingbird
   OpenJDK image for the Bridge. Pin image digests; multi-arch (x86_64 + aarch64).
-- `compose/`     — Docker Compose for laptop development (single-node dev instance).
+- `compose/`     — Podman or Docker Compose for local development (single-node dev instance).
+  Kubernetes (the Helm chart) is the production target; Compose is a dev-only convenience.
 - `helm/creda/`  — Helm chart: StatefulSet, Services, ConfigMap, Secret references,
   ServiceAccount + minimal RBAC, NetworkPolicy, PodDisruptionBudget, and scheduled
   operational tasks as k8s CronJobs (snapshot generation, retention pruning, reputation decay).
@@ -20,7 +21,7 @@
 **Write:** Helm templates, Dockerfiles, Compose file, CronJobs, Ansible plays.
 
 > **Critical constraint (spec §6):** the same image and the same Helm chart must work on a
-> laptop (Compose), on-prem k8s (bundled MinIO), and cloud k8s (S3) — only configuration
+> a laptop (Podman/Docker Compose), on-prem k8s (bundled MinIO), and cloud k8s (S3) — only configuration
 > values change.
 
 > **Hard requirement — non-root (DQ-1):** every container runs as an unprivileged,
@@ -45,7 +46,7 @@ Concrete files:
   `securityContext`; `/livez` `/readyz` probes), `service` (FHIR ClusterIP + libp2p NodePort/LB +
   headless), `configmap`, `rbac` (minimal Role + ServiceAccount), `networkpolicy`,
   `poddisruptionbudget`, `cronjob-snapshot`.
-- `compose/docker-compose.yml` — laptop dev (Core + Bridge + optional MinIO via `--profile storage`).
+- `compose/docker-compose.yml` — local dev under Podman or Docker (Core + Bridge + optional MinIO via `--profile storage`).
 - `ansible/deploy.yml` — deploy onto an existing cluster (DQ-2): restricted-PSS namespace →
   cert-manager + SPIRE (idempotent) → Creda Helm release → verify rollout. `requirements.yml`,
   `inventory.example.ini`, `group_vars/all.example.yml`.

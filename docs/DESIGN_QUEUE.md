@@ -172,7 +172,7 @@ distroless base is now specifically Fedora Hummingbird.
 **Requirement.** A developer (or CI) must be able to build and test Creda **without manually
 installing a toolchain**. The Rust toolchain, the C compiler (for pqcrypto), and all
 dependencies are evaluated and provisioned by the environment, not by a human following a
-checklist. The only host prerequisite is Docker.
+checklist. The only host prerequisite is a container engine — Podman or Docker.
 
 **Decided shape.**
 - A **dev/build container** (`docker/dev.Dockerfile`) carries the full toolchain.

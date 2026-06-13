@@ -1,8 +1,10 @@
 # Creda task runner.
 #
-# The ONLY host prerequisite is Docker. Every target runs inside the dev container
-# (docker/dev.Dockerfile), which carries the Rust toolchain, a C compiler, and all
-# dependencies — so no developer installs cargo/rustc/clippy by hand. See docs/DEVELOPMENT.md.
+# The ONLY host prerequisite is a container engine — Podman or Docker. Every target runs
+# inside the dev container (docker/dev.Dockerfile), which carries the Rust toolchain, a C
+# compiler, and all dependencies — so no developer installs cargo/rustc/clippy by hand. The
+# `docker` invocations below run unchanged under Podman's Docker-compatible CLI (the
+# maintainers build under Podman). See docs/DEVELOPMENT.md.
 #
 # Usage:
 #   make anchor      # the known-good run: whole workspace, single-threaded build, with ONE
@@ -23,8 +25,9 @@
 #   make clean       # remove build artifacts and the dependency cache
 #
 # Low-memory machines: compiling RocksDB from source (librocksdb-sys) is memory-hungry and
-# can trip the OOM killer ("Killed signal terminated program cc1plus"). Either give Docker
-# more memory (Docker Desktop -> Settings -> Resources -> Memory: 6-8 GB), or cap build
+# can trip the OOM killer ("Killed signal terminated program cc1plus"). Either give the engine
+# more memory (Podman: `podman machine set --memory 8192`; Docker Desktop -> Settings ->
+# Resources -> Memory: 6-8 GB), or cap build
 # parallelism so fewer compilers run at once (slower, but bounded memory):
 #   make test JOBS=1     # one compiler at a time — safest on constrained Docker memory
 #   make test JOBS=2

@@ -94,14 +94,14 @@ creda/
 │   │                          #   must run on laptop, on-prem, and cloud (config only).
 │   ├── docker/                #   Multi-stage Dockerfiles on Fedora Hummingbird distroless
 │   │                          #   NONROOT base (FIPS by default, DQ-4) per binary.
-│   ├── compose/               #   Docker Compose for laptop dev.
+│   ├── compose/               #   Podman or Docker Compose for local dev (k8s is the target).
 │   ├── helm/creda/            #   Helm chart: StatefulSet, Services, ConfigMap, RBAC,
 │   │                          #   NetworkPolicy, PDB, CronJobs; non-root securityContext (DQ-1).
 │   └── ansible/               #   Deploy onto an existing cluster: cert-manager + SPIRE +
 │                              #   Helm release, idempotent (DQ-2). Spec §10.5, §10.6, §7.4, §11.
 │
 ├── testbed/                   # Local multi-peer test bed (DQ-3); same scenarios, two paths.
-│   ├── compose/               #   Fast multi-peer bring-up (Docker Compose).
+│   ├── compose/               #   Fast multi-peer bring-up (Podman or Docker Compose).
 │   ├── kind/                  #   Production-fidelity: real Helm chart on kind/k3d, non-root.
 │   └── scenarios/             #   Shared, runner-agnostic scenario library (also used by M9).
 │

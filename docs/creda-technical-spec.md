@@ -1066,9 +1066,9 @@ This is **not** the patient identity DAG — that is persistent data, not a work
 | **Helm chart** | 5 | 5 | yes | Industry standard. Templated YAML manifests with values files. Most institutions already operate Helm. Easy to customize for site-specific needs. **Recommended baseline.** |
 | **Kubernetes Operator** | 5 | 3 | partial | Custom controller that manages Creda peer lifecycle (snapshot scheduling, certificate rotation, Participant Registry sync). More powerful than Helm for ongoing operations. Requires writing and maintaining the operator. **Recommended at scale (50+ peer institutions or for managed offerings).** |
 | **Raw manifests** | 5 | 3 | yes | Plain YAML. Maximum transparency but no abstraction over environment differences. Suitable for very simple deployments or for embedding Creda into existing GitOps workflows. |
-| **Docker Compose** | 1 | 5 | yes | Not k8s-native at all. Useful for laptop development and demo deployments. Should be provided alongside k8s manifests but not as the primary deployment mode. |
+| **Compose (Podman/Docker)** | 1 | 5 | yes | Not k8s-native at all. Useful for local development (Podman or Docker) and demo deployments. Should be provided alongside k8s manifests but not as the primary deployment mode. |
 
-**Recommendation:** Provide a Helm chart as the primary deployment artifact, with a Docker Compose file for laptop development. A Kubernetes Operator should be developed once Creda has more than ~20 production deployments and patterns of operational toil emerge that the operator can automate.
+**Recommendation:** Kubernetes is the production target — provide a Helm chart as the primary deployment artifact, with a Compose file (Podman or Docker) for local development only. A Kubernetes Operator should be developed once Creda has more than ~20 production deployments and patterns of operational toil emerge that the operator can automate.
 
 #### 7.4.4 Object Storage for Snapshots
 
@@ -1109,14 +1109,14 @@ The default Creda deployment stack, optimized for "deployable with little to no 
 
 - **Storage**: RocksDB embedded, mounted on a k8s PersistentVolume.
 - **Operational orchestration**: Kubernetes CronJobs for simple tasks; Argo Workflows added when multi-step pipelines emerge.
-- **Packaging**: Helm chart (primary); Docker Compose (laptop development); Kubernetes Operator (deferred).
+- **Packaging**: Helm chart (primary, Kubernetes-native production target); Compose via Podman or Docker (local development only); Kubernetes Operator (deferred).
 - **Object storage for snapshots**: MinIO bundled by default; cloud S3-compatible via configuration override.
 - **Observability**: Prometheus + Grafana + OpenTelemetry.
 - **Identity**: SPIRE for SPIFFE, cert-manager for UDAP.
 
 This stack runs on:
 
-- **A laptop**: Docker Compose with RocksDB + local filesystem snapshots + minimal Prometheus. Used for development and integration testing.
+- **A laptop**: Compose under Podman or Docker, with RocksDB + local filesystem snapshots + minimal Prometheus. Used for development and integration testing.
 - **A small on-premises k8s cluster**: Helm chart with bundled MinIO. Used by community hospitals and small HIEs.
 - **A managed cloud k8s service**: Helm chart with cloud S3-compatible storage and the institution's existing Prometheus/Grafana. Used by large health systems and HIEs.
 

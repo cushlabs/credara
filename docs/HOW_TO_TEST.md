@@ -12,9 +12,11 @@ up by hand.
 
 ## What you need
 
-1. **Docker** — Docker Desktop on macOS/Windows, or Docker Engine on Linux. Give
-   it **6–8 GB of memory** (Settings → Resources). RocksDB builds from source and
-   the OOM killer will take down `cc1plus` on a default 2 GB allocation.
+1. **Podman or Docker** — Podman (rootless; `podman machine init` on macOS/Windows) or
+   Docker Desktop/Engine. The `make` targets shell out to `docker`, which Podman provides as a
+   compatible CLI. Give the engine **6–8 GB of memory** (Podman: `podman machine set --memory
+   8192`; Docker: Settings → Resources). RocksDB builds from source and the OOM killer will
+   take down `cc1plus` on a default 2 GB allocation.
 2. **Git**, to clone the repo.
 3. For the multi-peer testbed only: **kind ≥ 0.23**, **kubectl ≥ 1.30**,
    **helm ≥ 3.14**. Everything else runs inside containers.
