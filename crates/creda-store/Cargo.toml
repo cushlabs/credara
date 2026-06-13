@@ -20,7 +20,7 @@ libgit2 = ["dep:git2"]
 [dependencies]
 creda-events = { path = "../creda-events" }
 thiserror = "1"
-rocksdb = { version = "0.22", optional = true }
+rocksdb = { version = "0.24", optional = true }
 git2 = { version = "0.18", optional = true }
 
 [dev-dependencies]
