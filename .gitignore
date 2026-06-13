@@ -55,6 +55,9 @@ docs/LAUNCH_CHECKLIST.md
 # ---- OS / editor cruft ----
 .DS_Store
 Thumbs.db
+# FUSE leaves these when a file is replaced while still open (mounted-fs artifact).
+.fuse_hidden*
+**/.fuse_hidden*
 *.swp
 *.swo
 *~
