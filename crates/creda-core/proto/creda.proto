@@ -120,6 +120,12 @@ message AuthReply {
 message Empty {}
 message Metrics { uint64 event_count = 1; }
 
+// The institutions this peer has seen: the distinct audience display names appearing in
+// AuthorizationGrants across the whole local store. The read behind the Bridge's `GET /Organization`
+// discovery surface — a client can offer "share with an institution already on the network" instead
+// of hardcoding a list. InstitutionId audiences (raw fingerprints) render as `fpr:<hex>`.
+message InstitutionsReply { repeated string names = 1; }
+
 service Creda {
   rpc CreateEvent(CreateEventRequest) returns (EventReply);
   rpc GetEvent(GetEventRequest) returns (GetEventReply);
@@ -128,4 +134,5 @@ service Creda {
   rpc MatchByTokens(MatchRequest) returns (MatchReply);
   rpc EvaluateAuthorization(AuthRequest) returns (AuthReply);
   rpc GetMetrics(Empty) returns (Metrics);
+  rpc ListInstitutions(Empty) returns (InstitutionsReply);
 }

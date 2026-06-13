@@ -4,7 +4,8 @@ import { CodeCard } from '@shared/components/CodeCard';
 import { Modal } from '@shared/components/Modal';
 import { useToast } from '@shared/components/Toast';
 import { getBridge, gossipToast } from '@shared/fhir/client';
-import type { CredaAuthorization, GrantPurpose, GrantScope, UseMode } from '@shared/fhir/types';
+import type { AccessRequest } from '@shared/fhir/client';
+import type { CredaAuthorization, CredaProvenance, GrantPurpose, GrantScope, UseMode } from '@shared/fhir/types';
 import { avatarColor, classNames, initials } from '@shared/lib/format';
 
 import './patient.css';
@@ -33,6 +34,8 @@ interface ActivityEntry {
   ev: 'grant' | 'revoke' | 'access';
   text: string;
   when: string;
+  /** Sort key (epoch ms). Optimistic entries use Date.now(); event-sourced ones use `recorded`. */
+  ts?: number;
 }
 
 const EV_COLOR: Record<ActivityEntry['ev'], string> = {
@@ -41,6 +44,40 @@ const EV_COLOR: Record<ActivityEntry['ev'], string> = {
   access: 'var(--access)',
 };
 const EV_LETTER: Record<ActivityEntry['ev'], string> = { grant: '+', revoke: '–', access: '↧' };
+
+function fmtWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso || '—';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/**
+ * Build the activity feed from the real event DAG (`$creda-provenance`), not from authorization
+ * *state*. Each AuthorizationGrant, AuthorizationRevocation, and ExportReceipt is its own node, so
+ * a grant that was later revoked still appears as a distinct "Granted …" entry — the feed survives
+ * a page reload because it reflects events, not the collapsed active/revoked status. Grant payloads
+ * don't carry the audience (it's not in the Provenance projection), so we recover it by joining on
+ * the grant id from `Consent?patient=`; a revocation's parent is the grant it targets.
+ */
+function buildActivity(events: CredaProvenance[], auths: CredaAuthorization[]): ActivityEntry[] {
+  const audienceById = new Map(auths.map((a) => [a.id, a.audience]));
+  const purposeById = new Map(auths.map((a) => [a.id, a.purpose]));
+  const out: ActivityEntry[] = [];
+  for (const e of events) {
+    const ts = Date.parse(e.recorded) || 0;
+    if (e.eventType === 'AuthorizationGrant') {
+      const audience = audienceById.get(e.id) ?? 'an institution';
+      const purpose = purposeById.get(e.id) ?? e.purpose ?? 'access';
+      out.push({ ev: 'grant', text: `Granted ${purpose} access to ${audience}`, when: fmtWhen(e.recorded), ts });
+    } else if (e.eventType === 'AuthorizationRevocation') {
+      const audience = audienceById.get(e.parents[0] ?? '') ?? 'an institution';
+      out.push({ ev: 'revoke', text: `Stopped sharing with ${audience}`, when: fmtWhen(e.recorded), ts });
+    } else if (e.eventType === 'ExportReceipt') {
+      out.push({ ev: 'access', text: `${e.institution || 'An institution'} used an access you granted`, when: fmtWhen(e.recorded), ts });
+    }
+  }
+  return out.sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).slice(0, 50);
+}
 
 export function PatientApp() {
   return (
@@ -67,35 +104,40 @@ function ConsentApp() {
   const bridge = getBridge();
   const [tab, setTab] = useState<Tab>('access');
   const [grants, setGrants] = useState<CredaAuthorization[]>([]);
-  // Seeded from real grants on load (see refresh); starts empty rather than with a fabricated
-  // "export receipt" entry. The feed reflects grants/revocations, not a real ExportReceipt stream
-  // yet — that's the remaining ⚠️ in the FE audit (HANDOFF), to be read from events later.
+  // Event-sourced from `$creda-provenance` on every refresh (see below) — each grant, revocation,
+  // and export receipt is its own timeline entry, so the feed survives a page reload and no longer
+  // collapses a revoked grant into a single "stopped" row.
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
+  // Institutions known to the network — `GET /Organization` (Core's ListInstitutions): the real,
+  // network-wide list of institutions seen in grants, for the share datalist. Fetched once.
+  const [institutions, setInstitutions] = useState<string[]>([]);
+  // Pending access requests from providers (off-chain FHIR Task inbox). The patient answers each
+  // with an on-chain grant (Approve) or dismisses it.
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+
   const refresh = useCallback(async () => {
-    // Real data both ways: the bridge's `Consent?patient={id}` search (§8.2.9 read-back) returns
-    // the patient's grants with revoked ones marked; the mock implements the same method over its
-    // seed state. The access list now survives a page refresh against the real peer.
-    const list = await bridge.listAuthorizations(await patientId(bridge));
+    // Real reads, joined: `Consent?patient={id}` (§8.2.9 read-back) gives the current grant list
+    // (audience/purpose/status) for the access tab; `$creda-provenance` gives the full event DAG
+    // for the activity feed; `Task?patient=` gives pending access requests. The mock implements all
+    // three. Authorization provenance doesn't carry the audience, so buildActivity joins it back.
+    const id = await patientId(bridge);
+    const [list, events, reqs] = await Promise.all([
+      bridge.listAuthorizations(id),
+      // A provenance hiccup shouldn't blank the access list — degrade the feed to empty instead.
+      bridge.readSubgraph(id).catch(() => [] as CredaProvenance[]),
+      bridge.listAccessRequests(id).catch(() => [] as AccessRequest[]),
+    ]);
     setGrants(list);
-    // Seed the activity feed from the authorization state on first load.
-    setActivity((prev) => {
-      if (prev.length > 1) return prev;
-      const seeded: ActivityEntry[] = list.map((g) => ({
-        ev: g.status === 'revoked' ? ('revoke' as const) : ('grant' as const),
-        text:
-          g.status === 'revoked'
-            ? `Stopped sharing with ${g.audience}`
-            : `Granted ${g.purpose} access to ${g.audience}`,
-        when: g.since || '—',
-      }));
-      return [...prev, ...seeded].slice(0, 12);
-    });
+    setActivity(buildActivity(events, list));
+    setRequests(reqs);
   }, [bridge]);
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    // Network institutions are independent of the patient; load once and tolerate failure.
+    bridge.listInstitutions().then(setInstitutions).catch(() => setInstitutions([]));
+  }, [refresh, bridge]);
 
   return (
     <div className="patient-app">
@@ -125,11 +167,42 @@ function ConsentApp() {
         {tab === 'access' && (
           <AccessTab
             grants={grants}
+            requests={requests}
+            onApprove={async (r) => {
+              try {
+                const grant = await bridge.authorize({
+                  patientId: await patientId(bridge),
+                  audience: r.requester,
+                  audienceKind: 'institution',
+                  purpose: r.purpose,
+                  use: r.use,
+                  scope: 'Identity only',
+                  expires: 'No expiry',
+                });
+                await bridge.resolveAccessRequest(r.id);
+                setActivity((a) => [{ ev: 'grant', text: `Granted ${grant.purpose} access to ${grant.audience}`, when: 'Just now', ts: Date.now() }, ...a]);
+                await refresh();
+                toast.show(gossipToast('Grant'));
+              } catch (err) {
+                toast.show(`Bridge error: ${(err as Error).message}`);
+              }
+            }}
+            onDismiss={async (r) => {
+              try {
+                await bridge.resolveAccessRequest(r.id);
+                await refresh();
+                toast.show('Request dismissed');
+              } catch (err) {
+                toast.show(`Bridge error: ${(err as Error).message}`);
+              }
+            }}
             onRevoke={async (g) => {
               try {
                 await bridge.revoke({ patientId: await patientId(bridge), grantId: g.id });
+                // Optimistic entry for instant feedback; refresh() then replaces the whole feed
+                // with the authoritative event-sourced list, so there's no duplicate.
+                setActivity((a) => [{ ev: 'revoke', text: `Stopped sharing with ${g.audience}`, when: 'Just now', ts: Date.now() }, ...a]);
                 await refresh();
-                setActivity((a) => [{ ev: 'revoke', text: `Stopped sharing with ${g.audience}`, when: 'Just now' }, ...a]);
                 toast.show(gossipToast('Revocation'));
               } catch (err) {
                 toast.show(`Bridge error: ${(err as Error).message}`);
@@ -139,11 +212,20 @@ function ConsentApp() {
         )}
         {tab === 'share' && (
           <ShareTab
-            onAuthorized={(g) => {
-              setActivity((a) => [{ ev: 'grant', text: `Granted ${g.purpose} access to ${g.audience}`, when: 'Just now' }, ...a]);
+            suggestions={Array.from(
+              new Set([
+                // Network-wide institutions (GET /Organization) first, then any this patient has
+                // shared with that aren't in that list yet.
+                ...institutions,
+                ...grants.filter((g) => g.audienceKind === 'institution').map((g) => g.audience),
+              ]),
+            ).sort()}
+            onAuthorized={async (g) => {
+              setActivity((a) => [{ ev: 'grant', text: `Granted ${g.purpose} access to ${g.audience}`, when: 'Just now', ts: Date.now() }, ...a]);
               setGrants((prev) => [g, ...prev]);
               setTab('access');
               toast.show(gossipToast('Grant'));
+              await refresh();
             }}
           />
         )}
@@ -153,7 +235,19 @@ function ConsentApp() {
   );
 }
 
-function AccessTab({ grants, onRevoke }: { grants: CredaAuthorization[]; onRevoke: (g: CredaAuthorization) => Promise<void> }) {
+function AccessTab({
+  grants,
+  requests,
+  onRevoke,
+  onApprove,
+  onDismiss,
+}: {
+  grants: CredaAuthorization[];
+  requests: AccessRequest[];
+  onRevoke: (g: CredaAuthorization) => Promise<void>;
+  onApprove: (r: AccessRequest) => Promise<void>;
+  onDismiss: (r: AccessRequest) => Promise<void>;
+}) {
   const active = grants.filter((g) => g.status === 'active');
   const revoked = grants.filter((g) => g.status === 'revoked');
   const [confirm, setConfirm] = useState<CredaAuthorization | null>(null);
@@ -163,6 +257,30 @@ function AccessTab({ grants, onRevoke }: { grants: CredaAuthorization[]; onRevok
         You control who can use your identity records. Each choice is <b>signed by your key</b> on this device and
         takes effect across the network within seconds — and so does stopping.
       </div>
+      {requests.length > 0 && (
+        <>
+          <h2 className="sec">{requests.length} request{requests.length > 1 ? 's' : ''} for access</h2>
+          {requests.map((r) => (
+            <div className="gcard" key={r.id} data-testid={`request-${r.id}`} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="ch">
+                <div className="ic" style={{ background: avatarColor(r.requester) }}>{initials(r.requester)}</div>
+                <div style={{ flex: 1 }}>
+                  <div className="nm">{r.requester}</div>
+                  <div className="meta">wants {r.purpose} access · {r.use}</div>
+                </div>
+              </div>
+              <div className="row2">
+                <button className="linky" onClick={() => onDismiss(r)} data-testid={`request-dismiss-${r.id}`}>
+                  Dismiss
+                </button>
+                <button className="btn primary" onClick={() => onApprove(r)} data-testid={`request-approve-${r.id}`}>
+                  Approve &amp; share
+                </button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
       <h2 className="sec">{active.length} sharing now</h2>
       {active.length === 0 && <div className="muted small" style={{ padding: 4 }}>You are not sharing with anyone.</div>}
       {active.map((g) => (
@@ -281,7 +399,14 @@ function GrantCard({ g, onAskRevoke }: { g: CredaAuthorization; onAskRevoke?: ()
   );
 }
 
-function ShareTab({ onAuthorized }: { onAuthorized: (g: CredaAuthorization) => void }) {
+function ShareTab({
+  onAuthorized,
+  suggestions,
+}: {
+  onAuthorized: (g: CredaAuthorization) => void;
+  /** Institutions on the network (+ any this patient has shared with) — datalist hints. */
+  suggestions: string[];
+}) {
   const toast = useToast();
   const bridge = getBridge();
   const [form, setForm] = useState({
@@ -349,12 +474,28 @@ function ShareTab({ onAuthorized }: { onAuthorized: (g: CredaAuthorization) => v
         <div className="formfield">
           <label>{form.kind === 'institution' ? 'Institution name' : 'Provider class'}</label>
           {form.kind === 'institution' ? (
-            <input
-              placeholder="e.g. Lakeside Hospital"
-              value={form.who}
-              onChange={(e) => setForm({ ...form, who: e.target.value })}
-              data-testid="share-who"
-            />
+            <>
+              {/* Free-text input backed by a datalist of institutions on the network (GET
+                  /Organization). Type any institution, or pick an existing one. Native datalist
+                  keeps it a real text field — faster repeat testing without a fixed list. */}
+              <input
+                list="known-institutions"
+                placeholder="e.g. Lakeside Hospital"
+                value={form.who}
+                onChange={(e) => setForm({ ...form, who: e.target.value })}
+                data-testid="share-who"
+              />
+              <datalist id="known-institutions">
+                {suggestions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              {suggestions.length > 0 && (
+                <div className="small" style={{ marginTop: 4 }}>
+                  Suggestions are institutions already on the network — or type a new name.
+                </div>
+              )}
+            </>
           ) : (
             <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} data-testid="share-who">
               <option value="">Choose a class…</option>

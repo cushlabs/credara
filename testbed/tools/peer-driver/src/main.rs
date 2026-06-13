@@ -16,8 +16,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use creda_events::{
     canonical, AdministrativeGender, AttestPurpose, AuthorizationScope, Demographics,
-    EventPayload, GrantAudience, GrantPurpose, LinkMethod, StructuredAddress, TokenizedDate,
-    TokenizedString, UseMode, VerificationMethod,
+    EventPayload, GrantAudience, GrantPurpose, InstitutionalIdentifier, LinkMethod,
+    StructuredAddress, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
 };
 
 mod pb {
@@ -118,14 +118,35 @@ async fn create(
 }
 
 /// An Assert with stable demo tokens, so clients can find the patient with
-/// `Patient?_creda-token=tok:demo:<family>` after every reseed.
-fn demo_assert(family: &str, given: &str, dob: &str, vm: VerificationMethod) -> EventPayload {
+/// `Patient?_creda-token=tok:demo:<family>` after every reseed. Carries the issuing institution's
+/// MRN and a city/state address so the clinician's MRNs/address surfaces project from real data
+/// (the issuing institution lives in the MRN payload, independent of the event signer).
+#[allow(clippy::too_many_arguments)]
+fn demo_assert(
+    family: &str,
+    given: &str,
+    dob: &str,
+    vm: VerificationMethod,
+    mrn_institution: &str,
+    mrn_value: &str,
+    city: &str,
+    state: &str,
+) -> EventPayload {
     EventPayload::Assert {
         demographics: Demographics {
             name_family: Some(vec![TokenizedString(format!("tok:demo:{family}"))]),
             name_given: Some(vec![TokenizedString(format!("tok:demo:{given}"))]),
             date_of_birth: Some(TokenizedDate(format!("tok:demo:{dob}"))),
             sex: Some(AdministrativeGender::Other),
+            address: Some(StructuredAddress {
+                city: Some(TokenizedString(format!("tok:demo:{city}"))),
+                state: Some(TokenizedString(format!("tok:demo:{state}"))),
+                ..Default::default()
+            }),
+            mrns: vec![InstitutionalIdentifier {
+                institution_id: TokenizedString(format!("tok:demo:{mrn_institution}")),
+                value: TokenizedString(format!("tok:demo:{mrn_value}")),
+            }],
             ..Default::default()
         },
         verification_method: vm,
@@ -136,13 +157,19 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     // ---- Maria Gonzalez: the well-linked patient with an active Mercy General grant ----------
     let m_mercy = create(
         client,
-        &demo_assert("gonzalez", "maria", "1984-03-12", VerificationMethod::GovernmentPhotoId),
+        &demo_assert(
+            "gonzalez", "maria", "1984-03-12", VerificationMethod::GovernmentPhotoId,
+            "Mercy General Hospital", "5582019", "Oakland", "CA",
+        ),
         &[],
     )
     .await?;
     let m_north = create(
         client,
-        &demo_assert("gonzalez", "maria", "1984-03-12", VerificationMethod::InsuranceCard),
+        &demo_assert(
+            "gonzalez", "maria", "1984-03-12", VerificationMethod::InsuranceCard,
+            "Northside Clinic", "A-7741", "Oakland", "CA",
+        ),
         &[],
     )
     .await?;
@@ -181,13 +208,19 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     // against one of these Asserts is how a resolution persists.
     let j_mercy = create(
         client,
-        &demo_assert("whitfield", "james", "1971-08-04", VerificationMethod::GovernmentPhotoId),
+        &demo_assert(
+            "whitfield", "james", "1971-08-04", VerificationMethod::GovernmentPhotoId,
+            "Mercy General Hospital", "6610042", "Fresno", "CA",
+        ),
         &[],
     )
     .await?;
     let j_lakeside = create(
         client,
-        &demo_assert("whitfield", "james", "1971-08-14", VerificationMethod::SelfReport),
+        &demo_assert(
+            "whitfield", "james", "1971-08-14", VerificationMethod::SelfReport,
+            "Lakeside Hospital", "LH-3098", "Fresno", "CA",
+        ),
         &[],
     )
     .await?;
