@@ -22,9 +22,11 @@ authority or vendor lock-in.
 
 ## Status
 
-> **Pre-launch — all milestones implemented; multi-peer testbed green; hardening in progress.
-> Open for testers.** The [technical specification](docs/credara-technical-spec.md) (Sections
-> 1–13 + appendices, ~90 pages) is complete and authoritative. All ten build milestones
+> **Spec finalized at v1.0 · software pre-launch — all milestones implemented; multi-peer
+> testbed green; hardening in progress. Open for testers.** The
+> [technical specification](docs/credara-technical-spec.md) (Sections 1–13 + appendices, ~90
+> pages) is **finalized at v1.0.0** — complete and authoritative — while the implementation
+> hardens toward a matching software release. All ten build milestones
 > (M0–M9) are implemented and verified, the default workspace builds and tests green, the
 > opt-in libp2p adapter compiles and lints clean against the pinned version, and the
 > **multi-peer testbed under kind passes its gossip-convergence and anti-entropy-repair

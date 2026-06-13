@@ -1,9 +1,9 @@
 # Credara: Technical Specification
 
-**Version:** 0.1.0-draft
-**Status:** Draft
+**Version:** 1.0.0
+**Status:** Released
 **Audience:** Engineering Team
-**Last Updated:** 2026-06-03
+**Last Updated:** 2026-06-13
 
 ---
 
@@ -3811,3 +3811,13 @@ What Credara actually writes from scratch:
 - Helm chart, Operator, deployment automation (~1,000-3,000 lines).
 
 Rough total: 8,000-15,000 lines of genuinely new code, plus integration with potentially hundreds of thousands of lines of existing libraries. That's the right ratio for a project that wants to be deployable, maintainable, and trusted in a regulated environment.
+
+## Version History
+
+**1.0.0 — 2026-06-13 (Released).** First released version of the specification; status moved from Draft to Released. Changes since `0.1.0-draft`:
+
+- Renamed the project and product to **Credara** throughout the prose. Code identifiers (crate names such as `creda-core` / `creda-events`, the `anchor creda` task, and FHIR search parameters like `_creda-token`) are retained unchanged so the spec continues to match the implementation.
+- Added **§13.9 Cross-Border and Federation** (§13.9.1 Patient Mobility Across National Networks): the four blockers to a traveling patient (jurisdictional admission gate, loss of strong matching identifiers, salt isolation, data-residency vs. replication), with federation between national networks and the HL7 FHIR International Patient Summary (IPS) named as the path. Renumbered the former §13.9 to **§13.10 Tracking and Closure**.
+- Clarified deployment packaging (§7.4, §10.5): **Kubernetes is the production target** (the Helm chart is primary), with **Ansible** for automated install onto an existing cluster and **Podman or Docker Compose** for local development only.
+
+**0.1.0-draft — 2026-06-03 (Draft).** Initial complete draft: Sections 1–13 plus Appendices A–C, ~90 pages. All ten build milestones (M0–M9) specified; multi-peer testbed scenarios defined.
