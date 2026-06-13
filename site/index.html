@@ -465,8 +465,25 @@
             <circle class="node" cx="780" cy="260" r="8" fill="url(#peerg)" style="animation-delay:1.3s"/>
             <circle class="node" cx="940" cy="150" r="8" fill="url(#peerg)" style="animation-delay:1.7s"/>
           </g>
+          <!-- patient: sits above the origin peer (subtle hierarchy), grants consent down to it -->
+          <path class="dedge" style="animation-delay:.7s" d="M300,59 L300,160" fill="none" stroke="#7fe3a6" stroke-width="1.6" stroke-dasharray="5 4"/>
+          <text class="node" x="310" y="112" text-anchor="start" fill="#7fe3a6" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" style="animation-delay:.8s">consent</text>
+          <circle class="node" cx="300" cy="52" r="7" fill="#34d399" stroke="#eaf2f9" stroke-opacity=".5" stroke-width="1.6" style="animation-delay:.75s"/>
+          <text class="node" x="300" y="36" text-anchor="middle" fill="#7fe3a6" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" style="animation-delay:.85s">Patient</text>
+          <!-- node labels (institution types) -->
+          <g fill="#9fb3cd" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" text-anchor="middle">
+            <text class="node" x="120" y="74"  style="animation-delay:.45s">HIE</text>
+            <text class="node" x="120" y="272" style="animation-delay:.55s">Clinic</text>
+            <text class="node" x="470" y="55"  style="animation-delay:.65s">Hospital</text>
+            <text class="node" x="470" y="272" style="animation-delay:.65s">Payer</text>
+            <text class="node" x="620" y="142" style="animation-delay:1.05s">Health system</text>
+            <text class="node" x="560" y="322" style="animation-delay:1.15s">Research</text>
+            <text class="node" x="780" y="74"  style="animation-delay:1.45s">Lab</text>
+            <text class="node" x="780" y="282" style="animation-delay:1.45s">Pharmacy</text>
+            <text class="node" x="940" y="134" style="animation-delay:1.85s">QHIN</text>
+          </g>
           <g fill="#7f95b1" font-family="ui-monospace,Menlo,monospace" font-size="10.5">
-            <text class="node" x="285" y="150" style="animation-delay:.6s">origin peer</text>
+            <text class="node" x="300" y="196" text-anchor="middle" style="animation-delay:.6s">origin peer</text>
             <text class="node" x="958" y="154" style="animation-delay:2.2s">~1–2 s network-wide</text>
           </g>
         </svg>
