@@ -21,7 +21,7 @@ libgit2 = ["dep:git2"]
 creda-events = { path = "../creda-events" }
 thiserror = "1"
 rocksdb = { version = "0.22", optional = true }
-git2 = { version = "0.18", optional = true }
+git2 = { version = "0.21", optional = true }
 
 [dev-dependencies]
 # Build sample events in the contract tests (integration tests need it as a dev-dep too).
