@@ -2845,22 +2845,105 @@ Test events have a configured `expirationTime`. A scheduled task in each peer (S
 
 Institutions can also explicitly tombstone test data on demand via the standard `$creda-tombstone` operation with `legalBasis=test-cleanup`.
 
-### 11.5 Legal Coordinator Operations Runbook (Stub)
+### 11.5 Legal Coordinator Operations Runbook
 
-The legal coordinator's operational responsibilities are distinct from institutional peer operations and warrant a separate runbook. This section is a placeholder; the full coordinator runbook will be published as a separate document.
+The legal coordinator is the network's admission-control authority (Section 9). Its responsibilities are administrative, not architectural: the coordinator does not sit in the data path, never sees PHI, and cannot create, modify, or censor patient events. Its *only* technical capability is publishing a bounded set of events to the **Participant Registry** — additions, revocations, network-salt announcements, and coordinator-succession events — each of which is itself a signed node in a Credara subgraph and therefore transparent and auditable. This runbook covers the coordinator's standing operations. It should be reviewed by the governance body annually and after any incident.
 
-Key topics to cover in the full runbook:
+The coordinator role can be held by one organization or distributed across several (e.g., regional coordinators per HIE jurisdiction) without protocol changes (Section 9). Where this runbook says "the coordinator," it means the operator(s) currently holding the role under the governance body's authority.
 
-- **Network genesis procedure** (one-time, documented in Section 11.1.1).
-- **Membership application review workflow**: BAA verification, UDAP certificate validation, application approval and registration.
-- **Revocation procedures**: criteria for revocation, governance approval requirements, technical execution.
-- **Coordinator key management**: HSM/KMS configuration, key rotation schedule, emergency key generation and standby procedures.
-- **Coordinator service operations**: deployment, monitoring, backup, disaster recovery for the Registry service itself.
-- **Governance interface**: how the coordinator interacts with the network's governance body for policy decisions, dispute resolution, and coordinator succession.
-- **Audit and reporting**: regular reports the coordinator produces for the governance body and participating institutions.
-- **Incident response**: procedures for coordinator key compromise (Section 11.3.4), governance disputes, and other coordinator-specific incidents.
+#### 11.5.1 Roles and separation of duties
 
-The coordinator role is critical to network trust; the runbook should be developed before the network's first production deployment and reviewed annually by the governance body.
+Two distinct principals are always in play, and they must not be the same person:
+
+- **The governance body** *authorizes* changes — admissions, revocations, salt rotations, key transitions, and succession. Its decisions are recorded in the governance record.
+- **The coordinator operator** *executes* an authorized change by publishing the corresponding Registry event with the coordinator signing key.
+
+No single operator may both approve and publish a Registry change. Publishing the coordinator signing key's events requires **M-of-N custody** (Section 11.5.6), so that no individual can unilaterally add or revoke a participant. Every Registry event must carry a reference to the governance authorization that justified it (Section 11.5.10).
+
+#### 11.5.2 Network genesis (one-time)
+
+Performed once, at network formation (the technical bootstrap is Section 11.1.1):
+
+1. Generate the coordinator signing key inside an HSM/KMS (Section 11.5.6); the private key is non-exportable.
+2. Publish the genesis Registry root signed by the coordinator key.
+3. Distribute the coordinator **public key** (the network trust anchor) to all founding institutions **out-of-band** through signed governance-body communications — never solely in-band.
+4. Record the genesis event, the key custodians, and the founding roster in the governance record.
+
+#### 11.5.3 Membership application and admission
+
+For each applicant institution (the join workflow is Section 9):
+
+1. **Intake.** Receive the application: organizational identity, UDAP certificate fingerprint, NPA/BAA execution status, and points of contact.
+2. **Legal check.** Confirm the Network Participation Agreement (the multi-party BAA framework, Section 9) is executed.
+3. **Credential validation.** Validate the UDAP certificate — chain of trust, validity window, not revoked — and record the fingerprint.
+4. **Identity-assurance check.** Confirm the applicant meets the network's IdP assurance floor for any patient-key admission it will perform (IAL/AAL per Section 13.8.4, which remains an open question pending governance decision).
+5. **Governance approval.** The governance body approves; the approval is recorded with a reference ID.
+6. **Publish.** The coordinator publishes an **addition** event to the Participant Registry (under M-of-N custody), registering the validated UDAP fingerprint and citing the governance approval reference.
+7. **Confirm and notify.** Verify the addition propagated (peers will admit connections matching the new fingerprint) and notify the institution.
+
+#### 11.5.4 Revocation and offboarding
+
+Grounds for revocation include: voluntary NPA withdrawal, UDAP certificate revocation or expiry, removal for cause (persistent misbehavior despite reputation downgrades, Section 6.4.1), or credential compromise.
+
+- **Routine revocation** (withdrawal, expiry) requires standard governance approval.
+- **Emergency revocation** (compromise, active abuse) follows an expedited governance path with retroactive ratification.
+
+Execution: the coordinator publishes a **revocation** event citing the authorization. Peers process it, drop active connections to the revoked peer, and reject future connections (Section 9). Revocation is **forward-looking** — events the institution previously created remain valid; the institution simply can no longer create new ones. During a coordinator outage, revocations cannot be published; the network relies on peer reputation downgrades and out-of-band notice until the coordinator returns (Section 11.3.3).
+
+#### 11.5.5 Network salt rotation
+
+The network salt underpins demographic tokenization and is rotated annually (Section 9.2.2). The coordinator:
+
+1. Generates the next salt and obtains governance sign-off.
+2. Publishes the next salt to the Participant Registry **ahead of its activation date**, opening the transition window (default six months, during which both the current and next salts are active for matching).
+3. Communicates the rotation timeline to all participants out-of-band.
+4. On the activation date, new tokens use only the new salt; historical salts are retained indefinitely so matching against older events continues to work.
+
+The salt is distributed only through the Registry and authenticated channels — never over an insecure medium.
+
+#### 11.5.6 Coordinator key management
+
+- The coordinator signing key lives in an HSM/KMS, hardware-backed and non-exportable, under **M-of-N custody** split across separate custodians.
+- **Routine rotation** on a fixed schedule (default annual) with an overlap window during which both the outgoing and incoming public keys are recognized as trust anchors; the transition is published as a Registry event and communicated out-of-band.
+- A **standby emergency key** is generated and distributed-but-not-activated in advance (Section 11.3.4), so that compromise response is measured in hours, not days.
+- All coordinator-key usage is logged and included in the audit report (Section 11.5.10).
+
+#### 11.5.7 Registry service operations
+
+- **Deployment and backup.** Operate the Registry service with the same non-root, hardened posture as peers (Section 10.6); back up the Registry subgraph. Because the Registry is a replicated Credara subgraph that peers cache, a service outage does not halt the network (Section 11.3.3) — existing peers keep operating on cached state.
+- **Monitoring.** Alert on **unexpected Registry events**: any addition or revocation not traceable to a governance authorization, or a sudden burst of changes (normal Registry activity is sparse). This is the primary detection signal for key compromise (Section 11.3.4).
+- **Capacity.** Registry updates are infrequent; capacity planning is trivial relative to peer event volume.
+
+#### 11.5.8 Incident response
+
+- **Suspected key compromise.** Execute the emergency key-transition protocol in Section 11.3.4: convene governance, activate the standby key, distribute the new trust anchor out-of-band, and retroactively revoke the compromised key from the transition timestamp. Events the compromised key signed *before* the compromise remain valid; those after the transition are invalid.
+- **Unauthorized Registry event detected.** Treat as compromise until proven otherwise — freeze further publication, convene governance, assess scope against the governance record, and transition the key if the private key may be exposed.
+- **Governance dispute.** Pause the contested change; do not publish until the governance body resolves it.
+
+The specific thresholds (how many governance-body members must authorize a key transition), the out-of-band signing chain, and the required tabletop exercises are tracked as open question **13.5.3** and must be finalized with founding institutions before network launch.
+
+#### 11.5.9 Governance interface and coordinator succession
+
+The coordinator executes only what the governance body authorizes; policy decisions, dispute resolution, and admission criteria are the governance body's. To **transfer or distribute** the coordinator role (single org to a successor, or splitting into regional coordinators):
+
+1. Generate the successor coordinator key(s) in an HSM.
+2. The governance body authorizes the succession and records it.
+3. Publish a **coordinator-succession** event to the Registry, signed by the outgoing key, designating the new key(s).
+4. Distribute the new trust anchor(s) out-of-band.
+5. Retain the outgoing key as a recognized anchor through an overlap window, then deprecate it.
+
+The protocol is unchanged by succession — this is an administrative handover, not a re-architecture (Section 9).
+
+#### 11.5.10 Audit and reporting
+
+The coordinator produces, on a regular cadence (default quarterly) and on demand for the governance body:
+
+- The **Registry change log** — every addition, revocation, salt rotation, and succession event, each with its governance authorization reference.
+- A **coordinator-key usage** report.
+- An **incident summary** for the period.
+- The current **membership roster** and any pending applications.
+
+Because the Registry is itself a tamper-evident subgraph, these reports are reconstructable and independently verifiable by any participant — the report is a convenience, not the source of truth. The governance body reviews this runbook annually.
 
 ### 11.6 Cryptographic Algorithm Migration
 
@@ -3633,11 +3716,127 @@ Open questions are not failures. They are the work that remains. Naming them hon
 
 ## Appendix A: Prior Art and References
 
-[To be written — IPFS/libp2p, W3C DID/VC, Git Merkle DAG, CRDT literature, TEFCA/Carequality specs, relevant academic papers]
+Credara is assembled from mature standards and components rather than invented from scratch (see the *Standards over invention* design principle in Section 2 and the build-vs-buy mapping in Appendix C). This appendix records the prior art that informed the architecture and the external standards, protocols, and academic results the system relies on. Citations name the canonical source; implementers should confirm the current version of each standard before pinning conformance claims.
+
+### A.1 Distributed systems and replication
+
+- Lamport, L. (1978). "Time, Clocks, and the Ordering of Events in a Distributed System." *Communications of the ACM*, 21(7). — logical clocks carried on event nodes (Section 5.1).
+- Demers, A., et al. (1987). "Epidemic Algorithms for Replicated Database Maintenance." *PODC '87*. — the gossip + anti-entropy foundation (Sections 6–7).
+- Leitão, J., Pereira, J., & Rodrigues, L. (2007). "HyParView: A Membership Protocol for Reliable Gossip-Based Broadcast." *IEEE/IFIP DSN '07*. — the active/passive view membership and shuffling model (Section 6).
+- Leitão, J., Pereira, J., & Rodrigues, L. (2007). "Epidemic Broadcast Trees" (Plumtree). *IEEE SRDS '07*. — eager/lazy push gossip.
+- Maymounkov, P., & Mazières, D. (2002). "Kademlia: A Peer-to-Peer Information System Based on the XOR Metric." *IPTPS '02*. — the DHT used for discovery (Section 6.1.6).
+- Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). "Conflict-Free Replicated Data Types." *SSS '11* (INRIA RR-7687). — convergence under asynchronous replication; the append-forward DAG draws on CRDT convergence properties.
+- Merkle, R. C. (1987). "A Digital Signature Based on a Conventional Encryption Function." *CRYPTO '87*. — Merkle hashing, used for anti-entropy roots (Section 7).
+
+### A.2 Content-addressed and transparency systems
+
+- Benet, J. (2014). "IPFS — Content Addressed, Versioned, P2P File System." *arXiv:1407.3561*.
+- libp2p — modular peer-to-peer networking stack providing gossipsub, the Kademlia DHT, and Noise transport. <https://libp2p.io>
+- The Git object model — a content-addressed Merkle DAG of immutable objects; the structural analogue for Credara's signed-event DAG.
+- Sigstore Rekor — append-only signed transparency log; the audit-trail pattern referenced in Section 10. <https://docs.sigstore.dev>
+- Certificate Transparency — RFC 6962 (Laurie, Langley, Kasper, 2013) — append-only signed-log design.
+
+### A.3 Cryptographic primitives and protocols
+
+- Noise Protocol Framework (Perrin, 2018). <https://noiseprotocol.org> — mutually-authenticated encrypted channels (libp2p Noise transport).
+- RFC 8949 — Concise Binary Object Representation (CBOR), including deterministic encoding (canonical CBOR, Section 5.1).
+- RFC 8032 — Edwards-Curve Digital Signature Algorithm (EdDSA); Ed25519 is the default signature algorithm.
+- RFC 9562 — Universally Unique IDentifiers (UUIDs), defining the time-ordered UUIDv7 used as node identifiers.
+- BLAKE3 (O'Connor, Aumasson, Neves, Wilcox-O'Hearn, 2020) — content integrity and Merkle roots. <https://github.com/BLAKE3-team/BLAKE3>
+- FIPS 180-4 — Secure Hash Standard (SHA-512), the FIPS-validated DHT routing-key hash.
+- NIST FIPS 203 (ML-KEM), FIPS 204 (ML-DSA), and FIPS 205 (SLH-DSA), 2024 — post-quantum standards; ML-DSA-65 and SLH-DSA are Credara's PQC signature options (Section 9).
+
+### A.4 Healthcare interoperability standards
+
+- HL7 FHIR Release 4 (R4), v4.0.1 — the integration surface. <https://hl7.org/fhir/R4/>
+- HL7 FHIR US Core Implementation Guide — US-realm profiles.
+- SMART App Launch (SMART on FHIR) — app authorization for clinical and patient apps. <https://hl7.org/fhir/smart-app-launch/>
+- HL7 FHIR US UDAP Security IG (FAST Security) — institutional registration, authentication, and authorization. <https://hl7.org/fhir/us/udap-security/>
+- HL7 FHIR At Scale Taskforce (FAST). <https://confluence.hl7.org/spaces/FAST/overview>
+- HL7 International Patient Summary (IPS) IG and ISO 27269 — cross-border patient summary (referenced in Section 13.9).
+
+### A.5 Trust frameworks, exchange networks, and identity
+
+- TEFCA — Trusted Exchange Framework and Common Agreement; the Common Agreement and QHIN Technical Framework, administered by the Recognized Coordinating Entity (the Sequoia Project). <https://rce.sequoiaproject.org>
+- TEFCA Individual Access Services (IAS) — the cross-network tokenization scheme Credara aligns with (Section 9.2.5).
+- Carequality — interoperability framework. <https://carequality.org>
+- DirectTrust — trust framework for Direct Secure Messaging; the governance model Credara's admission control is patterned on. <https://directtrust.org>
+- SPIFFE / SPIRE — workload identity (SVIDs). <https://spiffe.io>
+- W3C Decentralized Identifiers (DID) Core v1.0 and the W3C Verifiable Credentials Data Model — conceptual prior art for decentralized identifiers and portable, cryptographically-verifiable claims.
+- OpenID Connect (OIDC) and WebAuthn / FIDO2 — patient authentication and passkey-bound patient signing keys (Section 9.1).
+- NIST SP 800-63 — Digital Identity Guidelines (IAL/AAL assurance levels, referenced in Section 13.8.4).
+
+### A.6 Record linkage and matching
+
+- Fellegi, I. P., & Sunter, A. B. (1969). "A Theory for Record Linkage." *Journal of the American Statistical Association*, 64(328). — the probabilistic matching model adapted for Credara's confidence scoring (Section 5.3).
+
+### A.7 Regulatory and legal framework
+
+- HIPAA — Health Insurance Portability and Accountability Act; Privacy and Security Rules (45 CFR Parts 160 and 164).
+- 21st Century Cures Act — information-blocking rule (45 CFR Part 171).
+- 42 CFR Part 2 — Confidentiality of Substance Use Disorder Patient Records.
+- GDPR — Regulation (EU) 2016/679, including Article 17 (right to erasure) for EU-resident data.
+- California Confidentiality of Medical Information Act (CMIA); Washington My Health My Data Act (MHMDA).
+
+### A.8 Implementation components
+
+- RocksDB (<https://rocksdb.org>) and libgit2 (<https://libgit2.org>) — candidate `Store` substrates (Section 5.2; open question 13.1).
+- HAPI FHIR — HL7's reference Java FHIR implementation, used by the Bridge. <https://hapifhir.io>
+- cert-manager (<https://cert-manager.io>), Helm, Kubernetes, and Ansible — deployment and certificate lifecycle.
+- Prometheus, Grafana, and OpenTelemetry — observability.
+- Contributor Covenant v2.1 — the project code of conduct.
 
 ## Appendix B: Glossary
 
-[To be written — Credara-specific terminology definitions]
+Terms are defined as used in this specification. Section references point to the authoritative definition.
+
+- **Amend / Amendment** — An event by which the *originating* institution corrects its own prior Assert. Only the originator (or a successor key with a valid rotation chain) may amend (Section 3.4).
+- **Anti-entropy** — The periodic reconciliation backstop: two peers compare a Merkle root over their sorted sets of event UUIDs and exchange only the missing nodes when the roots differ (Sections 6–7).
+- **Assert** — The foundational identity event: an institution claims tokenized demographics about a patient. A parentless Assert is a *root node* (Section 3.4.1).
+- **Attestation (Attest)** — An event that corroborates identity facts, including a patient's signed self-attestation (self-verify) (Section 3.4).
+- **AuthorizationGrant** — A signed, scoped, revocable directive granting specified institutions (or institutional classes) access to a patient's subgraph. Supersedes the earlier `Consent` type (Section 4.3).
+- **AuthorizationRevocation** — An event withdrawing a prior Grant. Deliberately distinct from a Tombstone (Section 4.3).
+- **BAA** — Business Associate Agreement; the HIPAA contract required between PHI-handling peers, established network-wide through the NPA.
+- **Bridge (FHIR Bridge)** — The Java/Kotlin, HAPI-FHIR-based component that translates between FHIR R4 and Credara events (Sections 8, 10.4).
+- **CBOR** — Concise Binary Object Representation. Canonical (deterministic) CBOR is the serialization for signed event nodes (Section 5.1).
+- **Confidence scoring** — Probabilistic identity-match scoring adapting the Fellegi-Sunter model to per-field weights; advisory, not enforced (Section 5.3).
+- **Contestation (Contest)** — An event declaring a prior Link incorrect; the two subgraphs revert to independent. The original Link is retained for audit, not deleted (Section 3.4).
+- **Coordinator (legal coordinator)** — The administrative admission-control authority that maintains the Participant Registry. It is not a runtime data intermediary and cannot create, modify, or censor patient events (Section 9).
+- **Credara Core** — The Rust peer daemon composing the event, store, graph, and networking layers and exposing the gRPC API (Section 10.1).
+- **DAG (directed acyclic graph)** — The signed-event graph that is Credara's system of record; each event references its parents and the graph only grows forward (Section 5).
+- **Deceased declaration** — An event recording a patient's death.
+- **DHT (Kademlia DHT)** — The distributed hash table that maps a *tokenized* subgraph key to the peer IDs holding that subgraph; the discovery layer (Section 6.1.6).
+- **Dual control** — The two-party authorization-enforcement model: a source-side Export Gate and a relying-side Verifier, neither able to unilaterally circumvent authorization (Section 4.5).
+- **Export Gate** — The source-side component that validates the Portable Authorization Artifact before data egress and emits the ExportReceipt (Sections 4.5.1, 10.2).
+- **ExportReceipt** — An event recording that a data release occurred under a specific Grant (Section 4.3.3).
+- **FHIR** — Fast Healthcare Interoperability Resources (HL7); Release 4 (R4) is Credara's integration surface.
+- **Gossip / gossipsub** — Epidemic event propagation: peers push event batches to neighbors, converging network-wide in roughly log(N) rounds (~1–2 s) (Section 6).
+- **Head node** — The most recent node(s) of a subgraph; Link events reference subgraph heads.
+- **HIE** — Health Information Exchange.
+- **IAS** — TEFCA Individual Access Services, including the tokenization scheme Credara aligns with (Section 9.2.5).
+- **Link** — An event asserting that two independent subgraphs represent the same real-world person, *without* merging them or transferring ownership (Section 3.4.2).
+- **Link-chain defense** — Protection against rogue-Link attacks via per-method confidence ceilings (Section 4.6 step 5.5; Section 5.3.5).
+- **Merkle root** — A hash over the sorted set of event UUIDs, compared during anti-entropy. Computed over UUIDs, not contents, so tombstoning never causes divergence (Section 7).
+- **MPI** — Master Patient Index; the institutional identity system Credara complements rather than replaces.
+- **Network salt** — A 256-bit, network-wide value (rotated annually) mixed into demographic tokenization to resist rainbow-table attacks (Section 9.2).
+- **Noise** — The Noise Protocol Framework; the encrypted, mutually-authenticated transport carried over libp2p (Section 6).
+- **NPA** — Network Participation Agreement; the multi-party BAA framework establishing bilateral HIPAA coverage among all peers (Section 9).
+- **Participant Registry** — A signed, replicated list of admitted institutions' UDAP certificate fingerprints, maintained as a Credara subgraph by the coordinator (Section 9).
+- **PHI** — Protected Health Information. Cleartext PHI never traverses the network; tokenized demographics (themselves PHI under HIPAA) are what peers exchange.
+- **PQC** — Post-quantum cryptography; ML-DSA-65 (FIPS 204) and SLH-DSA (FIPS 205) are the available signature algorithms (Section 9).
+- **Portable Authorization Artifact** — The signed AuthorizationGrant event made portable: a detached CBOR artifact a relying party can verify offline (Section 4.5).
+- **Provenance** — The traceable chain of who asserted what, when, and based on what prior assertions; structural, not a bolted-on audit log (Section 2).
+- **QHIN** — Qualified Health Information Network (TEFCA).
+- **Root node** — A parentless Assert; the start of an independent identity subgraph (Section 3.4.1).
+- **SMART on FHIR** — The app-launch/authorization framework for clinical and patient applications (Section 9.1).
+- **SPIFFE / SPIRE** — The workload-identity framework and its runtime; issues the SVIDs that identify peer workloads (Section 9).
+- **Subgraph** — The set of events about one patient (possibly spanning institutions, joined by Links); the unit of replication, discovery, and authorization.
+- **TEFCA** — Trusted Exchange Framework and Common Agreement; the US nationwide-exchange framework Credara aligns with.
+- **Tokenization / token** — The deterministic, salted-BLAKE3 transformation of a demographic field. Only tokens — never cleartext PHI — traverse the network (Section 9.2).
+- **Tombstone** — An event implementing the right to be forgotten by scrubbing PII content while preserving graph topology. Distinct from an AuthorizationRevocation (Section 3.4).
+- **UDAP** — Unified Data Access Profiles; the institutional identity/authorization profile (the HL7 FAST Security IG) (Section 9.1).
+- **UUIDv7** — The time-ordered UUID used as an event node's identifier and address (RFC 9562).
+- **Verifier** — The relying-side component that independently confirms authorization, identity continuity, and provenance integrity at the point of use, offline-capable (Sections 4.5.2, 10.3).
 
 ## Appendix C: Build vs. Buy — Existing Components for Each Technical Decision
 

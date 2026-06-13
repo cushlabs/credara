@@ -49,11 +49,11 @@ authority or vendor lock-in.
 > what is real vs. demo vs. not-yet-implemented vs. tracked-open-question — read it before building
 > on any surface. The persona apps under `clients/` are **demonstration code**, not production.
 
-[![ci-rust](https://github.com/cushlabs/credara/actions/workflows/ci-rust.yml/badge.svg?branch=main)](https://github.com/cushlabs/credara/actions/workflows/ci-rust.yml)
-[![ci-java](https://github.com/cushlabs/credara/actions/workflows/ci-java.yml/badge.svg?branch=main)](https://github.com/cushlabs/credara/actions/workflows/ci-java.yml)
-[![ci-conformance](https://github.com/cushlabs/credara/actions/workflows/ci-conformance.yml/badge.svg?branch=main)](https://github.com/cushlabs/credara/actions/workflows/ci-conformance.yml)
-[![ci-docs](https://github.com/cushlabs/credara/actions/workflows/ci-docs.yml/badge.svg?branch=main)](https://github.com/cushlabs/credara/actions/workflows/ci-docs.yml)
-[![gitleaks](https://github.com/cushlabs/credara/actions/workflows/gitleaks.yml/badge.svg?branch=main)](https://github.com/cushlabs/credara/actions/workflows/gitleaks.yml)
+[![ci-rust](https://github.com/cushlabs/creda/actions/workflows/ci-rust.yml/badge.svg?branch=main)](https://github.com/cushlabs/creda/actions/workflows/ci-rust.yml)
+[![ci-java](https://github.com/cushlabs/creda/actions/workflows/ci-java.yml/badge.svg?branch=main)](https://github.com/cushlabs/creda/actions/workflows/ci-java.yml)
+[![ci-conformance](https://github.com/cushlabs/creda/actions/workflows/ci-conformance.yml/badge.svg?branch=main)](https://github.com/cushlabs/creda/actions/workflows/ci-conformance.yml)
+[![ci-docs](https://github.com/cushlabs/creda/actions/workflows/ci-docs.yml/badge.svg?branch=main)](https://github.com/cushlabs/creda/actions/workflows/ci-docs.yml)
+[![gitleaks](https://github.com/cushlabs/creda/actions/workflows/gitleaks.yml/badge.svg?branch=main)](https://github.com/cushlabs/creda/actions/workflows/gitleaks.yml)
 
 Beyond the milestones, the in-daemon **gRPC serve socket** (Bridge ↔ Core over a Unix
 domain socket or TCP), the **libp2p transport ↔ engine replication** path (signed-event
