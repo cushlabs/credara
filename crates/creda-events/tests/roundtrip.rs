@@ -40,9 +40,7 @@ fn contest_reason_canonical_bytes_match_cross_language_golden() {
     use creda_events::{ContestReason, EventId, EventPayload};
 
     let payload = EventPayload::Contest {
-        target_link_id: EventId::from_bytes([
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        ]),
+        target_link_id: EventId::from_bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
         reason: ContestReason {
             code: ContestReasonCode::DistinctPatients,
             detail: Some("different humans".to_string()),
