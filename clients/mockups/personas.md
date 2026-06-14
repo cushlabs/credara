@@ -2,7 +2,7 @@
 
 This document captures who Credara's interfaces serve and what each is allowed to see and do.
 It is a design reference for the mockups in this folder, not a specification — the authoritative
-source is [`docs/credara-technical-spec.md`](../docs/credara-technical-spec.md).
+source is [`docs/credara-technical-spec.md`](../../docs/credara-technical-spec.md).
 
 There are two intersecting axes:
 
@@ -89,7 +89,7 @@ authorization events are **enforced** (§4.8).
   party's clinical data.
 - **Status.** Mockup built — [`patient-consent-mockup.html`](patient-consent-mockup.html); also
   represented in the federation view of
-  [`credara-reference-architecture.html`](credara-reference-architecture.html).
+  [`credara-reference-architecture.html`](../../credara-reference-architecture.html).
 
 ---
 
@@ -118,6 +118,10 @@ These gate what any persona's session may see. They are enforced below the UI.
 | [`steward-console-mockup.html`](steward-console-mockup.html) | Identity steward · operator view |
 | [`patient-consent-mockup.html`](patient-consent-mockup.html) | Patient · consent client |
 | [`compliance-audit-mockup.html`](compliance-audit-mockup.html) | Compliance / audit reviewer · read-only |
-| [`credara-reference-architecture.html`](credara-reference-architecture.html) | System map (incl. the patient peer) |
+| [`peer-operator-console-mockup.html`](peer-operator-console-mockup.html) | Peer operator · consolidated console (steward + compliance + peer health) |
 
-All four personas now have a mockup.
+Each persona has a mockup; the **peer-operator console** folds the steward and
+compliance/audit views into one operator surface.
+
+The system map is not a persona mockup and lives at the repo root:
+[`credara-reference-architecture.html`](../../credara-reference-architecture.html).

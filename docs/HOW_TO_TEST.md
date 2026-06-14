@@ -297,7 +297,7 @@ Common first-time hiccups:
 - [`clients/README.md`](../clients/README.md) — the five persona front-end clients,
   their FHIR-bridge wiring, and how to swap from mock mode to a real bridge once
   the M7 stubs land.
-- [`design/personas.md`](../design/personas.md) — what each persona is allowed to see
+- [`clients/mockups/personas.md`](../clients/mockups/personas.md) — what each persona is allowed to see
   and do. Useful as a checklist when walking the UI in UAT — if a persona's UI lets
   you do something `personas.md` says they cannot, that is a bug.
 

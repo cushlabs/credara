@@ -32,7 +32,10 @@ pub struct Snapshot {
 pub fn render(core: &CredaCore, ready: &ReadyFlag, process_start_secs: u64) -> String {
     let snapshot = Snapshot {
         events: core.event_count().unwrap_or(0) as u64,
-        institutions: core.list_institutions().map(|v| v.len() as u64).unwrap_or(0),
+        institutions: core
+            .list_institutions()
+            .map(|v| v.len() as u64)
+            .unwrap_or(0),
         ready: ready.is_ready(),
         process_start_secs,
     };
@@ -47,7 +50,10 @@ pub fn render_snapshot(s: &Snapshot) -> String {
         "creda_build_info",
         "Build metadata; constant 1 with the version carried as a label.",
         "gauge",
-        &format!("creda_build_info{{version=\"{}\"}} 1", env!("CARGO_PKG_VERSION")),
+        &format!(
+            "creda_build_info{{version=\"{}\"}} 1",
+            env!("CARGO_PKG_VERSION")
+        ),
     );
     metric(
         &mut out,
@@ -123,7 +129,10 @@ mod tests {
         assert!(body.contains("\ncreda_ready 1\n"));
         assert!(body.contains("creda_build_info{version=\""));
         // Well-formed: every metric has exactly one HELP and one TYPE.
-        assert_eq!(body.matches("# HELP ").count(), body.matches("# TYPE ").count());
+        assert_eq!(
+            body.matches("# HELP ").count(),
+            body.matches("# TYPE ").count()
+        );
         assert_eq!(body.matches("# HELP ").count(), 6);
     }
 
