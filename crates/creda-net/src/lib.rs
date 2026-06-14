@@ -11,8 +11,9 @@
 //!
 //! - **The genuinely-new logic — libp2p-free and unit-testable without a network.** This is the
 //!   default build:
-//!   - [`bucketing`] — the 1,024 topic-bucket scheme (`Blake3(dht_key) mod 1024`, §6.2.4) and
-//!     DHT key derivation (§6.1.6).
+//!   - [`bucketing`] — the 1,024 topic-bucket scheme (`SHA-512(dht_key) mod 1024`, §6.2.4) and
+//!     DHT key derivation (§6.1.6). SHA-512 (not Blake3) because the routing key needs a
+//!     FIPS-validated, network-wide-coordinated primitive — see the `bucketing` module docs.
 //!   - [`antientropy`] — the Merkle-root-over-**UUID-set** mechanism and the reconciliation
 //!     delta (§6.1.8). Deliberately hashes UUIDs, not contents, so tombstoning doesn't diverge
 //!     roots (§6.1.8, §7.2.2).
