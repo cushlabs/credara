@@ -3,7 +3,7 @@
 The five persona clients are the project's **manual end-to-end test harness**: driven against a
 **real** bridge they exercise the full path — client → FHIR → bridge → gRPC → Core → DAG → gossip —
 exactly the way external clients will. Run this pass *before* opening the network to external
-clients. The automated equivalent is the integration smoke (HANDOFF #3); this is the hands-on
+clients. The automated equivalent is the planned integration smoke; this is the hands-on
 version that also validates the UI contract.
 
 ## Golden rule
@@ -82,7 +82,7 @@ not just reflected optimistically in the UI.
 
 ## Coverage gaps to close (each = "make this a real test")
 
-In priority order (also the de-fixturing backlog in HANDOFF/STATUS):
+In priority order (also the de-fixturing backlog in STATUS):
 1. **Prior-auth decision → `$creda-verify`** (Core already implements `EvaluateAuthorization`).
 2. **Audit ledger** → real grants/revocations/export receipts (Consent search + type-filtered
    provenance).

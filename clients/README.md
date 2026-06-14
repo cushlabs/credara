@@ -9,9 +9,8 @@
 > They run in **mock** mode (in-memory fixtures; global "MOCK BRIDGE" chip) and **real** mode
 > (against a live peer). In real mode, any surface still backed by fixtures shows an amber
 > **`DEMO DATA`** chip — which for testing purposes means *"this surface tests nothing yet"* (a
-> coverage gap). See `docs/STATUS.md` for the authoritative real-vs-fixture map and `docs/HANDOFF.md`
-> for the de-fixturing backlog. Don't treat these as a reference production EHR / patient / payer
-> integration.
+> coverage gap). See `docs/STATUS.md` for the authoritative real-vs-fixture map and de-fixturing
+> backlog. Don't treat these as a reference production EHR / patient / payer integration.
 
 Five persona-specific front-end clients ported from `design/*-mockup.html` into
 type-checked, FHIR-bridge-wired React apps:

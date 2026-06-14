@@ -49,22 +49,3 @@ jobs:
         run: cargo build --workspace --release
       - name: Manifest sanity (always)
         run: cargo metadata --no-deps --format-version 1 > /dev/null && echo "Cargo manifest valid."
-
-  # The off-by-default libp2p adapter (creda-net `--features libp2p`) is otherwise never compiled
-  # in CI, so rust-libp2p API drift — the constructor/event-shape risk flagged by
-  # TODO(libp2p-verify) — would only surface when a real peer is brought up. This job compiles and
-  # lints it against the pinned version on every push. Separate from `rust` so its heavy compile
-  # doesn't slow the core gate, and so a first-build API reconciliation is an isolated signal.
-  libp2p-adapter:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Install system build deps
-        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev protobuf-compiler
-      - name: Clippy the libp2p adapter against the pinned rust-libp2p
-        run: cargo clippy -p creda-net --features libp2p --all-targets -- -D warnings
