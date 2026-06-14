@@ -30,6 +30,9 @@ pub use authorization::{
 };
 pub use confidence::{ConfidenceConfig, Contribution, FieldClass};
 pub use error::{Error, Result};
-pub use identity::{project, EffectiveIdentity, FieldEntry, FieldKey, FieldValue};
+pub use identity::{
+    project, subgraph_identity, EffectiveIdentity, FieldEntry, FieldKey, FieldValue,
+    SubgraphIdentity,
+};
 pub use link_chain::{evaluate_link_chain, LinkChainConfig, LinkChainResult, MethodCeilings};
 pub use subgraph::Subgraph;

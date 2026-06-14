@@ -341,6 +341,38 @@ fn mrns_project_as_a_non_disputed_identifier_set() {
 }
 
 #[test]
+fn subgraph_identity_is_deterministic_root_set_and_last_modified() {
+    use creda_graph::{subgraph_identity, Subgraph};
+    let ka = key();
+    let kb = key();
+    let a = assert_ev(&ka, demo_family("smith"), VerificationMethod::GovernmentPhotoId, WALL);
+    let b = assert_ev(&kb, demo_family("jones"), VerificationMethod::GovernmentPhotoId, WALL);
+    let l = link_ev(&ka, a.id, b.id);
+
+    let sg = Subgraph::from_nodes(vec![a.clone(), b.clone(), l.clone()]);
+    let ident = subgraph_identity(&sg);
+
+    // Root set = the two parentless Asserts, sorted; the Link is not a root.
+    let mut expected_roots = vec![a.id, b.id];
+    expected_roots.sort();
+    assert_eq!(ident.root_set, expected_roots);
+
+    // Last-modified = the node with the highest (logical_clock, id) — the Link (clock 2 > 1).
+    assert_eq!(ident.last_modified_event, Some(l.id));
+
+    // Subgraph id = Blake3 over the sorted root ids concatenated — recomputed independently.
+    let mut buf = Vec::new();
+    for id in &expected_roots {
+        buf.extend_from_slice(id.as_bytes());
+    }
+    assert_eq!(ident.subgraph_id, creda_events::ContentHash::blake3(&buf).digest);
+
+    // Deterministic regardless of node insertion order — peers agree byte-for-byte.
+    let reordered = Subgraph::from_nodes(vec![l, b, a]);
+    assert_eq!(subgraph_identity(&reordered), ident);
+}
+
+#[test]
 fn attesting_one_conflicting_value_resolves_dispute() {
     // Two institutions assert conflicting DOBs (the James Whitfield seed shape): disputed.
     let a = assert_ev(

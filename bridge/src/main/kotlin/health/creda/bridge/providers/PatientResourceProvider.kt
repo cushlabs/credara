@@ -11,14 +11,24 @@ import ca.uhn.fhir.rest.annotation.Search
 import ca.uhn.fhir.rest.api.MethodOutcome
 import ca.uhn.fhir.rest.param.TokenAndListParam
 import ca.uhn.fhir.rest.server.IResourceProvider
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException
 import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException
-import ca.uhn.fhir.rest.server.exceptions.NotImplementedOperationException
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException
 import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
+import org.hl7.fhir.r4.model.CodeType
+import org.hl7.fhir.r4.model.CodeableConcept
+import org.hl7.fhir.r4.model.Coding
+import org.hl7.fhir.r4.model.DateType
+import org.hl7.fhir.r4.model.Enumerations
+import org.hl7.fhir.r4.model.Extension
+import org.hl7.fhir.r4.model.HumanName
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Parameters
 import org.hl7.fhir.r4.model.Patient
 import org.hl7.fhir.r4.model.Provenance
+import org.hl7.fhir.r4.model.StringType
+import org.hl7.fhir.r4.model.UnsignedIntType
 import org.springframework.stereotype.Component
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -56,20 +66,31 @@ class PatientResourceProvider(
     override fun getResourceType(): Class<Patient> = Patient::class.java
 
     /**
-     * read = the CredaPatient projection (§8.2.2). NOT IMPLEMENTED — fails loudly rather than
-     * returning a hollow/placeholder Patient that would silently impersonate a real projection.
-     * The real CredaPatient (US Core Patient + subgraph-identifier slice + per-field confidence /
-     * disputed-value extensions) is pending, and cleartext demographics are deliberately NOT
-     * available at the Bridge (privacy by structure, §9.2; they require the cleartext-retrieval
-     * protocol §9.2.4). Use `Patient?_creda-token=` (search), `$creda-provenance`, or
-     * `$creda-effective-identity` for what IS implemented. Tracked: §8.2.2 / docs/STATUS.md.
+     * read = the CredaPatient projection (§8.2.2): a valid US Core Patient carrying the Credara
+     * `mustSupport` extensions (subgraph identifier, root set, last-modified event) plus the
+     * structural identity the Bridge legitimately holds — institutional MRN identifiers, the
+     * subgraph identifier, and **gender** (the one demographic that is not tokenized). Name, DOB,
+     * and address are emitted **masked** (FHIR `data-absent-reason`): cleartext is deliberately not
+     * at the Bridge (privacy by structure, §9.2) and is fetched out-of-band via the consent-gated
+     * `$creda-cleartext` operation. This is honest — never a fabricated value.
      */
     @Read
     fun read(@IdParam id: IdType): Patient {
-        throw NotImplementedOperationException(
-            "Patient/read (CredaPatient projection) is not implemented yet (§8.2.2). " +
-                "Use Patient?_creda-token= search, \$creda-provenance, or \$creda-effective-identity.",
-        )
+        val patientUuid = try {
+            UUID.fromString(id.idPart)
+        } catch (e: IllegalArgumentException) {
+            throw InvalidRequestException(
+                "Patient/read requires a subgraph entry-point UUID, got '${id.idPart}'",
+            )
+        }
+        val entry = EventPayloadCbor.uuidBytes(patientUuid)
+        val identity = core.subgraphIdentity(listOf(entry))
+        val fields = core.effectiveIdentity(listOf(entry))
+        // No events reachable from this entry point → the patient does not exist here.
+        if (identity.rootSet.isEmpty() && identity.lastModifiedEvent == null && fields.isEmpty()) {
+            throw ResourceNotFoundException(id)
+        }
+        return CredaPatientMapper.project(id.idPart, identity, fields)
     }
 
     /** search by demographic token (§8.2.11): `Patient?_creda-token=...` -> MatchByTokens. */
@@ -169,3 +190,114 @@ class PatientResourceProvider(
 /** Helper: first valueString of a named FHIR Parameters parameter, or null. */
 private fun Parameters.parameterFirstRep(name: String): String? =
     parameter.firstOrNull { it.name == name }?.value?.primitiveValue()
+
+/**
+ * Projects a subgraph's §8.2.2 identity envelope + effective identity into a **CredaPatient** — a
+ * valid US Core Patient. Pure (no gRPC), so it is unit-testable.
+ *
+ * What it carries and why:
+ *  - the three `mustSupport` extensions (subgraph identifier, root set, last-modified event) and the
+ *    subgraph identifier as a stable `Patient.identifier`;
+ *  - institutional **MRNs** as identifiers (these are identifiers, not cleartext demographics);
+ *  - **gender**, the one demographic that is a plain enum rather than a token (§5.3.1);
+ *  - **name / birthDate masked** via FHIR `data-absent-reason` — cleartext is deliberately not at
+ *    the Bridge (§9.2) and is retrieved out-of-band via the consent-gated `$creda-cleartext` op.
+ *    Core's per-field confidence and dispute flag ride along as extensions so a consumer knows how
+ *    trustworthy the eventual cleartext is. Nothing here is ever a fabricated value.
+ */
+internal object CredaPatientMapper {
+    private const val BASE = "http://credara.network"
+    private const val PROFILE = "$BASE/fhir/StructureDefinition/CredaPatient"
+    private const val SUBGRAPH_SYSTEM = "$BASE/identifier/subgraph"
+    private const val EXT_SUBGRAPH_ID = "$BASE/StructureDefinition/subgraph-identifier"
+    private const val EXT_ROOT_SET = "$BASE/StructureDefinition/root-set"
+    private const val EXT_LAST_MODIFIED = "$BASE/StructureDefinition/last-modified-event"
+    private const val EXT_FIELD_CONFIDENCE = "$BASE/StructureDefinition/field-confidence"
+    private const val EXT_DISPUTED = "$BASE/StructureDefinition/disputed-value"
+    private const val DATA_ABSENT = "http://hl7.org/fhir/StructureDefinition/data-absent-reason"
+    private const val MRN_SYSTEM_PREFIX = "$BASE/identifier/mrn/"
+    private val DETOKEN = Regex("^tok:[^:]+:(.+)$")
+    private const val UNIT_SEP = "\u001F"
+
+    fun project(
+        patientId: String,
+        identity: CredaCoreClient.SubgraphIdentity,
+        fields: List<CredaCoreClient.EffectiveField>,
+    ): Patient {
+        val p = Patient()
+        p.id = patientId
+        p.meta.addProfile(PROFILE)
+
+        val subgraphHex = identity.subgraphId.joinToString("") { "%02x".format(it) }
+        // §8.2.2 subgraph identifier — both a stable cross-institution Patient.identifier and the
+        // mustSupport extension. Root set + last-modified event are the other two mustSupport exts.
+        p.addIdentifier().setSystem(SUBGRAPH_SYSTEM).setValue(subgraphHex)
+        p.addExtension(Extension(EXT_SUBGRAPH_ID).setValue(StringType(subgraphHex)))
+        identity.rootSet.forEach {
+            p.addExtension(Extension(EXT_ROOT_SET).setValue(StringType(it.toString())))
+        }
+        identity.lastModifiedEvent?.let {
+            p.addExtension(Extension(EXT_LAST_MODIFIED).setValue(StringType(it.toString())))
+        }
+
+        // Institutional MRNs from the effective identity (issuer travels in the value, unit-sep).
+        fields.firstOrNull { it.key == "mrn" }?.values?.forEach { v ->
+            val parts = v.value.split(UNIT_SEP)
+            val mrn = detoken(parts.getOrNull(1))
+            if (mrn != null) {
+                p.addIdentifier().apply {
+                    type = CodeableConcept().addCoding(
+                        Coding()
+                            .setSystem("http://terminology.hl7.org/CodeSystem/v2-0203")
+                            .setCode("MR")
+                            .setDisplay("Medical record number"),
+                    )
+                    detoken(parts.getOrNull(0))?.let { inst -> system = MRN_SYSTEM_PREFIX + inst }
+                    value = mrn
+                }
+            }
+        }
+
+        // Gender — a plain enum, not tokenized (§5.3.1), so available in the clear.
+        fields.firstOrNull { it.key == "sex" }?.values?.firstOrNull()?.value?.let { sex ->
+            p.gender = when (sex) {
+                "male" -> Enumerations.AdministrativeGender.MALE
+                "female" -> Enumerations.AdministrativeGender.FEMALE
+                "other" -> Enumerations.AdministrativeGender.OTHER
+                else -> Enumerations.AdministrativeGender.UNKNOWN
+            }
+        }
+
+        // Name + birthDate: cleartext is held only at the originating institution (§9.2). Emit them
+        // MASKED so the Patient is US-Core-valid yet never carries a fabricated value; cleartext is
+        // fetched via the consent-gated $creda-cleartext op.
+        val name = p.addName()
+        name.addExtension(Extension(DATA_ABSENT).setValue(CodeType("masked")))
+        fields.firstOrNull { it.key == "name-family" }?.values?.firstOrNull()?.let {
+            name.addExtension(Extension(EXT_FIELD_CONFIDENCE).setValue(UnsignedIntType(it.confidence)))
+        }
+
+        val birthDate = DateType()
+        birthDate.addExtension(Extension(DATA_ABSENT).setValue(CodeType("masked")))
+        fields.firstOrNull { it.key == "date-of-birth" }?.let { dob ->
+            dob.values.firstOrNull()?.let {
+                birthDate.addExtension(
+                    Extension(EXT_FIELD_CONFIDENCE).setValue(UnsignedIntType(it.confidence)),
+                )
+            }
+            if (dob.disputed) {
+                birthDate.addExtension(
+                    Extension(EXT_DISPUTED).setValue(org.hl7.fhir.r4.model.BooleanType(true)),
+                )
+            }
+        }
+        p.birthDateElement = birthDate
+
+        return p
+    }
+
+    private fun detoken(token: String?): String? {
+        if (token == null) return null
+        return DETOKEN.find(token)?.groupValues?.get(1) ?: token
+    }
+}

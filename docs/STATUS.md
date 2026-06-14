@@ -28,7 +28,7 @@ priority class of bug here.
 | `creda-events` | ✅ | Event model, 10 event types, canonical CBOR, Blake3, UUIDv7, algorithm-agile signatures. |
 | `creda-store` | ✅ | `Store` trait + RocksDB + in-memory; secondary indexes. libgit2 substrate is ❓ (§13.1). |
 | `creda-graph` | ✅ | Subgraph materialize, **effective-identity projection** (confidence-weighted, attestation-amplified, disputed-flagged), 7-step authorization eval, link-chain defense. Confidence *weights* are ❓ calibration (§5.3.2). |
-| `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics. |
+| `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics, ListInstitutions, GetSubgraphIdentity (§8.2.2). |
 | `creda-export-gate`, `creda-verifier` | ✅ | Dual-control enforcement. Verifier stale-state policy is ❓ (§13.4.3). |
 | `creda-net` | ✅ (DHT privacy ❓) | Pure replication logic green with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic + gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter **compiles + clippy-cleanly against the pinned rust-libp2p 0.56**, guarded on every push by `ci-rust`'s `libp2p-adapter` job (the old `TODO(libp2p-verify)` gap is closed); live multi-peer convergence/AE tests run in the testbed. DHT query-privacy remains ❓ (§13.3). |
 
@@ -45,8 +45,8 @@ priority class of bug here.
 | `$creda-attest` | ✅ | Attests the real events in `references` (targets = parents); per-patient root-stub only as the no-reference fallback. |
 | `$creda-amend` | ✅ (DOB-only) | Tokenization is demo-shaped — production needs the real tokenizer. |
 | `$creda-contest` | ✅ | Emits canonical `ContestReason {code, detail?}` (§3.4.3, kebab code). Cross-language golden vector pins Rust ↔ cbor2 ↔ bridge; clients send a real reason code (clinician link-confirm/DOB, steward). |
-| `Patient/read` (CredaPatient) | 🚧 | **Throws `NotImplementedOperationException`** — was returning a hollow Patient. CredaPatient projection is §8.2.2 pending; cleartext is intentionally not at the Bridge (§9.2). |
-| `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14); not registered → 404 if called. |
+| `Patient/read` (CredaPatient) | ✅ | US Core Patient projection (§8.2.2): the three `mustSupport` extensions (subgraph identifier / root set / last-modified, from Core's new `GetSubgraphIdentity`), MRN identifiers, and **real gender**; name/DOB **masked** (`data-absent-reason`) since cleartext stays off the Bridge (§9.2). Cleartext fetch via `$creda-cleartext` is the remaining related piece (🚧). |
+| `$creda-cleartext` / `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14). `$creda-cleartext` (§9.2) is the consent-gated P2P fetch of cleartext name/DOB that `Patient/read` masks. Not registered → 404 if called. |
 
 ## Persona clients (`clients/`) — 🧪 DEMO / EXAMPLE + manual E2E harness
 

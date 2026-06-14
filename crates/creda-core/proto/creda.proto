@@ -126,6 +126,15 @@ message Metrics { uint64 event_count = 1; }
 // of hardcoding a list. InstitutionId audiences (raw fingerprints) render as `fpr:<hex>`.
 message InstitutionsReply { repeated string names = 1; }
 
+// The §8.2.2 CredaPatient identity envelope for a subgraph — the deterministic, peer-identical
+// values the Bridge needs to emit CredaPatient's mustSupport extensions. Computed in shared graph
+// logic so every peer agrees byte-for-byte.
+message SubgraphIdentityReply {
+  bytes subgraph_id = 1;          // Blake3 over the sorted root-set ids (32 bytes)
+  repeated bytes root_set = 2;    // sorted root-set event ids (16 bytes each)
+  bytes last_modified_event = 3;  // most recently authored event id; empty for an empty subgraph
+}
+
 service Creda {
   rpc CreateEvent(CreateEventRequest) returns (EventReply);
   rpc GetEvent(GetEventRequest) returns (GetEventReply);
@@ -135,4 +144,5 @@ service Creda {
   rpc EvaluateAuthorization(AuthRequest) returns (AuthReply);
   rpc GetMetrics(Empty) returns (Metrics);
   rpc ListInstitutions(Empty) returns (InstitutionsReply);
+  rpc GetSubgraphIdentity(EntryPoints) returns (SubgraphIdentityReply);
 }

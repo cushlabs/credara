@@ -13,7 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use creda_events::{
-    AdministrativeGender, CertificateFingerprint, Demographics, EventId, EventPayload,
+    AdministrativeGender, CertificateFingerprint, ContentHash, Demographics, EventId, EventPayload,
     IdentityEventNode, IdentityEventType, StructuredAddress, TokenizedString,
 };
 
@@ -388,4 +388,41 @@ fn unix_secs(rfc3339: &str) -> Option<i64> {
     time::OffsetDateTime::parse(rfc3339, &time::format_description::well_known::Rfc3339)
         .ok()
         .map(|t| t.unix_timestamp())
+}
+
+/// The §8.2.2 CredaPatient identity envelope for a subgraph: a deterministic, **peer-identical**
+/// identifier plus the data the FHIR projection's `mustSupport` extensions need. Every peer holding
+/// the same subgraph computes the same values, which is what makes the subgraph identifier a stable
+/// cross-institution key (and why it lives here in shared graph logic, not at any one Bridge).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubgraphIdentity {
+    /// Blake3 over the canonical (sorted, concatenated 16-byte) root-set ids (§8.2.2). 32 bytes.
+    pub subgraph_id: Vec<u8>,
+    /// The root set: the sorted ids of the subgraph's parentless root Asserts (§3.4.1).
+    pub root_set: Vec<EventId>,
+    /// The most recently authored event (max logical clock, ties broken by id) — backs the
+    /// last-modified-event extension. `None` only for an empty subgraph.
+    pub last_modified_event: Option<EventId>,
+}
+
+/// Compute the deterministic identity envelope for a subgraph (§8.2.2). The subgraph identifier is
+/// `Blake3` over the sorted root-set ids concatenated as raw 16-byte values — order-independent
+/// because the set is sorted first, so two peers with the same roots agree byte-for-byte.
+pub fn subgraph_identity(subgraph: &Subgraph) -> SubgraphIdentity {
+    let mut root_set = subgraph.roots();
+    root_set.sort();
+    let mut buf = Vec::with_capacity(root_set.len() * 16);
+    for id in &root_set {
+        buf.extend_from_slice(id.as_bytes());
+    }
+    let subgraph_id = ContentHash::blake3(&buf).digest;
+    let last_modified_event = subgraph
+        .nodes()
+        .max_by_key(|n| (n.logical_clock, n.id))
+        .map(|n| n.id);
+    SubgraphIdentity {
+        subgraph_id,
+        root_set,
+        last_modified_event,
+    }
 }

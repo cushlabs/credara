@@ -45,7 +45,7 @@ use pb::creda_server::{Creda, CredaServer};
 use pb::{
     AuthReply, AuthRequest, CreateEventRequest, EffectiveIdentityReply, Empty, EntryPoints,
     EventReply, GetEventReply, GetEventRequest, InstitutionsReply, MatchReply, MatchRequest,
-    Metrics, SubgraphEventsReply, SubgraphEventsRequest,
+    Metrics, SubgraphEventsReply, SubgraphEventsRequest, SubgraphIdentityReply,
 };
 
 /// Fire-and-forget hook the gRPC service invokes after a locally created event has been signed
@@ -357,6 +357,23 @@ impl Creda for CredaService {
         let core = self.core.clone();
         let names = blocking(move || core.list_institutions()).await?;
         Ok(Response::new(InstitutionsReply { names }))
+    }
+
+    async fn get_subgraph_identity(
+        &self,
+        request: Request<EntryPoints>,
+    ) -> std::result::Result<Response<SubgraphIdentityReply>, Status> {
+        let entries = ids_from_bytes(&request.into_inner().ids)?;
+        let core = self.core.clone();
+        let ident = blocking(move || core.subgraph_identity(&entries)).await?;
+        Ok(Response::new(SubgraphIdentityReply {
+            subgraph_id: ident.subgraph_id,
+            root_set: ident.root_set.iter().map(|id| id.as_bytes().to_vec()).collect(),
+            last_modified_event: ident
+                .last_modified_event
+                .map(|id| id.as_bytes().to_vec())
+                .unwrap_or_default(),
+        }))
     }
 }
 

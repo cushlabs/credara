@@ -166,6 +166,32 @@ class CredaCoreClient(
     fun listInstitutions(): List<String> =
         stub.listInstitutions(Empty.getDefaultInstance()).namesList
 
+    /** A subgraph's §8.2.2 CredaPatient identity envelope (deterministic, peer-identical). */
+    data class SubgraphIdentity(
+        val subgraphId: ByteArray,
+        val rootSet: List<java.util.UUID>,
+        val lastModifiedEvent: java.util.UUID?,
+    )
+
+    /**
+     * GetSubgraphIdentity (§8.2.2): the deterministic subgraph identifier (Blake3 of the sorted
+     * root set), the root set, and the last-modified event — the data behind CredaPatient's
+     * mustSupport extensions. Computed in Core's shared graph logic so peers agree byte-for-byte.
+     */
+    fun subgraphIdentity(entryPoints: List<ByteArray>): SubgraphIdentity {
+        val req = EntryPoints.newBuilder()
+            .apply { entryPoints.forEach { addIds(ByteString.copyFrom(it)) } }
+            .build()
+        val reply = stub.getSubgraphIdentity(req)
+        val lastModified = reply.lastModifiedEvent.toByteArray()
+        return SubgraphIdentity(
+            subgraphId = reply.subgraphId.toByteArray(),
+            rootSet = reply.rootSetList.map { EventPayloadCbor.bytesToUuid(it.toByteArray()) },
+            lastModifiedEvent =
+                if (lastModified.isNotEmpty()) EventPayloadCbor.bytesToUuid(lastModified) else null,
+        )
+    }
+
     @PreDestroy
     fun shutdown() {
         channel.shutdownNow()

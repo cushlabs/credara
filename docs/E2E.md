@@ -80,6 +80,14 @@ not just reflected optimistically in the UI.
 - [ ] ❌ Entire ledger is a fixture (zero bridge calls). Does not reflect the grants/revocations/
       receipts you just created. Whole persona is a gap.
 
+### Bridge API spot-checks (curl, not a persona UI)
+- [ ] `GET /Patient/{subgraph-entry-uuid}` → a **CredaPatient** (§8.2.2): `meta.profile` = CredaPatient;
+      the subgraph-identifier / root-set / last-modified extensions present; an MRN identifier and a
+      stable subgraph `identifier`; **gender** populated; **name and birthDate masked** (each carries a
+      `data-absent-reason: masked` extension and no real value — never a fabricated demographic). A
+      bad (non-UUID) id → 400; an unknown id with no events → 404. Cleartext name/DOB are *not* here
+      by design (§9.2) — that's the future `$creda-cleartext` op.
+
 ## Coverage gaps to close (each = "make this a real test")
 
 In priority order (also the de-fixturing backlog in STATUS):

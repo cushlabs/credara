@@ -191,6 +191,17 @@ impl CredaCore {
 
     /// `MatchByTokens` (§10.1.3): candidate entry points whose demographics carry any of the
     /// given tokens (§5.2.5 index 1). Returns a sorted, de-duplicated set.
+    /// The §8.2.2 CredaPatient identity envelope for the subgraph reachable from `entry_points`:
+    /// the deterministic subgraph identifier, root set, and last-modified event. Pure graph logic
+    /// (creda-graph) so every peer computes the same values.
+    pub fn subgraph_identity(
+        &self,
+        entry_points: &[EventId],
+    ) -> Result<creda_graph::SubgraphIdentity> {
+        let subgraph = self.get_subgraph(entry_points)?;
+        Ok(creda_graph::subgraph_identity(&subgraph))
+    }
+
     pub fn match_by_tokens(&self, tokens: &[String]) -> Result<Vec<EventId>> {
         let mut hits: BTreeSet<EventId> = BTreeSet::new();
         for token in tokens {
