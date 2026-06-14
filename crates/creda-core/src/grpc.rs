@@ -368,7 +368,11 @@ impl Creda for CredaService {
         let ident = blocking(move || core.subgraph_identity(&entries)).await?;
         Ok(Response::new(SubgraphIdentityReply {
             subgraph_id: ident.subgraph_id,
-            root_set: ident.root_set.iter().map(|id| id.as_bytes().to_vec()).collect(),
+            root_set: ident
+                .root_set
+                .iter()
+                .map(|id| id.as_bytes().to_vec())
+                .collect(),
             last_modified_event: ident
                 .last_modified_event
                 .map(|id| id.as_bytes().to_vec())

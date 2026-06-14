@@ -345,8 +345,18 @@ fn subgraph_identity_is_deterministic_root_set_and_last_modified() {
     use creda_graph::{subgraph_identity, Subgraph};
     let ka = key();
     let kb = key();
-    let a = assert_ev(&ka, demo_family("smith"), VerificationMethod::GovernmentPhotoId, WALL);
-    let b = assert_ev(&kb, demo_family("jones"), VerificationMethod::GovernmentPhotoId, WALL);
+    let a = assert_ev(
+        &ka,
+        demo_family("smith"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
+    let b = assert_ev(
+        &kb,
+        demo_family("jones"),
+        VerificationMethod::GovernmentPhotoId,
+        WALL,
+    );
     let l = link_ev(&ka, a.id, b.id);
 
     let sg = Subgraph::from_nodes(vec![a.clone(), b.clone(), l.clone()]);
@@ -365,7 +375,10 @@ fn subgraph_identity_is_deterministic_root_set_and_last_modified() {
     for id in &expected_roots {
         buf.extend_from_slice(id.as_bytes());
     }
-    assert_eq!(ident.subgraph_id, creda_events::ContentHash::blake3(&buf).digest);
+    assert_eq!(
+        ident.subgraph_id,
+        creda_events::ContentHash::blake3(&buf).digest
+    );
 
     // Deterministic regardless of node insertion order — peers agree byte-for-byte.
     let reordered = Subgraph::from_nodes(vec![l, b, a]);
