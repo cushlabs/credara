@@ -7,7 +7,7 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check docs presence
         run: |
           test -f docs/credara-technical-spec.md || { echo "Missing spec markdown"; exit 1; }
