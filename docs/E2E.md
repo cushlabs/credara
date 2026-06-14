@@ -80,13 +80,23 @@ not just reflected optimistically in the UI.
 - [ ] ❌ Entire ledger is a fixture (zero bridge calls). Does not reflect the grants/revocations/
       receipts you just created. Whole persona is a gap.
 
-### Bridge API spot-checks (curl, not a persona UI)
+### Bridge API spot-checks (curl)
+
+The persona UIs render demographics (name/DOB/address/MRNs) from **`$creda-effective-identity`**,
+de-tokenized client-side — so they don't call `Patient/read`. `Patient/read` is the *standards-facing*
+CredaPatient resource (for external FHIR consumers / QHINs), checked here directly:
+
 - [ ] `GET /Patient/{subgraph-entry-uuid}` → a **CredaPatient** (§8.2.2): `meta.profile` = CredaPatient;
       the subgraph-identifier / root-set / last-modified extensions present; an MRN identifier and a
       stable subgraph `identifier`; **gender** populated; **name and birthDate masked** (each carries a
       `data-absent-reason: masked` extension and no real value — never a fabricated demographic). A
-      bad (non-UUID) id → 400; an unknown id with no events → 404. Cleartext name/DOB are *not* here
-      by design (§9.2) — that's the future `$creda-cleartext` op.
+      bad (non-UUID) id → 400; an unknown id with no events → 404.
+- [ ] Reconcile with the UIs: the readable name/DOB the **clinician** shows are de-tokenized
+      `$creda-effective-identity` values, *readable only because demo tokens embed their display form*
+      (`tok:demo:1971-08-04`). In production those tokens are opaque and real cleartext comes from the
+      consent-gated `$creda-cleartext` P2P fetch (§9.2) — the same path this masked CredaPatient points
+      at. So "the UI shows the name" and "CredaPatient masks the name" are the demo and production ends
+      of one privacy model, not a contradiction.
 
 ## Coverage gaps to close (each = "make this a real test")
 
