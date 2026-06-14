@@ -70,7 +70,7 @@ function StewardConsole() {
       try {
         if (action.ev === 'Contest') {
           const link = c.events.find((e) => e.type === 'Link');
-          await bridge.contest({ linkId: link?.id ?? c.id, reason: action.label });
+          await bridge.contest({ linkId: link?.id ?? c.id, code: action.contestCode ?? 'other', detail: action.label });
         }
         // Attest / Amend / Tombstone / Link map to other $creda-* ops not yet wired in the
         // bridge — record the steward's action locally and surface the new node in the DAG.

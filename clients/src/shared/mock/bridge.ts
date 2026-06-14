@@ -187,7 +187,7 @@ export function mockBridge(): FhirBridge {
     async contest(req: ContestRequest) {
       const ev = prov(nextId('c'), 'unknown', 'Contest', 'Mercy General (you)', {
         parents: [req.linkId],
-        summary: req.reason,
+        summary: req.detail ? `${req.code}: ${req.detail}` : req.code,
         recorded: new Date().toISOString(),
       });
       provenance.push(ev);

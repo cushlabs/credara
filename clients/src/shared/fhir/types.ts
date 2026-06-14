@@ -79,6 +79,13 @@ export type CredaEventType =
   | 'AuthorizationRevocation'
   | 'ExportReceipt';
 
+/** ContestReason.code (§3.4.3) — kebab-case, mirrors the Rust `ContestReasonCode` enum. */
+export type ContestReasonCode =
+  | 'distinct-patients'
+  | 'demographic-conflict'
+  | 'duplicate-record'
+  | 'other';
+
 export interface CredaProvenance {
   resourceType: 'Provenance';
   id: string;

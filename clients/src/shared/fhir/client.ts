@@ -12,6 +12,7 @@
 import { mockBridge } from '../mock/bridge';
 import type {
   AuthorizationDecision,
+  ContestReasonCode,
   CredaAuthorization,
   CredaProvenance,
   GrantPurpose,
@@ -86,7 +87,10 @@ export interface EffectiveField {
 export interface ContestRequest {
   /** The Provenance.id of the Link being contested. */
   linkId: string;
-  reason: string;
+  /** ContestReason.code (§3.4.3) — why the link is wrong. */
+  code: ContestReasonCode;
+  /** Optional free-text elaboration (ContestReason.detail). */
+  detail?: string;
 }
 
 export interface FhirBridge {
@@ -200,9 +204,12 @@ class HttpBridge implements FhirBridge {
   }
 
   async contest(req: ContestRequest): Promise<CredaProvenance> {
+    // ContestReason {code, detail?} — code is required; detail omitted when absent.
+    const parts: Record<string, string> = { code: req.code };
+    if (req.detail) parts.detail = req.detail;
     const res = await this.req<FhirProvenanceResource>(
       `/Provenance/${encodeURIComponent(req.linkId)}/$creda-contest`,
-      { method: 'POST', body: JSON.stringify(parametersOf({ reason: req.reason })) },
+      { method: 'POST', body: JSON.stringify(parametersOf(parts)) },
     );
     return provenanceFromFhir(res);
   }

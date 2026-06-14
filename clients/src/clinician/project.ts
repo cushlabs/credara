@@ -187,6 +187,7 @@ export function projectDobChallenge(identity: EffectiveField[], subgraph: CredaP
       ? 'Flags the demographic conflict by contesting the link, without asserting a value.'
       : 'Routes to the identity team. No event is written.',
     targetEventId: link?.id,
+    contestCode: 'demographic-conflict',
   });
 
   return {
@@ -240,6 +241,7 @@ export function projectLinkChallenge(subgraph: CredaProvenance[]): Challenge | n
         eventType: 'Contest' as const,
         note: 'Contests the link, severing the merge in the effective identity (§5.2.4 step 4).',
         targetEventId: link.id,
+        contestCode: 'distinct-patients',
       },
     ],
   };

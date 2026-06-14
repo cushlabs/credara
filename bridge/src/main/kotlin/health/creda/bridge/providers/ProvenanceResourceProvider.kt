@@ -5,6 +5,7 @@ import ca.uhn.fhir.rest.annotation.Operation
 import ca.uhn.fhir.rest.annotation.Read
 import ca.uhn.fhir.rest.annotation.ResourceParam
 import ca.uhn.fhir.rest.server.IResourceProvider
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException
 import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
 import org.hl7.fhir.r4.model.IdType
@@ -45,13 +46,21 @@ class ProvenanceResourceProvider(
         } catch (_: IllegalArgumentException) {
             throw ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException(linkId)
         }
-        val reason = params.parameter
-            .firstOrNull { it.name == "reason" }
-            ?.value
-            ?.primitiveValue()
-            ?: "contested by reviewer"
+        // ContestReason {code, detail?} (§3.4.3). `code` is a kebab ContestReasonCode; `detail`
+        // is optional free text. For backward compatibility a caller that sends only the legacy
+        // free-text `reason` is treated as code=other with that text as the detail.
+        fun param(name: String): String? =
+            params.parameter.firstOrNull { it.name == name }?.value?.primitiveValue()
+        val codeParam = param("code")
+        val code = codeParam ?: "other"
+        if (code !in EventPayloadCbor.CONTEST_REASON_CODES) {
+            throw InvalidRequestException(
+                "contest 'code' must be one of ${EventPayloadCbor.CONTEST_REASON_CODES}",
+            )
+        }
+        val detail = param("detail") ?: if (codeParam == null) param("reason") else null
 
-        val payloadCbor = EventPayloadCbor.encodeContest(targetLinkUuid, reason)
+        val payloadCbor = EventPayloadCbor.encodeContest(targetLinkUuid, code, detail)
         val parentBytes = EventPayloadCbor.uuidBytes(targetLinkUuid)
         val eventCbor = core.createEvent(payloadCbor, listOf(parentBytes))
         return ProvenanceMapper.fromEventCbor(eventCbor)

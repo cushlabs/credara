@@ -45,7 +45,7 @@ priority class of bug here.
 | `$creda-effective-identity` | ✅ | Per-field projection (value/confidence/supporting/disputed). |
 | `$creda-attest` | ✅ | Attests the real events in `references` (targets = parents); per-patient root-stub only as the no-reference fallback. |
 | `$creda-amend` | ✅ (DOB-only) | Tokenization is demo-shaped — production needs the real tokenizer (HANDOFF follow-up). |
-| `$creda-contest` | ✅ wire / ⚠️ | Works, but `encodeContest` emits the legacy `{Other:text}`; reconcile to `ContestReason {code, detail?}` (HANDOFF follow-up). |
+| `$creda-contest` | ✅ | Emits canonical `ContestReason {code, detail?}` (§3.4.3, kebab code). Cross-language golden vector pins Rust ↔ cbor2 ↔ bridge; clients send a real reason code (clinician link-confirm/DOB, steward). |
 | `Patient/read` (CredaPatient) | 🚧 | **Throws `NotImplementedOperationException`** — was returning a hollow Patient. CredaPatient projection is §8.2.2 pending; cleartext is intentionally not at the Bridge (§9.2). |
 | `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14); not registered → 404 if called. |
 

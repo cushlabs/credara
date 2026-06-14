@@ -62,18 +62,32 @@ object EventPayloadCbor {
             Add("verification_method", "self-report")
         }).EncodeToBytes(canonical)
 
+    /** Valid `ContestReasonCode` values (§3.4.3), kebab-case to mirror the Rust enum. */
+    val CONTEST_REASON_CODES = setOf(
+        "distinct-patients", "demographic-conflict", "duplicate-record", "other",
+    )
+
     /**
      * Build the canonical CBOR for `EventPayload::Contest { target_link_id, reason }`.
+     *
+     * `reason` is the Rust struct `ContestReason { code, detail? }` (§3.4.3) — a map with a kebab
+     * `code` and an optional free-text `detail`, NOT the legacy externally-tagged `{Other: text}`.
+     * `detail` is omitted when null, matching serde `skip_serializing_if = "Option::is_none"`.
+     *
      * @param targetLinkId the Link event being contested
-     * @param reason free-text reason; encoded as ContestReason::Other variant payload
+     * @param code one of [CONTEST_REASON_CODES]
+     * @param detail optional free-text elaboration
      */
-    fun encodeContest(targetLinkId: UUID, reason: String): ByteArray =
-        wrapVariant("Contest", CBORObject.NewMap().apply {
+    fun encodeContest(targetLinkId: UUID, code: String, detail: String? = null): ByteArray {
+        require(code in CONTEST_REASON_CODES) { "invalid contest reason code: $code" }
+        return wrapVariant("Contest", CBORObject.NewMap().apply {
             Add("target_link_id", uuidBytes(targetLinkId))
-            // ContestReason is itself an externally-tagged enum; the Other variant carries a
-            // free-text string. Wrap accordingly.
-            Add("reason", CBORObject.NewMap().apply { Add("Other", reason) })
+            Add("reason", CBORObject.NewMap().apply {
+                Add("code", code)
+                if (detail != null) Add("detail", detail)
+            })
         }).EncodeToBytes(canonical)
+    }
 
     // ---- Decoder for the IdentityEventNode response shape ----------------------------------
 
@@ -192,9 +206,10 @@ object EventPayloadCbor {
         }
 
     /**
-     * Lenient ContestReason rendering. The Rust struct is `{code, detail?}`; the bridge's own
-     * encodeContest still emits the legacy `{"Other": <text>}` shape (reconciliation tracked in
-     * the handoff), so accept both rather than guessing which side wrote the event.
+     * Render a ContestReason for display. The canonical shape (what both Core and our own
+     * encodeContest now emit) is the struct `{code, detail?}`. The legacy externally-tagged
+     * `{"Other": <text>}` and a bare text string are still accepted defensively, so any event
+     * written before the reconciliation still renders rather than dropping its reason.
      */
     private fun decodeContestReason(reason: CBORObject?): String? = when {
         reason == null -> null

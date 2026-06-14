@@ -4,6 +4,7 @@
 // Amend / Tombstone) — each option here maps to a bridge `$creda-*` operation.
 
 import type { EventType } from '@shared/components/EventDag';
+import type { ContestReasonCode } from '@shared/fhir/types';
 
 export type CaseKind = 'duplicate' | 'conflict' | 'contest' | 'synthetic' | 'stale' | 'blockedLink';
 
@@ -61,6 +62,8 @@ export interface CaseAction {
   /** Maps to the bridge operation. null = no graph change (defer / out-of-band). */
   ev: 'Attest' | 'Contest' | 'Amend' | 'Tombstone' | 'Link' | null;
   note: string;
+  /** ContestReason.code carried on a Contest (§3.4.3). Defaults to 'other' if unset. */
+  contestCode?: ContestReasonCode;
 }
 
 export interface StewardCase {
@@ -165,7 +168,7 @@ export const CASES: StewardCase[] = [
     ],
     actions: [
       { label: 'Confirm — same person', cls: 'attest', ev: 'Attest', note: 'Records a treatment-purpose attestation affirming the link.' },
-      { label: 'Reject — different people', cls: 'contest', ev: 'Contest', note: 'Contests the link. The projection severs it.' },
+      { label: 'Reject — different people', cls: 'contest', ev: 'Contest', note: 'Contests the link. The projection severs it.', contestCode: 'distinct-patients' },
       { label: 'Defer', cls: 'ghost', ev: null, note: 'No event written; the case stays open for more evidence.' },
     ],
   },
@@ -195,7 +198,7 @@ export const CASES: StewardCase[] = [
     ],
     actions: [
       { label: 'Request amendment from Lakeside', cls: 'amend', ev: 'Amend', note: 'Requests that Lakeside correct its DOB to the photo-ID-verified value. An Amend only takes effect once that institution signs it (§3.4.5).' },
-      { label: 'Mark as distinct patients', cls: 'contest', ev: 'Contest', note: 'Contests the link if these are not the same person.' },
+      { label: 'Mark as distinct patients', cls: 'contest', ev: 'Contest', note: 'Contests the link if these are not the same person.', contestCode: 'distinct-patients' },
       { label: 'Defer', cls: 'ghost', ev: null, note: 'Hold for outreach; no event written.' },
     ],
   },
@@ -230,7 +233,7 @@ export const CASES: StewardCase[] = [
       { id: 'g1', type: 'Attest', inst: 'BluePeak Family Care', when: '2026-05-28', x: 540, y: 55, parents: ['l1'], summary: 'Self-issued Grant naming BluePeak as audience. Inert.' },
     ],
     actions: [
-      { label: 'Contest the link', cls: 'contest', ev: 'Contest', note: 'Records a signed Contest by Mercy on the BluePeak Link.' },
+      { label: 'Contest the link', cls: 'contest', ev: 'Contest', note: 'Records a signed Contest by Mercy on the BluePeak Link.', contestCode: 'other' },
       { label: 'Leave standing for review', cls: 'ghost', ev: null, note: 'No event written. The Link stays in the DAG, blocked by step 5.5.' },
       { label: 'Reach BluePeak out-of-band', cls: 'amend', ev: null, note: 'No graph change. Triggers an operator workflow.' },
     ],

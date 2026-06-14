@@ -4,7 +4,7 @@
 // hold them client-side here for now and overlay just-written events from the FHIR mock.
 
 import type { EventType } from '@shared/components/EventDag';
-import type { CredaProvenance } from '@shared/fhir/types';
+import type { ContestReasonCode, CredaProvenance } from '@shared/fhir/types';
 
 export type FieldOption = { inst: string; v: string; vm: string };
 
@@ -42,6 +42,8 @@ export interface ChallengeOption {
   targetEventId?: string;
   /** Corrected DOB token to carry on an Amend (the value being affirmed). */
   amendDob?: string;
+  /** ContestReason.code to carry on a Contest (§3.4.3). Defaults to 'other' if unset. */
+  contestCode?: ContestReasonCode;
 }
 
 export interface PatientProjection {

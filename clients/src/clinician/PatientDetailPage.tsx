@@ -154,7 +154,7 @@ export function PatientDetailPage() {
           });
         } else if (option.eventType === 'Contest') {
           const link = option.targetEventId ?? patient.events.find((e) => e.type === 'Link')?.id ?? patient.id;
-          receipt = await bridge.contest({ linkId: link, reason: option.label });
+          receipt = await bridge.contest({ linkId: link, code: option.contestCode ?? 'other', detail: option.label });
         } else if (option.eventType === 'Amend') {
           // Wired to $creda-amend (handoff item 1): the corrected DOB is written as a real
           // Amend against the conflicting Assert, so the resolution persists past a reseed.

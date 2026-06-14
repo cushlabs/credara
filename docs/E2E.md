@@ -58,7 +58,12 @@ not just reflected optimistically in the UI.
 - [ ] Address + per-institution MRNs → live from Core's effective identity (MRNs are a non-disputed
       identifier set; the issuing institution travels in the MRN payload).
 - [ ] Link-confirm challenge → derived from a real uncontested, un-attested Link (James). Confirm
-      writes a real Attest on the Link; "wrongly merged" writes a real Contest.
+      writes a real Attest on the Link; "wrongly merged" writes a real **Contest carrying a
+      ContestReason `{code, detail}`** (code `distinct-patients`; the DOB challenge's "Neither /
+      unsure" uses `demographic-conflict`). Verify in the Core log that the signed `Contest`'s
+      reason is the structured `{code, detail}` (not the legacy `{Other:text}`), and **re-open the
+      patient → the contested Link is severed**: the two records no longer merge in the effective
+      identity (§5.2.4 step 4). `reset` restores the un-contested link.
 - [ ] ❌ Still fixture (coverage gaps): headline confidence score, sex, worklist membership. The
       stale-assert challenge is intentionally absent in real mode — a time-decayed assert can't be
       seeded (Core stamps wall-clock at creation), so it's not faked.
