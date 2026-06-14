@@ -25,7 +25,7 @@ jobs:
           java-version: '21'
       - name: Set up Gradle
         if: steps.bridge.outputs.present == 'true'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           # Pin to Gradle 8.x: the Spring Boot 3.3.2 plugin's bootJar still calls
           # CopyProcessingSpec.getDirMode(), which Gradle 9 removed. Without a committed wrapper,
