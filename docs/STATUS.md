@@ -5,9 +5,8 @@ deployed to a real network, not independently security-reviewed, **do not use wi
 This file is the single authoritative map of *what is real vs. what is not*, so nothing in the
 tree silently misleads you. Where this file and the code disagree, that is a bug — file it.
 
-The companion `docs/HANDOFF.md` is the rolling working-session log; this file is the durable,
-contributor-facing summary. The authoritative *design* is `docs/credara-technical-spec.md`; tracked
-unknowns live in its **§13 Open Questions**.
+This file is the durable, contributor-facing summary. The authoritative *design* is
+`docs/credara-technical-spec.md`; tracked unknowns live in its **§13 Open Questions**.
 
 ## Legend
 
@@ -31,7 +30,7 @@ priority class of bug here.
 | `creda-graph` | ✅ | Subgraph materialize, **effective-identity projection** (confidence-weighted, attestation-amplified, disputed-flagged), 7-step authorization eval, link-chain defense. Confidence *weights* are ❓ calibration (§5.3.2). |
 | `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics. |
 | `creda-export-gate`, `creda-verifier` | ✅ | Dual-control enforcement. Verifier stale-state policy is ❓ (§13.4.3). |
-| `creda-net` | ✅ logic / ⚠️ version-pinned | Pure replication logic green; the rust-libp2p adapter is marked `TODO(libp2p-verify)` (constructor/event-shape pinning against the libp2p version) and DHT query-privacy is ❓ (§13.3). |
+| `creda-net` | ✅ logic / ⚠️ adapter (now CI-compiled) | Pure replication logic green, now with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic and the gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter is now **compiled + linted in CI against the pinned rust-libp2p** (`ci-rust` → `libp2p-adapter` job), closing the never-built `TODO(libp2p-verify)` gap; live multi-peer convergence/AE tests remain in the testbed. DHT query-privacy is ❓ (§13.3). |
 
 ## FHIR Bridge (`bridge/`, Kotlin/HAPI) — partial
 
@@ -44,7 +43,7 @@ priority class of bug here.
 | `$creda-provenance` | ✅ | Bundle of CredaProvenance over `GetSubgraphEvents`. |
 | `$creda-effective-identity` | ✅ | Per-field projection (value/confidence/supporting/disputed). |
 | `$creda-attest` | ✅ | Attests the real events in `references` (targets = parents); per-patient root-stub only as the no-reference fallback. |
-| `$creda-amend` | ✅ (DOB-only) | Tokenization is demo-shaped — production needs the real tokenizer (HANDOFF follow-up). |
+| `$creda-amend` | ✅ (DOB-only) | Tokenization is demo-shaped — production needs the real tokenizer. |
 | `$creda-contest` | ✅ | Emits canonical `ContestReason {code, detail?}` (§3.4.3, kebab code). Cross-language golden vector pins Rust ↔ cbor2 ↔ bridge; clients send a real reason code (clinician link-confirm/DOB, steward). |
 | `Patient/read` (CredaPatient) | 🚧 | **Throws `NotImplementedOperationException`** — was returning a hollow Patient. CredaPatient projection is §8.2.2 pending; cleartext is intentionally not at the Bridge (§9.2). |
 | `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14); not registered → 404 if called. |
@@ -57,7 +56,7 @@ software. Run against a real bridge they exercise the full client→FHIR→bridg
 path. A `DEMO DATA` chip on a surface means it isn't a valid E2E test yet (a coverage gap). They run in two modes (`VITE_FHIR_BASE`): a **mock bridge**
 (in-memory fixtures; global "MOCK BRIDGE" chip) and **real** (against a live peer). In real mode,
 any surface still backed by fixtures shows an amber **`DEMO DATA`** chip so it cannot be mistaken
-for live data. Current real-vs-fixture state (drive every row to ✅; see HANDOFF for detail):
+for live data. Current real-vs-fixture state (drive every row to ✅):
 
 | App | Real against the bridge | Still fixture (chip-marked) |
 |---|---|---|
@@ -75,8 +74,6 @@ for live data. Current real-vs-fixture state (drive every row to ✅; see HANDOF
   bounds 2/3, storage substrate, R4→R5, FAST Consent F1–F5, etc.).
 - **`TODO(open-question-*)`** / **`TODO(libp2p-verify)`** / **`TODO(bridge-verify)`** — in-code,
   each referencing the above. These are sign-posted, intentional.
-- **`docs/HANDOFF.md`** — the prioritized next-work queue + the front-end de-fixturing plan
-  (#1 visible-demo marking ✅ landed; #2 read-after-write; #3 integration smoke + CI gate).
 
 ## Release gates (what "green" means)
 
@@ -84,5 +81,5 @@ for live data. Current real-vs-fixture state (drive every row to ✅; see HANDOF
 2. `(cd clients && pnpm install && pnpm typecheck)` clean (pnpm — not npm/npx).
 3. Multi-peer testbed scenarios pass (`make -C testbed up && smoke && ae-repair`).
 4. No **silent fakes**: every not-yet-real surface is 🚧 (loud) or 🧪 (chip-marked demo).
-5. (Planned, HANDOFF #3) integration smoke drives each client interaction against a real bridge
+5. (Planned) integration smoke drives each client interaction against a real bridge
    and asserts a real effect; CI grep gate rejects untracked `TODO`/`FIXME`/fixture leakage.
