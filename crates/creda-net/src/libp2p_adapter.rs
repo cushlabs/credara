@@ -13,13 +13,15 @@
 //! never break the rest of the workspace — only this file needs reconciliation when the pinned
 //! version (currently `libp2p = "0.54"`, see Cargo.toml) is bumped.
 //!
-//! ## Status: documented scaffold
+//! ## Status: compiles + clippy-clean against the pinned libp2p (0.56)
 //!
-//! This captures the intended architecture — a background Swarm task driven by a command channel,
-//! with [`NetworkTransport`] methods translating to gossipsub/kad/request-response operations.
-//! The spots that are most version-specific are marked `TODO(libp2p-verify)` and must be
-//! reconciled against the pinned libp2p version on first compile of this feature. It is not
-//! built or tested by the default workspace build by design (see the crate docs).
+//! A background Swarm task driven by a command channel, with [`NetworkTransport`] methods
+//! translating to gossipsub/kad/request-response operations. It builds and lints cleanly against
+//! libp2p 0.56, and CI's `libp2p-adapter` job (ci-rust.yml) compiles + clippies it on every push,
+//! so a version bump that changes the constructor or event shapes fails there rather than silently.
+//! The version-sensitive spots carry a `libp2p 0.56` note (the places to re-check on a bump). It is
+//! off the default workspace build by design (see the crate docs); the live multi-peer convergence
+//! tests run in the testbed.
 //!
 //! `TODO(open-question-13.3)`: DHT query-privacy (§8.5) is unresolved — Kademlia lookups reveal
 //! the queried key to the peers on the lookup path. This adapter wires the DHT but does not
@@ -49,7 +51,7 @@ use crate::transport::{EventSource, NetworkTransport};
 /// It lives in its own module so the `#[derive(NetworkBehaviour)]` macro's generated code (which
 /// uses a bare `Result<..>`) resolves to the std-prelude `Result`, not this crate's `Result`
 /// alias (which takes one type parameter and would otherwise break the generated `Debug` and
-/// connection-handler impls). TODO(libp2p-verify).
+/// connection-handler impls). Builds clean against libp2p 0.56.
 mod behaviour {
     use libp2p::swarm::NetworkBehaviour;
     use libp2p::{gossipsub, identify, kad, request_response};
@@ -164,9 +166,9 @@ impl Libp2pTransport {
     /// which is where mandatory signature verification happens (§3.6). This is the transport→engine
     /// half of replication.
     ///
-    /// TODO(libp2p-verify): the `SwarmBuilder` chain, the gossipsub/kad/request_response
-    /// constructors, and the executor wiring are the version-sensitive lines — reconcile against
-    /// the pinned libp2p version on first build.
+    /// libp2p 0.56 (version-sensitive): the `SwarmBuilder` chain, the gossipsub/kad/request_response
+    /// constructors, and the executor wiring are the lines most likely to change on a libp2p bump —
+    /// re-check them then (CI's `libp2p-adapter` job will flag it). Verified against 0.56.
     pub async fn spawn(
         keypair: libp2p::identity::Keypair,
         listen_on: Multiaddr,
@@ -242,8 +244,8 @@ impl Libp2pTransport {
     /// Kademlia routing table). Entries that fail to parse are logged and skipped rather than
     /// aborting startup, so a stale bootstrap list can't keep the peer from coming up.
     ///
-    /// TODO(libp2p-verify): derive the identity from the institution signing key / SPIFFE SVID
-    /// rather than generating a throwaway one (§6.2.3).
+    /// TODO(peer-identity, §6.2.3): derive the libp2p identity from the institution signing key /
+    /// SPIFFE SVID rather than generating a throwaway one. (Not a version concern — a real follow-up.)
     pub async fn generate_and_spawn(
         listen: &str,
         bootstrap: Vec<String>,
@@ -336,9 +338,10 @@ impl NetworkTransport for Libp2pTransport {
 
 /// Construct the composed behaviour.
 ///
-/// TODO(libp2p-verify): gossipsub/kad/request_response constructor signatures are
-/// version-sensitive. The request/response protocol uses the CBOR codec over a single protocol
-/// id; gossipsub uses the default config with message-id derived from content.
+/// libp2p 0.56 (version-sensitive): gossipsub/kad/request_response constructor signatures are the
+/// kind of thing that shifts on a libp2p bump — re-check here then. The request/response protocol
+/// uses the CBOR codec over a single protocol id; gossipsub uses the default config with message-id
+/// derived from content. Verified against 0.56.
 fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
     let peer_id = PeerId::from(key.public());
 
@@ -386,9 +389,9 @@ fn build_behaviour(key: &libp2p::identity::Keypair) -> CredaBehaviour {
 ///   with a `HashSet<PeerId>` accumulator across multi-step progress events; the awaiting Sender
 ///   is completed when the query terminates (`step.last`).
 ///
-/// TODO(libp2p-verify): the exact field names of `SwarmEvent`/`request_response::Event`/
-/// `kad::Event::OutboundQueryProgressed`/`kad::QueryResult::GetProviders` are libp2p 0.54
-/// version-sensitive — adjust the match arms if the field/variant names drifted.
+/// libp2p 0.56 (version-sensitive): the exact field names of `SwarmEvent`/`request_response::Event`/
+/// `kad::Event::OutboundQueryProgressed`/`kad::QueryResult::GetProviders` can shift on a libp2p
+/// bump — adjust the match arms then. The arms below are verified against 0.56.
 async fn run_swarm(
     mut swarm: Swarm<CredaBehaviour>,
     mut cmd_rx: mpsc::Receiver<Command>,
@@ -493,10 +496,10 @@ async fn run_swarm(
                     // accumulated peer-id bytes to the awaiting caller. Other kad events
                     // (routing-table updates, other query kinds) we currently ignore.
                     //
-                    // TODO(libp2p-verify): the exact `kad::Event::OutboundQueryProgressed` field
-                    // names and the `QueryResult::GetProviders` variant shape are libp2p 0.54
-                    // version-sensitive (`Result<GetProvidersOk, GetProvidersError>`). If 0.54
-                    // dropped the error half, adjust the match accordingly.
+                    // libp2p 0.56 (version-sensitive): the exact `kad::Event::OutboundQueryProgressed`
+                    // field names and the `QueryResult::GetProviders` variant shape
+                    // (`Result<GetProvidersOk, GetProvidersError>`) can shift on a libp2p bump —
+                    // adjust the match arms then. Verified against 0.56.
                     SwarmEvent::Behaviour(CredaBehaviourEvent::Kademlia(
                         kad::Event::OutboundQueryProgressed {
                             id,

@@ -33,8 +33,9 @@ that libp2p can never destabilize the rest of the workspace:
     (§6.3.1).
 - **The assembled part — `libp2p_adapter.rs`, behind the OFF-BY-DEFAULT `libp2p` feature:** a
   thin `NetworkTransport` over a libp2p `Swarm`. This is the single isolation point for libp2p
-  version churn; spots needing first-build reconciliation against the pinned version are marked
-  `TODO(libp2p-verify)`.
+  version churn; it compiles + clippy-cleanly against the pinned libp2p (0.56), and CI's
+  `libp2p-adapter` job builds/lints it on every push, so a version bump that breaks the API fails
+  there. The version-sensitive spots carry a `libp2p 0.56` note (where to re-check on a bump).
 
 ### Why off by default
 
@@ -42,7 +43,7 @@ that libp2p can never destabilize the rest of the workspace:
 green and fast regardless of rust-libp2p API changes. Enable the adapter deliberately:
 
 ```sh
-cargo build -p creda-net --features libp2p   # heavy compile; reconcile any TODO(libp2p-verify)
+cargo build -p creda-net --features libp2p   # heavy compile; verified against libp2p 0.56
 ```
 
 Core (M5) and the multi-peer test bed (DQ-3) turn the feature on. The full multi-peer

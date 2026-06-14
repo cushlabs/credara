@@ -132,7 +132,8 @@ The code has only run multi-peer in **single-host kind**. Real cross-host gossip
 - **No independent security review** (SECURITY.md).
 - **DHT query-privacy unresolved** (§13.3) — lookups reveal interest patterns; acceptable for a
   closed synthetic pilot, not for PHI.
-- **libp2p adapter version-pinning** unverified at scale (`TODO(libp2p-verify)`).
+- **libp2p adapter** compiles + clippy-cleanly against the pinned rust-libp2p 0.56 (CI-guarded),
+  but cross-host reachability and multi-peer behaviour at scale remain the pilot's real unknown (§3).
 - **Confidence weights uncalibrated** (§5.3.2); **revocation Bounds 2/3 unvalidated** (§4.7).
 - **Capacity unknown** (§13.7.2) — 50 GB / resource defaults are guesses; monitor.
 - **Synthetic-only is now an enforced invariant** (`config.syntheticOnly`) — but only once the

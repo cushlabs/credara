@@ -30,7 +30,7 @@ priority class of bug here.
 | `creda-graph` | ✅ | Subgraph materialize, **effective-identity projection** (confidence-weighted, attestation-amplified, disputed-flagged), 7-step authorization eval, link-chain defense. Confidence *weights* are ❓ calibration (§5.3.2). |
 | `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics. |
 | `creda-export-gate`, `creda-verifier` | ✅ | Dual-control enforcement. Verifier stale-state policy is ❓ (§13.4.3). |
-| `creda-net` | ✅ logic / ⚠️ adapter (now CI-compiled) | Pure replication logic green, now with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic and the gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter is now **compiled + linted in CI against the pinned rust-libp2p** (`ci-rust` → `libp2p-adapter` job), closing the never-built `TODO(libp2p-verify)` gap; live multi-peer convergence/AE tests remain in the testbed. DHT query-privacy is ❓ (§13.3). |
+| `creda-net` | ✅ (DHT privacy ❓) | Pure replication logic green with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic + gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter **compiles + clippy-cleanly against the pinned rust-libp2p 0.56**, guarded on every push by `ci-rust`'s `libp2p-adapter` job (the old `TODO(libp2p-verify)` gap is closed); live multi-peer convergence/AE tests run in the testbed. DHT query-privacy remains ❓ (§13.3). |
 
 ## FHIR Bridge (`bridge/`, Kotlin/HAPI) — partial
 
@@ -72,8 +72,9 @@ for live data. Current real-vs-fixture state (drive every row to ✅):
   `docs/dht-query-privacy.md` (hard gate before real-PHI; fine for the synthetic pilot).
 - **Spec §13 Open Questions** — the canonical list (confidence calibration, DHT privacy, revocation
   bounds 2/3, storage substrate, R4→R5, FAST Consent F1–F5, etc.).
-- **`TODO(open-question-*)`** / **`TODO(libp2p-verify)`** / **`TODO(bridge-verify)`** — in-code,
-  each referencing the above. These are sign-posted, intentional.
+- **`TODO(open-question-*)`** / **`TODO(bridge-verify)`** — in-code, each referencing the above.
+  These are sign-posted, intentional. (`TODO(libp2p-verify)` is resolved — the adapter compiles +
+  clippy-cleanly against libp2p 0.56 and CI's `libp2p-adapter` job keeps it that way.)
 
 ## Release gates (what "green" means)
 
