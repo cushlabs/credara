@@ -77,8 +77,11 @@ not just reflected optimistically in the UI.
 - [ ] ❌ Queue/cases are fixtures; resolve actions target fixture ids. Whole persona is a gap.
 
 ### Audit (`/audit`)
-- [ ] ❌ Entire ledger is a fixture (zero bridge calls). Does not reflect the grants/revocations/
-      receipts you just created. Whole persona is a gap.
+- [ ] ❌ The audit *client* is still a fixture (zero bridge calls) — it does not reflect the
+      disclosures you just created. But the real **bridge** surface now exists: the disclosure ledger
+      `AuditEvent?patient=` (on-chain ExportReceipts) and the read-side access-audit interceptor
+      (see the Bridge API spot-checks below). Wiring this persona to `AuditEvent?patient=` is the
+      remaining (demo) step.
 
 ### Bridge API spot-checks (curl)
 
@@ -99,6 +102,15 @@ CredaPatient resource (for external FHIR consumers / QHINs), checked here direct
       A wired provider returns a Patient with **real** name/DOB/address (past the gate, so *not* masked).
       The cross-institution P2P leg (requester's bridge → originating bridge) is tracked separately; this
       checks the operation + gate + SPI directly.
+- [ ] `GET /AuditEvent?patient={subgraph-entry-uuid}` → the **disclosure ledger** (§8.2.4): the
+      patient's `ExportReceipt` events as FHIR `AuditEvent` (ATNA Export type, source + recipient
+      agents, governing `Consent` entity, the patient as an entity), **newest first**. Empty until you
+      run `$creda-export` (honest — no fabricated ledger); after an export, that disclosure appears and
+      **survives a reload** (it's read from the DAG, not buffered). A bad (non-UUID) id → 400.
+- [ ] Read-side access audit: make any read/search above, then check the bridge's audit log for an
+      `access op=… resourceType=… path=… ` line (logger `health.creda.bridge.audit.access`). This is
+      the "who queried which subgraph" stream — separate from the on-chain disclosure ledger, and
+      SIEM-forwarded in deployment. (A custom `AccessAuditSink` bean redirects it to a SIEM.)
 - [ ] Reconcile with the UIs: the readable name/DOB the **clinician** shows are de-tokenized
       `$creda-effective-identity` values, *readable only because demo tokens embed their display form*
       (`tok:demo:1971-08-04`). In production those tokens are opaque and real cleartext comes from the
@@ -110,8 +122,9 @@ CredaPatient resource (for external FHIR consumers / QHINs), checked here direct
 
 In priority order (also the de-fixturing backlog in STATUS):
 1. **Prior-auth decision → `$creda-verify`** (Core already implements `EvaluateAuthorization`).
-2. **Audit ledger** → real grants/revocations/export receipts (Consent search + type-filtered
-   provenance).
+2. **Audit ledger** — the bridge surface is now real (`AuditEvent?patient=` disclosure ledger +
+   access-audit interceptor); the remaining step is **wiring the audit client** to it (replace the
+   fixture ledger with an `AuditEvent?patient=` read).
 3. **Clinician** action-log / request-access → real events + read-after-write.
 4. **Steward** queue → real Links + contest on real ids.
 5. **Patient** activity feed → real ExportReceipt stream.

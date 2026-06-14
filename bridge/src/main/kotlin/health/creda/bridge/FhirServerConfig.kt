@@ -4,6 +4,7 @@ import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.rest.server.RestfulServer
 import health.creda.bridge.providers.AuditEventResourceProvider
 import health.creda.bridge.providers.AuthorizationResourceProvider
+import health.creda.bridge.providers.BridgeAccessAuditInterceptor
 import health.creda.bridge.providers.ConsentResourceProvider
 import health.creda.bridge.providers.OrganizationResourceProvider
 import health.creda.bridge.providers.PatientResourceProvider
@@ -40,7 +41,8 @@ class CredaRestfulServer(
     private val organization: OrganizationResourceProvider,
     private val task: TaskResourceProvider,
     private val authorization: AuthorizationResourceProvider,
-    // AuditEventResourceProvider intentionally NOT injected — see initialize() for why.
+    private val auditEvent: AuditEventResourceProvider,
+    private val accessAudit: BridgeAccessAuditInterceptor,
 ) : RestfulServer(FhirContext.forR4()) {
 
     private val log = org.slf4j.LoggerFactory.getLogger(CredaRestfulServer::class.java)
@@ -61,22 +63,24 @@ class CredaRestfulServer(
         if (!initialized.compareAndSet(false, true)) return
         // Plain Server: providers translate FHIR <-> Core gRPC; no JPA, no parallel store.
         //
-        // AuditEventResourceProvider is *intentionally not registered yet*: HAPI's
-        // RestfulServer rejects any IResourceProvider that has zero annotated methods with
-        // HAPI-0289, and AuditEventResourceProvider is a deferred-work stub today (the
-        // auditing interceptor that would populate it is an M-?? follow-up). When the
-        // interceptor lands and the provider gains real @Read / @Search methods, add it
-        // back to this call.
-        setResourceProviders(patient, provenance, consent, organization, task)
+        // AuditEventResourceProvider serves the **disclosure** ledger: `AuditEvent?patient=` over the
+        // patient's on-chain ExportReceipts (§4.3.3, §8.2.4). Its @Search is real now (no longer the
+        // empty HAPI-0289 stub), so it joins the registered resource providers.
+        setResourceProviders(patient, provenance, consent, organization, task, auditEvent)
         // AuthorizationResourceProvider is a *plain* provider, not a resource provider: its
         // operations are Patient-typed (@Operation typeName="Patient") but it cannot be a second
         // Patient IResourceProvider (PatientResourceProvider already is — HAPI forbids two for one
         // type). registerProvider is HAPI's path for operation-only providers that attach to an
         // existing resource type; without this the ops 404/400 as "No methods exist for resource".
         registerProvider(authorization)
+        // Read-side access auditing (§8.2.4, §9.1.6): every completed interaction -> AccessAuditSink
+        // (default: structured audit log, SIEM-forwarded). The "who queried which subgraph" stream,
+        // kept separate from the on-chain disclosure ledger above.
+        registerInterceptor(accessAudit)
         log.info(
-            "Creda RestfulServer initialized — 5 resource providers (Patient, Provenance, Consent, Organization, Task) + " +
-                "1 plain provider (authorization ops on Patient); AuditEvent deferred until interceptor lands",
+            "Creda RestfulServer initialized — 6 resource providers (Patient, Provenance, Consent, " +
+                "Organization, Task, AuditEvent) + 1 plain provider (authorization ops on Patient) + " +
+                "read-side access-audit interceptor",
         )
         // TODO(bridge-verify): attach a custom ServerCapabilityStatementProvider that declares
         // `CapabilityStatement.implementationGuide = http://credara.network/fhir/ig/v1` and the
