@@ -8,9 +8,9 @@
 //! - `/readyz` — 200 OK once the daemon's startup sequence has completed (engine open, libp2p
 //!   listening, registry loaded). 503 before then. Kubernetes withholds traffic from a peer
 //!   whose `/readyz` is failing — which is what we want during bootstrap.
-//! - `/metrics` — placeholder text/plain endpoint. A real Prometheus exporter lands when the
-//!   metric surface from §11.2 is built out; this stub just returns the event count from the
-//!   engine so something is present at the chart-declared port for now.
+//! - `/metrics` — real Prometheus text-exposition endpoint ([`crate::metrics`]): build/identity,
+//!   readiness, process start, and store-derived gauges. The golden-signal counters/histograms of
+//!   §11.2.1 need request-path instrumentation and are the next slice (see `crate::metrics`).
 //!
 //! No new dependencies. The HTTP we serve is tiny enough to write directly over a tokio
 //! TcpListener. This sidesteps pulling in hyper or warp just to answer two-line probes.
@@ -58,6 +58,12 @@ pub async fn serve_health(listen: &str, ready: ReadyFlag, core: Arc<CredaCore>) 
         .map_err(|e| Error::Io(format!("health: bind {listen}: {e}")))?;
     eprintln!("creda serve: health endpoint listening on http://{listen}");
 
+    // Captured once: the process start time, exported as `creda_process_start_time_seconds`.
+    let started = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
     loop {
         let (mut stream, _peer) = match listener.accept().await {
             Ok(p) => p,
@@ -82,14 +88,14 @@ pub async fn serve_health(listen: &str, ready: ReadyFlag, core: Arc<CredaCore>) 
                 .and_then(|l| l.split_whitespace().nth(1))
                 .unwrap_or("/")
                 .to_string();
-            let response = handle(&path, &ready, &core);
+            let response = handle(&path, &ready, &core, started);
             let _ = stream.write_all(response.as_bytes()).await;
             let _ = stream.shutdown().await;
         });
     }
 }
 
-fn handle(path: &str, ready: &ReadyFlag, core: &CredaCore) -> String {
+fn handle(path: &str, ready: &ReadyFlag, core: &CredaCore, process_start_secs: u64) -> String {
     match path {
         "/livez" => http_response(200, "OK", "text/plain", "alive\n"),
         "/readyz" => {
@@ -101,15 +107,8 @@ fn handle(path: &str, ready: &ReadyFlag, core: &CredaCore) -> String {
             }
         }
         "/metrics" => {
-            // Placeholder Prometheus exposition format. A real exporter (§11.2) will replace
-            // this — for now, surface event count so kubelet probes see *some* signal at the
-            // chart-declared port.
-            let events = core.event_count().unwrap_or(0);
-            let body = format!(
-                "# HELP creda_events_total Number of events in the local store.\n\
-                 # TYPE creda_events_total gauge\n\
-                 creda_events_total {events}\n"
-            );
+            // Real Prometheus text exposition (§11.2); see `crate::metrics`.
+            let body = crate::metrics::render(core, ready, process_start_secs);
             http_response(200, "OK", "text/plain; version=0.0.4", &body)
         }
         _ => http_response(404, "Not Found", "text/plain", "not found\n"),

@@ -6,6 +6,7 @@ import health.creda.bridge.providers.AuditEventResourceProvider
 import health.creda.bridge.providers.AuthorizationResourceProvider
 import health.creda.bridge.providers.BridgeAccessAuditInterceptor
 import health.creda.bridge.providers.ConsentResourceProvider
+import health.creda.bridge.providers.CredaCapabilityStatementInterceptor
 import health.creda.bridge.providers.OrganizationResourceProvider
 import health.creda.bridge.providers.PatientResourceProvider
 import health.creda.bridge.providers.TaskResourceProvider
@@ -43,6 +44,7 @@ class CredaRestfulServer(
     private val authorization: AuthorizationResourceProvider,
     private val auditEvent: AuditEventResourceProvider,
     private val accessAudit: BridgeAccessAuditInterceptor,
+    private val capabilityStatement: CredaCapabilityStatementInterceptor,
 ) : RestfulServer(FhirContext.forR4()) {
 
     private val log = org.slf4j.LoggerFactory.getLogger(CredaRestfulServer::class.java)
@@ -77,13 +79,14 @@ class CredaRestfulServer(
         // (default: structured audit log, SIEM-forwarded). The "who queried which subgraph" stream,
         // kept separate from the on-chain disclosure ledger above.
         registerInterceptor(accessAudit)
+        // CapabilityStatement (§8.2.12): annotate HAPI's auto-generated `metadata` with the Credara
+        // IG (implementationGuide) and the per-resource Credara profiles. Operations and the
+        // `_creda-token` search param are already advertised from the providers' annotations.
+        registerInterceptor(capabilityStatement)
         log.info(
             "Creda RestfulServer initialized — 6 resource providers (Patient, Provenance, Consent, " +
                 "Organization, Task, AuditEvent) + 1 plain provider (authorization ops on Patient) + " +
-                "read-side access-audit interceptor",
+                "access-audit and CapabilityStatement interceptors",
         )
-        // TODO(bridge-verify): attach a custom ServerCapabilityStatementProvider that declares
-        // `CapabilityStatement.implementationGuide = http://credara.network/fhir/ig/v1` and the
-        // Creda profiles (CredaPatient/CredaProvenance/CredaAuthorization, §8.2.12).
     }
 }

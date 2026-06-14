@@ -28,7 +28,7 @@ priority class of bug here.
 | `creda-events` | ✅ | Event model, 10 event types, canonical CBOR, Blake3, UUIDv7, algorithm-agile signatures. |
 | `creda-store` | ✅ | `Store` trait + RocksDB + in-memory; secondary indexes. libgit2 substrate is ❓ (§13.1). |
 | `creda-graph` | ✅ | Subgraph materialize, **effective-identity projection** (confidence-weighted, attestation-amplified, disputed-flagged), 7-step authorization eval, link-chain defense. Confidence *weights* are ❓ calibration (§5.3.2). |
-| `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics, ListInstitutions, GetSubgraphIdentity (§8.2.2). |
+| `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics, ListInstitutions, GetSubgraphIdentity (§8.2.2). Health server (§10.5.3): `/livez`, `/readyz`, and `/metrics` — a **real** Prometheus exporter (`crate::metrics`) of operational gauges (build/up/ready/process-start, event + institution counts). The §11.2.1 golden-signal counters/histograms (gRPC/FHIR/gossip/AE traffic, latency, errors) are the next request-path instrumentation slice — tracked, not emitted as fabricated zeros. |
 | `creda-export-gate`, `creda-verifier` | ✅ | Dual-control enforcement. Verifier stale-state policy is ❓ (§13.4.3). |
 | `creda-net` | ✅ (DHT privacy ❓) | Pure replication logic green with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic + gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter **compiles + clippy-cleanly against the pinned rust-libp2p 0.56**, guarded on every push by `ci-rust`'s `libp2p-adapter` job (the old `TODO(libp2p-verify)` gap is closed); live multi-peer convergence/AE tests run in the testbed. DHT query-privacy remains ❓ (§13.3). |
 
@@ -49,7 +49,8 @@ priority class of bug here.
 | `$creda-cleartext` (§9.2) | ✅ (gate + SPI; P2P transport pending) | The consent-gated fetch of the cleartext name/DOB/address that `Patient/read` masks. Runs Core `EvaluateAuthorization` against the requester's fingerprint+purpose+useMode (**403** with no covering grant), then delegates to a `CleartextProvider` **SPI** the institution implements against its own EHR/MPI — Credara never stores cleartext. No provider bean ⇒ **501**; provider holding no record for the patient ⇒ **404**; never a fabricated demographic. The cross-institution **Bridge↔Bridge P2P transport** (requester's bridge → originating bridge over libp2p Noise) is the one remaining dependency — tracked, not stubbed; the operation itself is production-real for an in-cluster/direct call. |
 | `AuditEvent?patient=` (disclosure ledger) | ✅ | The on-chain disclosure half of audit (§4.3.3, §8.2.4): the patient's `ExportReceipt` events projected as FHIR `AuditEvent` (`AuditEventMapper`, FAST `$record-disclosure` shape), newest-first, each tied to the patient. Reads the real DAG via `GetSubgraphEvents` — empty until real `$creda-export` events exist (no fabricated ledger). Now a registered resource provider (was the HAPI-0289 empty stub). |
 | Read-side access audit (interceptor) | ✅ | The "who **queried** which subgraph" half (§8.2.4, §9.1.6): a HAPI `@Interceptor` on `SERVER_PROCESSING_COMPLETED_NORMALLY` emits an `AccessAuditRecord` to an `AccessAuditSink` SPI. Default sink writes a structured audit log (SIEM-forwarded); institutions register a SIEM sink. No fabricated principal — UDAP/SMART identity binding is wired with the auth layer (tracked). Stored separately from the DAG, per §8.2.4. |
-| `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14). Not registered → 404 if called. |
+| `CapabilityStatement` (`/metadata`, §8.2.12) | ✅ | HAPI's auto-generated statement, annotated by a `SERVER_CAPABILITY_STATEMENT_GENERATED` interceptor with the Credara IG (`implementationGuide`) and per-resource profiles (Patient→CredaPatient, Provenance→CredaProvenance, Consent→CredaAuthorization). The `$creda-*` operations + `_creda-token` search param are advertised from the providers' annotations. |
+| `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14). Not registered → 404 if called. |
 
 ## Persona clients (`clients/`) — 🧪 DEMO / EXAMPLE + manual E2E harness
 
@@ -69,8 +70,36 @@ for live data. Current real-vs-fixture state (drive every row to ✅):
 | steward | one contest write | queue/cases/link-chain viz |
 | audit | — | entire ledger/KPIs/report — the real **bridge** surface now exists (`AuditEvent?patient=` disclosure ledger + access-audit interceptor); wiring this client to it is the remaining (demo) step |
 
+The **steward** and **audit** personas are slated to merge into one **Peer Operator Console** (operator
+view: metrics + fleet-wide events + disclosures + stewardship + compliance). Mockup in
+`clients/mockups/peer-operator-console-mockup.html`; wiring + E2E tracked below.
+
 ## Tracked unfinished work (not bugs)
 
+- **Peer Operator Console — consolidate + wire up (+ E2E)** — a single operator/admin UI that merges
+  today's **steward** and **audit** personas with peer-health metrics. "This peer's full store" event
+  scope. **Cleartext authority is by trust boundary, not by role** (corrected from an earlier
+  break-glass-everywhere framing): a **first-party operator** (institution workforce) sees its **own
+  institution's** demographics directly from the MPI — same covered entity / BAA / source a clinician
+  reads, resolved through the `CleartextProvider`, logged like any read; **cross-institution** cleartext
+  is consent-gated via `$creda-cleartext` (the peer only holds tokenized provenance for other
+  institutions); and a **delegated / managed operator** (a third party running the peer on the
+  institution's behalf — a business associate, not workforce) is **break-glass** for all cleartext, with
+  the `CleartextProvider` ideally kept on the institution side. The console therefore carries an
+  operator-trust mode (first-party ⇄ delegated). Mockup:
+  `clients/mockups/peer-operator-console-mockup.html` (synthetic, no backend). Wiring still to complete:
+  **Overview** → `/metrics`; **Disclosures** → `AuditEvent` (generalize the per-patient ledger to
+  peer-wide); **Stewardship** → the contest path that's already live, plus the rest of the queue on real
+  Links/contests; **Events** → needs a **new fleet-wide Core `list events` RPC + bridge surface** (today
+  everything is patient/subgraph-scoped); **cleartext** → own-institution resolves directly (audited),
+  cross-institution + delegated-operator route to the consent-gated `$creda-cleartext`, writing
+  requester+reason to the access-audit log. **Needs E2E coverage**: add the console to the manual harness
+  (`docs/E2E.md`) and the planned automated smoke, asserting each section's real effect in Core (no
+  fixture passes). Until wired it is a 🧪 mockup, not a live surface.
+- **Golden-signal metric instrumentation (§11.2.1)** — `/metrics` exports real operational gauges
+  today; the labeled traffic/latency/error counters and histograms need request-path hooks (a tonic
+  tower layer in Core, the Bridge's HAPI interceptor, gossip/AE hooks). Tracked, not faked — absent
+  series are absent, never zero-valued placeholders.
 - **Cleartext P2P transport (§9.2)** — `$creda-cleartext` (consent gate + `CleartextProvider` SPI) is
   production-real for a direct/in-cluster call. The cross-institution leg — routing a requester bridge's
   call to the **originating** bridge over libp2p Noise — is the one remaining dependency. Tracked, not
