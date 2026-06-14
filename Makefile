@@ -32,6 +32,11 @@
 #   make test JOBS=1     # one compiler at a time — safest on constrained Docker memory
 #   make test JOBS=2
 
+# Container CLI. Defaults to `docker`; override for Podman (which many contributors use):
+#   make ci DOCKER=podman      — or export DOCKER=podman once in your shell.
+# Podman's CLI is Docker-compatible, so every invocation below works unchanged either way.
+DOCKER ?= docker
+
 DEV_IMAGE      ?= creda-dev:local
 DEV_DOCKERFILE := .devcontainer/Dockerfile
 
@@ -60,7 +65,7 @@ CARGO_JOBS := $(if $(JOBS),--jobs $(JOBS),)
 # dir, which sidesteps named-volume permission issues with a non-root user.
 UID := $(shell id -u)
 GID := $(shell id -g)
-RUN  = docker run --rm \
+RUN  = $(DOCKER) run --rm \
 	-v "$(CURDIR)":/work -w /work \
 	-e CARGO_HOME=/work/.cargo-cache \
 	-e HOME=/tmp \
@@ -70,7 +75,7 @@ RUN  = docker run --rm \
 .PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc libp2p shell ci clean bridge bridge-image bridge-stock
 
 dev-image:
-	docker build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
+	$(DOCKER) build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
 
 # The "anchor" run (= `anchor creda`): build + test the whole workspace single-threaded (so the
 # RocksDB from-source compile stays within a memory-limited Docker VM) and print ONE rolled-up
@@ -119,7 +124,7 @@ libp2p: dev-image
 ci: fmt-check clippy test grpc libp2p
 
 shell: dev-image
-	docker run --rm -it \
+	$(DOCKER) run --rm -it \
 		-v "$(CURDIR)":/work -w /work \
 		-e CARGO_HOME=/work/.cargo-cache -e HOME=/tmp \
 		--user $(UID):$(GID) \
@@ -130,10 +135,10 @@ shell: dev-image
 # Gradle/Maven cache lives in a gitignored in-repo dir; the repo root is mounted because the bridge
 # generates its gRPC stubs from the shared proto under crates/creda-core/proto.
 bridge-image:
-	docker build -t $(BRIDGE_DEV_IMAGE) --build-arg BASE=$(BRIDGE_BASE) -f $(BRIDGE_DOCKERFILE) .
+	$(DOCKER) build -t $(BRIDGE_DEV_IMAGE) --build-arg BASE=$(BRIDGE_BASE) -f $(BRIDGE_DOCKERFILE) .
 
 bridge: bridge-image
-	docker run --rm \
+	$(DOCKER) run --rm \
 		-v "$(CURDIR)":/work -w /work/bridge \
 		-e GRADLE_USER_HOME=/work/.gradle-cache -e HOME=/work/.gradle-cache \
 		--user $(UID):$(GID) \
@@ -142,7 +147,7 @@ bridge: bridge-image
 # Fallback: build on the prebuilt Debian-based gradle image (no custom image build) if the Fedora
 # parity image ever hiccups.
 bridge-stock:
-	docker run --rm \
+	$(DOCKER) run --rm \
 		-v "$(CURDIR)":/work -w /work/bridge \
 		-e GRADLE_USER_HOME=/work/.gradle-cache -e HOME=/work/.gradle-cache \
 		--user $(UID):$(GID) \
