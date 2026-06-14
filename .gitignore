@@ -51,6 +51,7 @@ charts/*.tgz
 # ---- Cowork handoff files (kept locally, not tracked) ----
 docs/GITHUB_SETUP.md
 docs/LAUNCH_CHECKLIST.md
+docs/HANDOFF.md
 
 # ---- OS / editor cruft ----
 .DS_Store
