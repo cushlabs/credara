@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Credara — Peer Operator Console (mockup)</title>
+<style>
+  :root{
+    --ink:#0f1b2d; --ink-2:#475569; --ink-3:#7c8aa0;
+    --bg:#eef2f6; --surface:#fff; --surface-2:#f7f9fc; --line:#dde4ee;
+    --assert:#2563eb; --attest:#15803d; --amend:#b45309; --contest:#c2410c;
+    --link:#7c3aed; --tomb:#334155; --grant:#1d4ed8; --revoke:#b91c1c; --export:#0e7490;
+    --good:#15803d; --bad:#b91c1c; --warn:#b45309; --info:#2563eb;
+    --primary:#0f4c6b; --primary-ink:#fff;
+    --radius:12px; --shadow:0 1px 2px rgba(15,27,45,.06),0 6px 20px rgba(15,27,45,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:224px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+  /* top bar */
+  .top{grid-column:1/3;display:flex;align-items:center;gap:14px;background:var(--surface);
+    border-bottom:1px solid var(--line);padding:10px 18px}
+  .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#19b3d6,#0f4c6b);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+  .brand{font-weight:650;letter-spacing:.2px}
+  .brand small{display:block;font-weight:500;color:var(--ink-3);font-size:11px;letter-spacing:.3px;text-transform:uppercase}
+  .top .spacer{flex:1}
+  .peerchip{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:9px;padding:5px 10px;font-size:12.5px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(21,128,61,.14)}
+  .who{display:flex;align-items:center;gap:9px}
+  .avatar{width:30px;height:30px;border-radius:50%;background:#0f4c6b;color:#fff;display:flex;
+    align-items:center;justify-content:center;font-size:12px;font-weight:650}
+  .postchip{font-size:11px;font-weight:650;color:#0e6e8e;background:#e1f1f6;border:1px solid #c6e3ec;
+    border-radius:20px;padding:3px 10px;letter-spacing:.2px}
+  .trusttoggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .trusttoggle .tt{font:inherit;font-size:11.5px;font-weight:600;border:0;background:var(--surface);
+    color:var(--ink-2);padding:5px 11px;cursor:pointer}
+  .trusttoggle .tt.on{background:#0f4c6b;color:#fff}
+  /* sidebar */
+  .side{background:var(--surface);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+  .navlabel{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-3);
+    padding:10px 12px 6px}
+  .nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;
+    color:var(--ink-2);font-weight:550;font-size:13.5px;border:1px solid transparent}
+  .nav:hover{background:var(--surface-2)}
+  .nav.on{background:#eaf3f7;color:#0f4c6b;border-color:#cfe6ee}
+  .nav .ico{width:18px;text-align:center;font-size:15px;opacity:.9}
+  .nav .count{margin-left:auto;font-size:11px;font-weight:700;background:#eef2f6;color:var(--ink-2);
+    border-radius:10px;padding:1px 7px}
+  .nav.on .count{background:#dcebd1;background:#d7ebf2;color:#0f4c6b}
+  .side .grow{flex:1}
+  .sidefoot{font-size:11px;color:var(--ink-3);padding:10px 12px;border-top:1px solid var(--line);line-height:1.5}
+  /* main */
+  .main{padding:20px 24px;overflow:auto}
+  .section{display:none}
+  .section.on{display:block;animation:fade .18s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  h1{font-size:19px;margin:0 0 2px;font-weight:650}
+  .crumb{color:var(--ink-3);font-size:12.5px;margin-bottom:16px}
+  h2{font-size:14px;margin:22px 0 10px;font-weight:650}
+  .muted{color:var(--ink-2)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  /* cards / metrics */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .card .l{font-size:12px;color:var(--ink-3);font-weight:600;letter-spacing:.2px}
+  .card .v{font-size:25px;font-weight:680;margin-top:5px;font-variant-numeric:tabular-nums}
+  .card .s{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+  .card.flag{border-color:#f0d2a8;background:#fffaf2}
+  .card.flag .v{color:var(--warn)}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0;overflow:hidden}
+  .panel .ph{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:650;font-size:13.5px}
+  .panel .pb{padding:14px 16px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:13px}
+  .kv .k{color:var(--ink-3)}
+  .kv .v{text-align:right;font-variant-numeric:tabular-nums}
+  /* split layout for browsers */
+  .split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+  .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chipf{font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);
+    border-radius:20px;padding:4px 11px;cursor:pointer}
+  .chipf.on{background:#0f4c6b;color:#fff;border-color:#0f4c6b}
+  input.search{flex:1;min-width:140px;height:34px;border:1px solid var(--line);border-radius:9px;padding:0 12px;font-size:13px;background:var(--surface)}
+  .list{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .row{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-top:0;font:inherit}
+  .row:last-child{border-bottom:0}
+  .row:hover{background:var(--surface-2)}
+  .row.sel{background:#eaf3f7;box-shadow:inset 3px 0 0 #0f4c6b}
+  .row .meta{flex:1;min-width:0}
+  .row .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .sm{font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .rt{font-size:11px;color:var(--ink-3);text-align:right;white-space:nowrap}
+  .etag{font-size:10.5px;font-weight:700;color:#fff;border-radius:6px;padding:3px 7px;letter-spacing:.2px;white-space:nowrap}
+  .sig{color:var(--good);font-size:11px;font-weight:700}
+  .empty{padding:30px;text-align:center;color:var(--ink-3);font-size:13px}
+  /* detail */
+  .detail{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;position:sticky;top:0}
+  .detail h3{margin:0 0 3px;font-size:15px}
+  .lineage{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0}
+  .pill{font-size:10.5px;font-weight:700;color:#fff;border-radius:14px;padding:3px 9px;white-space:nowrap}
+  .arrow{color:var(--ink-3)}
+  .btn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink);border-radius:9px;padding:8px 13px;cursor:pointer}
+  .btn:hover{background:var(--surface-2)}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.danger{color:var(--bad);border-color:#e7c2c2}
+  .btn.bg{color:#9a3412;border-color:#eccba6;background:#fff7ed}
+  .note{font-size:11.5px;color:var(--ink-3);margin-top:9px;line-height:1.5}
+  .cmp{width:100%;border-collapse:collapse;font-size:12.5px}
+  .cmp th{text-align:left;color:var(--ink-3);font-weight:600;font-size:11px;padding:5px 8px;border-bottom:1px solid var(--line)}
+  .cmp td{padding:6px 8px;border-bottom:1px solid var(--line)}
+  .conflict{color:var(--contest);font-weight:600}
+  .agree{font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}
+  .agree.match{background:#e7f4ec;color:#15803d}
+  .agree.conflict{background:#fbe9e2;color:#c2410c}
+  .finding{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:9px}
+  .finding.warn{background:#fffaf2;border-color:#f0d8b0}
+  .finding.violation{background:#fdf0f0;border-color:#eec4c4}
+  .lvl{font-size:10.5px;font-weight:800;border-radius:5px;padding:2px 7px;letter-spacing:.3px}
+  .lvl.warn{background:#fae7c8;color:#92400e}.lvl.violation{background:#f6d2d2;color:#991b1b}.lvl.pass{background:#d9efe0;color:#15803d}
+  .oplog{font-size:12px;display:flex;flex-direction:column;gap:0}
+  .oplog .e{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .oplog .e:last-child{border:0}
+  .oplog .t{color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+  /* modal */
+  .scrim{position:fixed;inset:0;background:rgba(15,27,45,.42);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .scrim.on{display:flex}
+  .modal{background:#fff;border-radius:14px;max-width:520px;width:100%;box-shadow:var(--shadow);overflow:hidden}
+  .modal .mh{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;font-weight:680}
+  .modal .mb{padding:16px 18px;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+  .modal .mf{padding:13px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:9px}
+  .modal textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:9px;padding:9px;font:inherit;font-size:13px;margin-top:8px;resize:vertical}
+  .warnbox{background:#fff7ed;border:1px solid #eccba6;color:#9a3412;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-top:12px;line-height:1.55}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);
+    color:#fff;font-size:13px;padding:11px 16px;border-radius:10px;opacity:0;transition:.25s;z-index:60;max-width:560px}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .banner{display:flex;align-items:center;gap:9px;background:#eef6f9;border:1px solid #cfe6ee;color:#0e6e8e;
+    border-radius:10px;padding:9px 13px;font-size:12.5px;margin-bottom:16px}
+  .subtle{font-size:11.5px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="mark">C</div>
+    <div class="brand">Credara<small>Peer Operator Console</small></div>
+    <div class="peerchip"><span class="dot"></span> Mercy General · <span class="mono">peer-0</span></div>
+    <div class="postchip">SYNTHETIC-ONLY</div>
+    <div class="trusttoggle" id="trusttoggle" title="Who operates this peer — determines cleartext policy">
+      <button class="tt on" data-m="first-party">First-party</button><button class="tt" data-m="delegated">Delegated</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="who">
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:600">S. Okafor</div>
+        <div class="subtle">Peer operator</div>
+      </div>
+      <div class="avatar">SO</div>
+    </div>
+  </div>
+
+  <nav class="side">
+    <div class="navlabel">Operate</div>
+    <div class="nav on" data-s="overview"><span class="ico">◴</span> Overview</div>
+    <div class="nav" data-s="events"><span class="ico">⬡</span> Events <span class="count">12,847</span></div>
+    <div class="navlabel">Govern</div>
+    <div class="nav" data-s="disclosures"><span class="ico">↧</span> Disclosures <span class="count">318</span></div>
+    <div class="nav" data-s="stewardship"><span class="ico">⚖</span> Stewardship <span class="count">3</span></div>
+    <div class="nav" data-s="compliance"><span class="ico">▣</span> Compliance <span class="count">2</span></div>
+    <div class="grow"></div>
+    <div class="sidefoot">You browse <b>tokenized</b> provenance by default; demographics for <b>your own</b> patients resolve from your MPI, like a clinician. Every read is recorded to the access log (§8.2.4).</div>
+  </nav>
+
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <section class="section on" id="overview">
+      <h1>Overview</h1>
+      <div class="crumb">Peer health and operating posture · this peer's local view</div>
+
+      <h2>Peer health <span class="subtle" style="font-weight:500">· from /metrics (§11.2)</span></h2>
+      <div class="cards">
+        <div class="card"><div class="l">Readiness</div><div class="v" style="color:var(--good)">Ready</div><div class="s">creda_ready 1 · /readyz 200</div></div>
+        <div class="card"><div class="l">Events in store</div><div class="v">12,847</div><div class="s">creda_events_total</div></div>
+        <div class="card"><div class="l">Institutions known</div><div class="v">9</div><div class="s">distinct grant audiences</div></div>
+        <div class="card"><div class="l">Uptime</div><div class="v">4d 06h</div><div class="s">since process start</div></div>
+        <div class="card"><div class="l">Build</div><div class="v" style="font-size:18px;padding-top:6px">0.1.0</div><div class="s">creda_build_info</div></div>
+      </div>
+
+      <h2>Needs attention</h2>
+      <div class="cards">
+        <div class="card"><div class="l">Open steward cases</div><div class="v">3</div><div class="s">1 contest · 2 link review</div></div>
+        <div class="card"><div class="l">Disclosures · 24h</div><div class="v">27</div><div class="s">24 export · 3 revocation</div></div>
+        <div class="card flag"><div class="l">Open findings</div><div class="v">2</div><div class="s">1 violation · 1 warning</div></div>
+        <div class="card"><div class="l">Gossip peers</div><div class="v">6</div><div class="s">live · AE current</div></div>
+      </div>
+
+      <div class="split" style="margin-top:22px">
+        <div class="panel">
+          <div class="ph">Peer identity &amp; posture</div>
+          <div class="pb">
+            <div class="kv">
+              <div class="k">Institution</div><div class="v">Mercy General Health</div>
+              <div class="k">UDAP fingerprint</div><div class="v mono" style="font-size:11.5px">a1f0…be45</div>
+              <div class="k">Signing algorithm</div><div class="v">Ed25519</div>
+              <div class="k">Network posture</div><div class="v">synthetic-only · test_data</div>
+              <div class="k">Operator trust</div><div class="v" id="ov-trust">first-party · institution workforce</div>
+              <div class="k">Cleartext policy</div><div class="v" id="ov-ctpolicy">own-institution direct · cross-institution consent-gated</div>
+              <div class="k">Cleartext source</div><div class="v">your MPI/EHR adapter · configured</div>
+              <div class="k">Access-audit sink</div><div class="v">SIEM forwarder</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">Your recent activity <span class="subtle" style="font-weight:500;margin-left:auto">watched-watcher</span></div>
+          <div class="pb">
+            <div class="oplog">
+              <div class="e"><span class="t">14:32</span><span>read <span class="mono">AuditEvent?patient=tok:7f3a…</span></span></div>
+              <div class="e"><span class="t">14:29</span><span>searched events · filter Contest</span></div>
+              <div class="e"><span class="t">13:58</span><span><b style="color:#9a3412">break-glass</b> cleartext · case&nbsp;c1 · reason logged</span></div>
+              <div class="e"><span class="t">11:04</span><span>resolved steward case c4 · signed Attest</span></div>
+            </div>
+            <div class="note">Operator reads and break-glass requests are logged to the same access-audit stream as any other principal — your authority is wide, not invisible.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EVENTS -->
+    <section class="section" id="events">
+      <h1>Events</h1>
+      <div class="crumb">Fleet-wide provenance — every event this peer has replicated · tokenized</div>
+      <div class="banner"><span>⬡</span> This is the peer's full local store across all subgraphs. Demographics are tokenized; cleartext is never here.</div>
+      <div class="toolbar" id="evfilters">
+        <span class="chipf on" data-f="all">All</span>
+        <span class="chipf" data-f="Assert">Assert</span>
+        <span class="chipf" data-f="Link">Link</span>
+        <span class="chipf" data-f="Attest">Attest</span>
+        <span class="chipf" data-f="Contest">Contest</span>
+        <span class="chipf" data-f="Grant">Grant</span>
+        <span class="chipf" data-f="Revocation">Revocation</span>
+        <span class="chipf" data-f="Export">Export</span>
+        <span class="chipf" data-f="Amend">Amend</span>
+        <input class="search" id="evsearch" placeholder="Search token, institution, event id…" />
+      </div>
+      <div class="split">
+        <div class="list" id="evlist"></div>
+        <div class="detail" id="evdetail"><div class="empty">Select an event to inspect its provenance.</div></div>
+      </div>
+    </section>
+
+    <!-- DISCLOSURES -->
+    <section class="section" id="disclosures">
+      <h1>Disclosures</h1>
+      <div class="crumb">The on-chain disclosure ledger — what data moved, under which grant, to whom (§4.3.3)</div>
+      <div class="toolbar" id="dxfilters">
+        <span class="chipf on" data-f="all">All</span>
+        <span class="chipf" data-f="Grant">Grants</span>
+        <span class="chipf" data-f="Revocation">Revocations</span>
+        <span class="chipf" data-f="Export">Exports</span>
+        <input class="search" id="dxsearch" placeholder="Search token, requester, purpose…" />
+      </div>
+      <div class="split">
+        <div class="list" id="dxlist"></div>
+        <div class="detail" id="dxdetail"><div class="empty">Select a disclosure to inspect.</div></div>
+      </div>
+    </section>
+
+    <!-- STEWARDSHIP -->
+    <section class="section" id="stewardship">
+      <h1>Stewardship</h1>
+      <div class="crumb">Identity resolution queue — contests, low-confidence links, merge review (§5.2.4)</div>
+      <div class="split">
+        <div class="list" id="stlist"></div>
+        <div class="detail" id="stdetail"><div class="empty">Select a case from the queue.</div></div>
+      </div>
+    </section>
+
+    <!-- COMPLIANCE -->
+    <section class="section" id="compliance">
+      <h1>Compliance</h1>
+      <div class="crumb">Findings derived from the signed DAG — independently re-verifiable</div>
+      <div class="cards" style="margin-bottom:18px">
+        <div class="card"><div class="l">Events reviewed</div><div class="v">1,284</div><div class="s">selected window</div></div>
+        <div class="card"><div class="l">Export receipts</div><div class="v">211</div><div class="s">disclosures logged</div></div>
+        <div class="card flag"><div class="l">Violations</div><div class="v">1</div><div class="s">requires sign-off</div></div>
+        <div class="card flag"><div class="l">Warnings</div><div class="v">1</div><div class="s">review</div></div>
+      </div>
+      <div class="split">
+        <div class="panel">
+          <div class="ph">Findings <button class="btn primary" style="margin-left:auto;font-size:12px;padding:6px 11px" onclick="toast('Report generated (mockup) — would export a signed, re-verifiable PDF')">Generate report</button></div>
+          <div class="pb">
+            <div class="finding violation">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="lvl violation">VIOLATION</span> <b style="font-size:13px">Export without covering grant</b></div>
+              <div class="muted" style="font-size:12.5px">An ExportReceipt references grant <span class="mono">g:tok:2b…</span> that was revoked 40m earlier. Chain is intact; the disclosure post-dates revocation.</div>
+              <div class="mono subtle" style="margin-top:6px">subject tok:9c1d… · requester Lakeside · §4.3.2</div>
+            </div>
+            <div class="finding warn">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="lvl warn">WARNING</span> <b style="font-size:13px">Link below confidence floor honored</b></div>
+              <div class="muted" style="font-size:12.5px">A cross-institutional grant traversed a Link at effective confidence 7,100 (floor 7,500). Flagged for steward review.</div>
+              <div class="mono subtle" style="margin-top:6px">link n3 · §4.6 step 5.5</div>
+            </div>
+            <div class="finding"><div style="display:flex;gap:8px;align-items:center"><span class="lvl pass">PASS</span> <span class="muted" style="font-size:12.5px">Provenance integrity — all 1,284 chains resolve, signatures verified.</span></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">Operator access log <span class="subtle" style="font-weight:500;margin-left:auto">§8.2.4 · SIEM</span></div>
+          <div class="pb">
+            <div class="oplog">
+              <div class="e"><span class="t">14:32</span><span>S. Okafor · read AuditEvent · <span class="mono">tok:7f3a…</span></span></div>
+              <div class="e"><span class="t">13:58</span><span>S. Okafor · <b style="color:#9a3412">break-glass cleartext</b> · case c1</span></div>
+              <div class="e"><span class="t">11:21</span><span>D. Reyes (auditor) · searched disclosures</span></div>
+              <div class="e"><span class="t">09:10</span><span>S. Okafor · generated compliance report</span></div>
+            </div>
+            <div class="note">Compliance can see who looked at what — including operators. Break-glass cleartext requests appear here with their stated reason.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <div class="mh"><span style="color:#9a3412">⚠</span> <span id="bg-title">Request cleartext</span></div>
+    <div class="mb">
+      <span id="bg-body">…</span>
+      <div style="margin-top:8px">Subject: <b id="bg-subject" class="mono">tok:7f3a…</b></div>
+      <textarea id="bg-reason" placeholder="Reason for cleartext access (e.g. breach investigation, ticket #…)"></textarea>
+      <div class="warnbox">This is a privileged action. Your identity, the subject, and this reason are recorded and visible to compliance.</div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeBg()">Cancel</button>
+      <button class="btn bg" onclick="submitBg()">Request &amp; log</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const COLORS={Assert:'#2563eb',Link:'#7c3aed',Attest:'#15803d',Contest:'#c2410c',Grant:'#1d4ed8',Revocation:'#b91c1c',Export:'#0e7490',Amend:'#b45309',Tombstone:'#334155'};
+  const INST=['Mercy General','Lakeside Hospital','Northside Clinic','Valley Labs','St. Anne','Harbor Health'];
+
+  // ---- synthetic, tokenized event stream (this peer's local store) ----
+  const EVENTS=[
+    {id:'e8841',type:'Contest',subj:'tok:7f3a…91',inst:'Mercy General',clk:214,parents:['Link n3'],sig:1,note:'Disputes a Link as joining two distinct patients (code distinct-patients).'},
+    {id:'e8840',type:'Export',subj:'tok:9c1d…04',inst:'Lakeside Hospital',clk:213,parents:['Grant g:2b…'],sig:1,note:'Data released under a governing grant; recipient acknowledged.'},
+    {id:'e8838',type:'Grant',subj:'tok:9c1d…04',inst:'Mercy General',clk:212,parents:['Assert a:71…'],sig:1,note:'Authorization grant to Lakeside · purpose treatment.'},
+    {id:'e8835',type:'Attest',subj:'tok:5e22…77',inst:'Northside Clinic',clk:211,parents:['Assert a:5e…'],sig:1,note:'Second institution attests an asserted DOB; confidence amplified.'},
+    {id:'e8833',type:'Link',subj:'tok:7f3a…91',inst:'Valley Labs',clk:210,parents:['Assert a:7f…','Assert a:3c…'],sig:1,note:'Proposes two records are the same patient · method DemographicMatch.'},
+    {id:'e8830',type:'Assert',subj:'tok:3c80…12',inst:'Harbor Health',clk:209,parents:[],sig:1,note:'Root assertion of identity from front-desk registration.'},
+    {id:'e8829',type:'Revocation',subj:'tok:1a44…b0',inst:'Mercy General',clk:208,parents:['Grant g:1a…'],sig:1,note:'Withdraws a prior authorization grant.'},
+    {id:'e8826',type:'Amend',subj:'tok:5e22…77',inst:'Northside Clinic',clk:207,parents:['Assert a:5e…'],sig:1,note:'Corrects a previously asserted value; supersedes the original.'},
+    {id:'e8824',type:'Export',subj:'tok:b7f1…2a',inst:'St. Anne',clk:206,parents:['Grant g:9d…'],sig:1,note:'Disclosure under grant · purpose payment.'},
+    {id:'e8821',type:'Assert',subj:'tok:7f3a…91',inst:'Mercy General',clk:205,parents:[],sig:1,note:'Root assertion.'},
+    {id:'e8819',type:'Grant',subj:'tok:5e22…77',inst:'Northside Clinic',clk:204,parents:['Assert a:5e…'],sig:1,note:'Grant · purpose operations.'},
+    {id:'e8815',type:'Link',subj:'tok:b7f1…2a',inst:'Valley Labs',clk:203,parents:['Assert a:b7…','Assert a:0e…'],sig:1,note:'Link below confidence floor — see Stewardship.'},
+  ];
+
+  const DISCLOSURES=[
+    {id:'x214',type:'Export',subj:'tok:9c1d…04',who:'Lakeside Hospital',purpose:'treatment',grant:'g:tok:2b…',scope:'demographics + coverage',when:'14:41',finding:null,intact:1},
+    {id:'x213',type:'Revocation',subj:'tok:1a44…b0',who:'Mercy General',purpose:'—',grant:'g:tok:1a…',scope:'revokes prior grant',when:'13:18',finding:null,intact:1},
+    {id:'x212',type:'Export',subj:'tok:9c1d…04',who:'Lakeside Hospital',purpose:'treatment',grant:'g:tok:2b…',scope:'demographics',when:'12:55',finding:'violation',intact:1},
+    {id:'x211',type:'Grant',subj:'tok:9c1d…04',who:'Mercy General',purpose:'treatment',grant:'g:tok:2b…',scope:'authorizes Lakeside',when:'12:02',finding:null,intact:1},
+    {id:'x208',type:'Export',subj:'tok:b7f1…2a',who:'St. Anne',purpose:'payment',grant:'g:tok:9d…',scope:'coverage',when:'10:33',finding:null,intact:1},
+    {id:'x205',type:'Grant',subj:'tok:5e22…77',who:'Northside Clinic',purpose:'operations',grant:'g:tok:5e…',scope:'authorizes Northside',when:'09:47',finding:null,intact:1},
+  ];
+
+  const CASES=[
+    {id:'c1',kind:'Contest',tag:'CONTEST',title:'Possible wrong merge',insts:['Mercy General','Valley Labs'],conf:null,
+      summary:'A Link joined two records that a clinician believes are different patients. Contesting severs the merge.',
+      cmp:[['Family','whitfield','whitford','conflict'],['DOB','1971-08-04','1971-08-04','match'],['Sex','female','female','match'],['MRN','tok:5582019','tok:7741223','conflict']],
+      actions:[['Confirm distinct — sign Contest','danger'],['Keep merged','plain']]},
+    {id:'c2',kind:'Link',tag:'LINK REVIEW',title:'Link below confidence floor',insts:['Valley Labs','Harbor Health'],conf:71,
+      summary:'A cross-institutional Link sits at effective confidence 7,100 — under the 7,500 floor. It is honored pending review.',
+      cmp:[['Family','okafor','okafor','match'],['DOB','1988-02-19','1988-02-09','conflict'],['Address','tok:north-7','tok:north-7','match']],
+      actions:[['Attest the Link','plain'],['Contest the Link','danger']]},
+    {id:'c3',kind:'Link',tag:'LINK REVIEW',title:'New merge candidate',insts:['Northside Clinic','Mercy General'],conf:88,
+      summary:'A high-confidence Link is proposed between two subgraphs. Confirm to let the merge stand in effective identity.',
+      cmp:[['Family','reyes','reyes','match'],['DOB','1990-11-30','1990-11-30','match'],['Sex','male','male','match']],
+      actions:[['Confirm — sign Attest','plain'],['Contest','danger']]},
+  ];
+
+  // ---- renderers ----
+  function tag(t){return '<span class="etag" style="background:'+COLORS[t]+'">'+t+'</span>';}
+  function pill(label,t){const c=COLORS[t]||'#7c8aa0';return '<span class="pill" style="background:'+c+'">'+label+'</span>';}
+
+  let evFilter='all', evQuery='', evSel=null;
+  function renderEvents(){
+    const host=document.getElementById('evlist');
+    const rows=EVENTS.filter(e=>(evFilter==='all'||e.type===evFilter) &&
+      (e.subj+e.inst+e.id+e.type).toLowerCase().includes(evQuery.toLowerCase()));
+    if(!rows.length){host.innerHTML='<div class="empty">No events match.</div>';return;}
+    host.innerHTML=rows.map(e=>`<button class="row ${evSel===e.id?'sel':''}" onclick="selEvent('${e.id}')">
+      ${tag(e.type)}
+      <div class="meta"><div class="nm mono">${e.subj}</div><div class="sm">${e.inst} · clock ${e.clk} · ${e.id}</div></div>
+      <div class="rt"><span class="sig">ed25519 ✓</span></div>
+    </button>`).join('');
+  }
+  function selEvent(id){evSel=id;renderEvents();const e=EVENTS.find(x=>x.id===id);
+    const lineage=(e.parents.length?e.parents:['root (none)']).map(p=>'<span class="pill" style="background:#7c8aa0">'+p+'</span>').join('<span class="arrow">→</span>')+'<span class="arrow">→</span>'+pill(e.type,e.type);
+    document.getElementById('evdetail').innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${tag(e.type)}<span class="subtle mono">${e.id}</span></div>
+      <h3 class="mono">${e.subj}</h3>
+      <div class="muted" style="font-size:12.5px">${e.note}</div>
+      <div class="lineage">${lineage}</div>
+      <div class="kv" style="margin-top:6px">
+        <div class="k">Originating</div><div class="v">${e.inst}</div>
+        <div class="k">Logical clock</div><div class="v">${e.clk}</div>
+        <div class="k">Signature</div><div class="v" style="color:var(--good)">ed25519 · verified</div>
+        <div class="k">Subject</div><div class="v mono">${e.subj}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        ${cleartextBtn(e.subj)}
+        <button class="btn" onclick="toast('Opened full subgraph for ${e.subj} (mockup)')">Open subgraph</button>
+      </div>
+      <div class="note">${cleartextNote(e.subj)}</div>`;
+  }
+
+  let dxFilter='all', dxQuery='', dxSel=null;
+  function renderDx(){
+    const host=document.getElementById('dxlist');
+    const rows=DISCLOSURES.filter(d=>(dxFilter==='all'||d.type===dxFilter) &&
+      (d.subj+d.who+d.purpose+d.id).toLowerCase().includes(dxQuery.toLowerCase()));
+    if(!rows.length){host.innerHTML='<div class="empty">No disclosures match.</div>';return;}
+    host.innerHTML=rows.map(d=>`<button class="row ${dxSel===d.id?'sel':''}" onclick="selDx('${d.id}')">
+      ${tag(d.type)}
+      <div class="meta"><div class="nm">${d.who} <span class="subtle">· ${d.purpose}</span></div><div class="sm mono">${d.subj} · ${d.grant}</div></div>
+      <div class="rt">${d.finding?'<span class="lvl '+d.finding+'">'+d.finding.toUpperCase()+'</span><br>':''}${d.when}</div>
+    </button>`).join('');
+  }
+  function selDx(id){dxSel=id;renderDx();const d=DISCLOSURES.find(x=>x.id===id);
+    document.getElementById('dxdetail').innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${tag(d.type)}${d.finding?'<span class="lvl '+d.finding+'">'+d.finding.toUpperCase()+'</span>':''}</div>
+      <h3>${d.type}: ${d.who}</h3>
+      <div class="kv" style="margin-top:8px">
+        <div class="k">Subject (tokenized)</div><div class="v mono">${d.subj}</div>
+        <div class="k">Purpose</div><div class="v">${d.purpose}</div>
+        <div class="k">Requester</div><div class="v">${d.who}</div>
+        <div class="k">Governing grant</div><div class="v mono">${d.grant}</div>
+        <div class="k">Released scope</div><div class="v">${d.scope}</div>
+        <div class="k">Recorded</div><div class="v">${d.when}</div>
+      </div>
+      <div class="note" style="margin-top:12px">${d.intact?'<span style="color:var(--good)">✓</span> chain intact — every parent resolves, signatures verified':'<span style="color:var(--bad)">✕</span> chain broken'}</div>
+      ${d.finding==='violation'?'<div class="warnbox" style="margin-top:10px">This export post-dates the revocation of its governing grant. Flagged for sign-off in Compliance.</div>':''}
+      <div style="margin-top:14px">${cleartextBtn(d.subj)}</div>
+      <div class="note">${cleartextNote(d.subj)}</div>`;
+  }
+
+  let stSel=null;
+  function renderSt(){
+    const host=document.getElementById('stlist');
+    host.innerHTML=CASES.map(c=>`<button class="row ${stSel===c.id?'sel':''}" onclick="selSt('${c.id}')">
+      <span class="etag" style="background:${c.kind==='Contest'?COLORS.Contest:COLORS.Link}">${c.tag}</span>
+      <div class="meta"><div class="nm">${c.title}</div><div class="sm">${c.insts.join(' · ')}</div></div>
+      <div class="rt">${c.conf?c.conf+'%':'—'}</div>
+    </button>`).join('');
+  }
+  function selSt(id){stSel=id;renderSt();const c=CASES.find(x=>x.id===id);
+    const cmp=c.cmp.map(r=>`<tr><td class="muted">${r[0]}</td><td class="${r[3]==='conflict'?'conflict':''} mono">${r[1]}</td><td class="${r[3]==='conflict'?'conflict':''} mono">${r[2]}</td><td><span class="agree ${r[3]}">${r[3]}</span></td></tr>`).join('');
+    const acts=c.actions.map((a,i)=>`<button class="btn ${a[1]==='danger'?'danger':''}" onclick="resolve('${c.id}','${a[0].replace(/'/g,'')}')">${a[0]}</button>`).join('');
+    document.getElementById('stdetail').innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="etag" style="background:${c.kind==='Contest'?COLORS.Contest:COLORS.Link}">${c.tag}</span></div>
+      <h3>${c.title}</h3>
+      <div class="muted" style="font-size:12.5px;margin-bottom:10px">${c.summary}</div>
+      <table class="cmp"><thead><tr><th>Field</th><th>${c.insts[0]}</th><th>${c.insts[1]}</th><th>Agreement</th></tr></thead><tbody>${cmp}</tbody></table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">${acts}</div>
+      <div class="note">Resolving signs a new event into the subgraph (Attest/Contest), gossiped to peers. You act on tokenized values only.</div>`;
+  }
+  function resolve(id,label){toast('Signed & recorded — '+label+' · gossiping to peers (mockup)');}
+
+  // ---- cleartext authority: trust boundary (who runs the peer) × whose data it is ----
+  const OURS = new Set(['tok:7f3a…91','tok:9c1d…04','tok:1a44…b0']);
+  let trustMode = 'first-party';
+  let bgMode = 'consent';
+  function isOwn(subj){return OURS.has(subj);}
+  function cleartextMode(subj){
+    if(trustMode==='delegated') return 'breakglass';      // managed operator: any cleartext is exceptional
+    return isOwn(subj) ? 'direct' : 'consent';            // first-party: own = direct, cross-institution = consent-gated
+  }
+  function cleartextBtn(subj){
+    const m=cleartextMode(subj);
+    if(m==='direct')  return `<button class="btn" onclick="viewDemographics('${subj}')">View demographics</button>`;
+    if(m==='consent') return `<button class="btn bg" onclick="openBg('${subj}','consent')">Request cleartext · consent-gated</button>`;
+    return `<button class="btn bg" onclick="openBg('${subj}','breakglass')">Break-glass: request cleartext</button>`;
+  }
+  function cleartextNote(subj){
+    const m=cleartextMode(subj);
+    if(m==='direct')  return "Your institution's own patient — demographics resolve directly from your MPI/EHR, the same source a clinician sees. Authorized workforce access, logged like any read.";
+    if(m==='consent') return "Another institution's patient — cleartext lives at the originating peer and is fetched via $creda-cleartext only under a covering grant.";
+    return "Delegated operator — you run this peer on the institution's behalf, so cleartext is exceptional and break-glass-gated. The CleartextProvider stays on the institution side.";
+  }
+  function viewDemographics(subj){toast('Resolved demographics for '+subj+' from your MPI — authorized workforce access, logged (§8.2.4)');}
+
+  // ---- cleartext request modal (consent-gated, or break-glass for a delegated operator) ----
+  function openBg(subj,mode){
+    bgMode=mode||'consent';
+    const bg=bgMode==='breakglass';
+    document.getElementById('bg-title').textContent=bg?'Break-glass: request cleartext':'Request cleartext · consent-gated';
+    document.getElementById('bg-body').innerHTML=bg
+      ? "You run this peer on the institution's behalf (delegated operator). Cleartext is not routinely available to you — this break-glass request routes to <span class=\"mono\">$creda-cleartext</span>, is granted only under a covering authorization, and is surfaced to the institution's compliance."
+      : "This is another institution's patient. Cleartext is fetched from the originating peer via <span class=\"mono\">$creda-cleartext</span> only if a covering grant authorizes it (§9.2).";
+    document.getElementById('bg-subject').textContent=subj;
+    document.getElementById('bg-reason').value='';
+    document.getElementById('scrim').classList.add('on');
+  }
+  function closeBg(){document.getElementById('scrim').classList.remove('on');}
+  function submitBg(){const r=document.getElementById('bg-reason').value.trim();if(!r){toast('A reason is required — the request is logged with it.');return;}closeBg();
+    toast(bgMode==='breakglass'?'Break-glass request routed to $creda-cleartext · logged with your reason':'Cleartext request routed to $creda-cleartext · consent-gated · logged');}
+
+  // ---- nav + filters ----
+  document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
+    document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));n.classList.add('on');
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
+    document.getElementById(n.dataset.s).classList.add('on');
+  });
+  document.querySelectorAll('#evfilters .chipf').forEach(c=>c.onclick=()=>{document.querySelectorAll('#evfilters .chipf').forEach(x=>x.classList.remove('on'));c.classList.add('on');evFilter=c.dataset.f;renderEvents();});
+  document.querySelectorAll('#dxfilters .chipf').forEach(c=>c.onclick=()=>{document.querySelectorAll('#dxfilters .chipf').forEach(x=>x.classList.remove('on'));c.classList.add('on');dxFilter=c.dataset.f;renderDx();});
+  document.getElementById('evsearch').oninput=e=>{evQuery=e.target.value;renderEvents();};
+  document.getElementById('dxsearch').oninput=e=>{dxQuery=e.target.value;renderDx();};
+  document.querySelectorAll('#trusttoggle .tt').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#trusttoggle .tt').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    trustMode=b.dataset.m;const del=trustMode==='delegated';
+    document.getElementById('ov-trust').textContent=del?"delegated · managed on the institution's behalf":'first-party · institution workforce';
+    document.getElementById('ov-ctpolicy').textContent=del?'all cleartext break-glass (operator is a business associate)':'own-institution direct · cross-institution consent-gated';
+    if(evSel)selEvent(evSel);if(dxSel)selDx(dxSel);
+    toast(del?'Delegated operator — cleartext is break-glass for every subject':'First-party operator — own-institution demographics resolve directly, cross-institution is consent-gated');
+  });
+
+  let toastT;
+  function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3200);}
+
+  renderEvents();renderDx();renderSt();
+</script>
+</body>
+</html>
