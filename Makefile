@@ -108,14 +108,15 @@ grpc: dev-image
 	$(RUN) cargo test -p creda-core --features grpc $(CARGO_JOBS)
 
 # Compile-check the shipped feature set (gRPC + libp2p). libp2p is the one quarantined dependency
-# whose API churns between versions, so this is its reconciliation entry point and is intentionally
-# NOT in CI — a libp2p API shift must never turn the workspace red. Reconcile TODO(libp2p-verify)
-# spots here on first build / version bump.
+# whose API churns between versions, so this is its reconciliation entry point. As of the
+# `libp2p-adapter` job in ci-rust.yml it IS exercised in CI (a dedicated, non-core job so a libp2p
+# API shift can't turn the *core* workspace red); re-check the `libp2p 0.56` spots on a version bump.
 libp2p: dev-image
 	$(RUN) cargo clippy -p creda-core --features grpc,libp2p --all-targets $(CARGO_JOBS) -- -D warnings
 
-# Everything CI checks, in one go.
-ci: fmt-check clippy test
+# Everything CI checks, in one go — run this before pushing. Mirrors the ci-rust workflow:
+# fmt-check + workspace clippy/test, the gRPC-feature clippy/test, and the libp2p adapter compile.
+ci: fmt-check clippy test grpc libp2p
 
 shell: dev-image
 	docker run --rm -it \
