@@ -91,12 +91,20 @@ CredaPatient resource (for external FHIR consumers / QHINs), checked here direct
       stable subgraph `identifier`; **gender** populated; **name and birthDate masked** (each carries a
       `data-absent-reason: masked` extension and no real value — never a fabricated demographic). A
       bad (non-UUID) id → 400; an unknown id with no events → 404.
+- [ ] `POST /Patient/{id}/$creda-cleartext` (params: `requester` fingerprint hex, `purpose`, `useMode`,
+      optional repeated `field` = `name`/`birthDate`/`address`) → the unmasked complement to `Patient/read`,
+      consent-gated (§9.2). With **no covering grant** → `403`; with a grant but **no `CleartextProvider`
+      configured** → `501` (the pilot default — cleartext is institution-supplied via the SPI, never
+      Credara-held, so an un-integrated bridge fails loudly rather than faking it); a bad (non-UUID) id → 400.
+      A wired provider returns a Patient with **real** name/DOB/address (past the gate, so *not* masked).
+      The cross-institution P2P leg (requester's bridge → originating bridge) is tracked separately; this
+      checks the operation + gate + SPI directly.
 - [ ] Reconcile with the UIs: the readable name/DOB the **clinician** shows are de-tokenized
       `$creda-effective-identity` values, *readable only because demo tokens embed their display form*
       (`tok:demo:1971-08-04`). In production those tokens are opaque and real cleartext comes from the
-      consent-gated `$creda-cleartext` P2P fetch (§9.2) — the same path this masked CredaPatient points
-      at. So "the UI shows the name" and "CredaPatient masks the name" are the demo and production ends
-      of one privacy model, not a contradiction.
+      consent-gated `$creda-cleartext` fetch (§9.2, now implemented — see the bullet above) — the same
+      path this masked CredaPatient points at. So "the UI shows the name" and "CredaPatient masks the
+      name" are the demo and production ends of one privacy model, not a contradiction.
 
 ## Coverage gaps to close (each = "make this a real test")
 

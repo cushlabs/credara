@@ -3,6 +3,9 @@ package health.creda.bridge.providers
 import ca.uhn.fhir.rest.annotation.IdParam
 import ca.uhn.fhir.rest.annotation.Operation
 import ca.uhn.fhir.rest.annotation.ResourceParam
+import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException
+import ca.uhn.fhir.rest.server.exceptions.NotImplementedOperationException
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException
 import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
 import health.creda.grpc.GrantPurpose
@@ -18,9 +21,11 @@ import org.hl7.fhir.r4.model.Identifier
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.InstantType
 import org.hl7.fhir.r4.model.Parameters
+import org.hl7.fhir.r4.model.Patient
 import org.hl7.fhir.r4.model.Period
 import org.hl7.fhir.r4.model.Reference
 import org.hl7.fhir.r4.model.StringType
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -43,6 +48,9 @@ import java.util.UUID
 @Component
 class AuthorizationResourceProvider(
     private val core: CredaCoreClient,
+    // Cleartext is institution-supplied (§9.2) — optional by construction: absent ⇒ the operation
+    // 501s rather than the app failing to start. An institution registers its own bean to integrate.
+    private val cleartextProviders: ObjectProvider<CleartextProvider>,
 ) {
 
     // These operations live on the *Patient* resource (`POST Patient/[id]/$creda-...`, §8.2.9) —
@@ -186,6 +194,52 @@ class AuthorizationResourceProvider(
                     .setValue(Reference("Consent/${EventPayloadCbor.bytesToUuid(g.toByteArray())}"))
             }
         }
+    }
+
+    /**
+     * `$creda-cleartext` (§9.2): the consent-gated fetch of cleartext demographics that `Patient/read`
+     * masks. Served by the **originating** institution's bridge (reached by the requester's bridge over
+     * P2P, §9.2). Two stages, both fail-closed:
+     *
+     *  1. **Consent gate** — Core `EvaluateAuthorization` against the requester's UDAP fingerprint +
+     *     purpose + use-mode. No covering grant ⇒ `403`. (Same evaluation as `$creda-verify`; the
+     *     local Verifier may be stale, §10.3.3 — fail-closed on stale is correct for cleartext.)
+     *  2. **Source** — cleartext lives only in the institution's own EHR/MPI, never in Credara, so the
+     *     [CleartextProvider] SPI does the lookup. No bean ⇒ `501` (un-integrated deployment); a bean
+     *     that has no record for this patient ⇒ `404`. Neither fabricates a demographic ("no silent
+     *     fakes", §9.2).
+     *
+     * `field` parameters (repeatable: `name` / `birthDate` / `address`) scope the response; absent =
+     * everything the provider returns. The result is an ordinary Patient with **real** values — it is
+     * past the gate, so it is not masked.
+     */
+    @Operation(name = "\$creda-cleartext", typeName = "Patient")
+    fun cleartext(@IdParam patient: IdType, @ResourceParam params: Parameters): Patient {
+        val q = parseAuthQuery(params)
+        val decision = core.evaluateAuthorization(
+            entryPoints = listOf(entryPointBytes(patient)),
+            requesterFingerprint = q.requesterFingerprint,
+            purpose = q.purpose,
+            useMode = q.useMode,
+        )
+        if (!decision.authorized) {
+            throw ForbiddenOperationException("\$creda-cleartext denied — no covering grant: ${decision.reason}")
+        }
+        val provider = cleartextProviders.getIfAvailable() ?: throw NotImplementedOperationException(
+            "no cleartext source is configured at this institution (\$creda-cleartext, §9.2) — the " +
+                "deployment must register a CleartextProvider bean integrating its EHR/MPI",
+        )
+        val fields = params.parameter
+            .filter { it.name == "field" }
+            .mapNotNull { it.value?.primitiveValue() }
+            .toSet()
+        val demographics = provider.cleartext(
+            requireUuid(patient.idPart.removePrefix("urn:uuid:"), "patient"),
+            fields,
+        ) ?: throw ResourceNotFoundException(
+            "no cleartext held at this institution for patient ${patient.idPart}",
+        )
+        return CleartextMapper.toPatient(patient.idPart, demographics, fields)
     }
 
     // ---- Parameters parsing ----------------------------------------------------------------

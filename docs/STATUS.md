@@ -45,8 +45,9 @@ priority class of bug here.
 | `$creda-attest` | ✅ | Attests the real events in `references` (targets = parents); per-patient root-stub only as the no-reference fallback. |
 | `$creda-amend` | ✅ (DOB-only) | Tokenization is demo-shaped — production needs the real tokenizer. |
 | `$creda-contest` | ✅ | Emits canonical `ContestReason {code, detail?}` (§3.4.3, kebab code). Cross-language golden vector pins Rust ↔ cbor2 ↔ bridge; clients send a real reason code (clinician link-confirm/DOB, steward). |
-| `Patient/read` (CredaPatient) | ✅ | US Core Patient projection (§8.2.2): the three `mustSupport` extensions (subgraph identifier / root set / last-modified, from Core's new `GetSubgraphIdentity`), MRN identifiers, and **real gender**; name/DOB **masked** (`data-absent-reason`) since cleartext stays off the Bridge (§9.2). Cleartext fetch via `$creda-cleartext` is the remaining related piece (🚧). |
-| `$creda-cleartext` / `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14). `$creda-cleartext` (§9.2) is the consent-gated P2P fetch of cleartext name/DOB that `Patient/read` masks. Not registered → 404 if called. |
+| `Patient/read` (CredaPatient) | ✅ | US Core Patient projection (§8.2.2): the three `mustSupport` extensions (subgraph identifier / root set / last-modified, from Core's new `GetSubgraphIdentity`), MRN identifiers, and **real gender**; name/DOB **masked** (`data-absent-reason`) since cleartext stays off the Bridge (§9.2). The unmasked fetch is `$creda-cleartext` (next row). |
+| `$creda-cleartext` (§9.2) | ✅ (gate + SPI; P2P transport pending) | The consent-gated fetch of the cleartext name/DOB/address that `Patient/read` masks. Runs Core `EvaluateAuthorization` against the requester's fingerprint+purpose+useMode (**403** with no covering grant), then delegates to a `CleartextProvider` **SPI** the institution implements against its own EHR/MPI — Credara never stores cleartext. No provider bean ⇒ **501**; provider holding no record for the patient ⇒ **404**; never a fabricated demographic. The cross-institution **Bridge↔Bridge P2P transport** (requester's bridge → originating bridge over libp2p Noise) is the one remaining dependency — tracked, not stubbed; the operation itself is production-real for an in-cluster/direct call. |
+| `$creda-link` / `-tombstone` / `-disambiguate` / `-self-verify` / `$match` / `$export`, Subscription, Bulk Data, CapabilityStatement IG customization | 🚧 | Documented as not-yet-implemented (§8.2.5–8.2.14). Not registered → 404 if called. |
 
 ## Persona clients (`clients/`) — 🧪 DEMO / EXAMPLE + manual E2E harness
 
@@ -68,6 +69,10 @@ for live data. Current real-vs-fixture state (drive every row to ✅):
 
 ## Tracked unfinished work (not bugs)
 
+- **Cleartext P2P transport (§9.2)** — `$creda-cleartext` (consent gate + `CleartextProvider` SPI) is
+  production-real for a direct/in-cluster call. The cross-institution leg — routing a requester bridge's
+  call to the **originating** bridge over libp2p Noise — is the one remaining dependency. Tracked, not
+  stubbed; until it lands, cleartext fetch is same-institution only.
 - **DHT query-privacy (§13.3)** — security-relevant; closure plan + cost model in
   `docs/dht-query-privacy.md` (hard gate before real-PHI; fine for the synthetic pilot).
 - **Spec §13 Open Questions** — the canonical list (confidence calibration, DHT privacy, revocation
