@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# anchor — settle a project into a known-good state by running its definitive build + test.
+# anchor — settle a project into a known-good state by running its complete gate (lint + test).
 #
-#   anchor creda   Run the full Creda workspace test suite single-threaded — the known-good
-#                  "settle it in" run. Single-threaded keeps the RocksDB from-source compile
-#                  within a memory-limited Docker VM (no OOM). Equivalent to `make anchor`.
+#   anchor creda   The complete local gate — fmt + clippy (workspace + grpc + libp2p) + the whole
+#                  test suite — single-threaded so the RocksDB from-source compile stays within a
+#                  memory-limited Docker VM (no OOM). Mirrors ci-rust: a clean run = a green CI.
+#                  Run it before every commit. Equivalent to `make anchor`.
 #
 # The only host prerequisite is Docker (see docs/DEVELOPMENT.md). Put `anchor` on your PATH so
 # `anchor creda` works from anywhere, e.g.:
@@ -26,7 +27,7 @@ ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 target="${1:-}"
 case "$target" in
   creda)
-    echo "⚓ Anchoring Creda — settling the workspace into a known-good state (full suite, single-threaded)…"
+    echo "⚓ Anchoring Creda — full local gate (fmt + clippy + tests, mirrors ci-rust), single-threaded…"
     exec make -C "$ROOT" anchor
     ;;
   "" | -h | --help | help)
@@ -34,11 +35,13 @@ case "$target" in
 anchor — settle a project into a known-good state (definitive build + test).
 
 Usage:
-  anchor creda    Run the full Creda workspace test suite single-threaded — the known-good
-                  "settle it in" run (bounded memory; avoids the RocksDB OOM).
+  anchor creda    The complete pre-commit gate — fmt + clippy (workspace + grpc + libp2p) + the
+                  whole test suite, single-threaded (bounded memory; avoids the RocksDB OOM).
+                  Mirrors ci-rust, so a clean run means a green CI.
 
-Other dev tasks are plain make targets from the repo root: make test, make ci, make fmt,
-make clippy, make shell. See docs/DEVELOPMENT.md.
+Faster inner-loop targets from the repo root: make test (workspace tests only), make fmt
+(auto-format), make clippy, make shell. `make ci` is this same gate as discrete targets.
+See docs/DEVELOPMENT.md.
 EOF
     ;;
   *)

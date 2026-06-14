@@ -72,15 +72,17 @@ RUN  = $(DOCKER) run --rm \
 	--user $(UID):$(GID) \
 	$(DEV_IMAGE)
 
-.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc libp2p shell ci clean bridge bridge-image bridge-stock
+.PHONY: anchor summary dev-image test test-fast fmt fmt-check clippy build grpc libp2p libp2p-adapter shell ci clean bridge bridge-image bridge-stock
 
 dev-image:
 	$(DOCKER) build -t $(DEV_IMAGE) --build-arg BASE=$(DEV_BASE) -f $(DEV_DOCKERFILE) .
 
-# The "anchor" run (= `anchor creda`): build + test the whole workspace single-threaded (so the
-# RocksDB from-source compile stays within a memory-limited Docker VM) and print ONE rolled-up
-# summary via cargo-nextest (failures-only + a workspace-wide total) instead of a result block
-# per test binary. Falls back to `cargo test` if nextest is missing. See tools/anchor-run.sh.
+# The "anchor" run (= `anchor creda`): the COMPLETE local gate, single-threaded so the RocksDB
+# from-source compile stays within a memory-limited Docker VM. It mirrors ci-rust.yml — fmt-check +
+# clippy (workspace + grpc + the creda-net libp2p adapter) + workspace tests (one rolled-up nextest
+# summary) + grpc-feature tests + doctests — so a clean `anchor creda` means a green ci-rust. This is
+# the run to do before every commit. See tools/anchor-run.sh. (`make ci` is the same gate as discrete,
+# non-OOM-bounded targets, handy for re-running a single failing step.)
 anchor: dev-image
 	$(RUN) bash tools/anchor-run.sh
 
@@ -119,9 +121,17 @@ grpc: dev-image
 libp2p: dev-image
 	$(RUN) cargo clippy -p creda-core --features grpc,libp2p --all-targets $(CARGO_JOBS) -- -D warnings
 
-# Everything CI checks, in one go — run this before pushing. Mirrors the ci-rust workflow:
-# fmt-check + workspace clippy/test, the gRPC-feature clippy/test, and the libp2p adapter compile.
-ci: fmt-check clippy test grpc libp2p
+# ci-rust's `libp2p-adapter` job, exactly: clippy creda-net's OWN targets (lib + tests, e.g.
+# wire_contract.rs) under its libp2p feature. Distinct from `libp2p` above (which lints creda-core
+# and only compiles — not lints — creda-net as a dependency), so a clippy warning in a creda-net
+# libp2p test would slip past `libp2p` but is caught here, matching CI.
+libp2p-adapter: dev-image
+	$(RUN) cargo clippy -p creda-net --features libp2p --all-targets $(CARGO_JOBS) -- -D warnings
+
+# Everything CI checks, in one go — the discrete-target form of the `anchor creda` gate. Mirrors
+# ci-rust.yml: fmt-check + workspace clippy/test, the gRPC-feature clippy/test, the creda-core
+# daemon libp2p wiring, and the creda-net libp2p adapter (ci-rust's libp2p-adapter job).
+ci: fmt-check clippy test grpc libp2p libp2p-adapter
 
 shell: dev-image
 	$(DOCKER) run --rm -it \
