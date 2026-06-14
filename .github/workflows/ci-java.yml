@@ -19,7 +19,7 @@ jobs:
           fi
       - name: Set up JDK
         if: steps.bridge.outputs.present == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
