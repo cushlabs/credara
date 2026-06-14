@@ -47,21 +47,6 @@ object EventPayloadCbor {
             Add("purpose", purpose)
         }).EncodeToBytes(canonical)
 
-    /**
-     * Build the canonical CBOR for a minimal root `EventPayload::Assert` — empty Demographics
-     * and a `self-report` verification method. The bridge creates one of these on demand to
-     * give cross-institutional Attest/Contest/Link events something to hang off of when the
-     * UI doesn't carry a real parent UUID (which is most of the M-clients flow today).
-     *
-     * Real Asserts originate at registration in the source EHR; this helper exists strictly
-     * for the bridge-side root-seed shim documented in PatientResourceProvider.
-     */
-    fun encodeRootAssertStub(): ByteArray =
-        wrapVariant("Assert", CBORObject.NewMap().apply {
-            Add("demographics", CBORObject.NewMap()) // all fields None → empty map
-            Add("verification_method", "self-report")
-        }).EncodeToBytes(canonical)
-
     /** Valid `ContestReasonCode` values (§3.4.3), kebab-case to mirror the Rust enum. */
     val CONTEST_REASON_CODES = setOf(
         "distinct-patients", "demographic-conflict", "duplicate-record", "other",

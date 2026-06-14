@@ -31,37 +31,19 @@ import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.model.UnsignedIntType
 import org.springframework.stereotype.Component
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Patient is a **projection, not a record** (§8.1.1). This provider translates FHIR Patient
- * operations into Creda Core gRPC calls and back — it holds no identity logic (§8.3.2).
- *
- * `read` / `search` project from Core; direct `create` / `delete` are rejected (§8.3.3);
- * the `$creda-*` operations are thin wrappers over Core RPCs.
- *
- * ## Bridge-seeded root Asserts (demo shim)
- *
- * Identity events other than `Assert` must have parents (§3.4). The M-clients persona UIs
- * carry *projection-level* event identifiers (e.g. `e3`) that are not real Core UUIDs — they
- * are mock-mode IDs. To let the UI's Attest button produce a real event on the gossip mesh
- * without the UI having to discover a Core UUID first, this provider keeps an in-memory
- * `patientId → rootEventId` map. When an Attest comes in and we don't yet have a root for
- * the patient, we synthesize a minimal root Assert (empty Demographics, self-report
- * verification) and pin its returned id. Subsequent Attests for the same patient reuse it.
- *
- * This shim is **demo-only** and will be removed when the bridge can derive a real subgraph
- * head from the patient identifier via Core's MatchByTokens or GetSubgraph. The map is
- * process-local (ConcurrentHashMap) so it does not survive a pod restart — fine for UAT,
- * unacceptable for production.
+ * operations into Creda Core gRPC calls and back — it holds no identity logic (§8.3.2) and no
+ * mutable state: every operation resolves against real Core events. `read` / `search` project from
+ * Core; direct `create` / `delete` are rejected (§8.3.3); the `$creda-*` operations are thin
+ * wrappers over Core RPCs. A patient id is always a real subgraph entry-point event UUID (resolved
+ * by clients via `Patient?_creda-token=`), so writes attach to the real subgraph, never a stub.
  */
 @Component
 class PatientResourceProvider(
     private val core: CredaCoreClient,
 ) : IResourceProvider {
-
-    /** patientId (free-form, as the UI sends it) → root Assert event UUID in Core. */
-    private val rootByPatient: ConcurrentHashMap<String, UUID> = ConcurrentHashMap()
 
     override fun getResourceType(): Class<Patient> = Patient::class.java
 
@@ -134,27 +116,31 @@ class PatientResourceProvider(
     }
 
     /**
-     * `$creda-attest` (§8.2.6): record an Attest event on the patient's chain. The UI sends a
-     * patient id and a purpose; the bridge ensures a root Assert exists for that patient (see
-     * class doc), then creates the Attest linked to it.
+     * `$creda-attest` (§8.2.6): record an Attest event affirming reliance on real events.
+     *
+     * The Attest targets the events named in `references` (the Asserts/Links being affirmed) —
+     * e.g. the clinician DOB-resolution attests the supporting Assert so its confidence rises in the
+     * effective identity. Targets are also the parents, so the Attest lands INSIDE the patient's
+     * subgraph. When no `references` are supplied, the Attest affirms the patient's subgraph entry
+     * point itself (the id is a real event UUID); the entry point must exist in Core, or this 404s.
+     * No synthesized stubs and no per-process state — every write attaches to a real event.
      */
     @Operation(name = "\$creda-attest")
     fun attest(@IdParam id: IdType, @ResourceParam params: Parameters): Provenance {
         val purpose = params.parameterFirstRep("purpose")?.lowercase() ?: "treatment"
-
-        // The Attest targets the REAL events named in `references` (the Asserts/Links being
-        // affirmed) — e.g. the clinician DOB-resolution attests the supporting Assert so its
-        // confidence rises in the effective identity. Targets are also the parents, so the Attest
-        // lands INSIDE that patient's subgraph rather than a detached stub. Only when no usable
-        // reference is supplied do we fall back to a per-patient root-Assert stub (static fixtures
-        // that carry no real target). The previous version ALWAYS used the stub and ignored
-        // `references` — which is why DOB attestations never reached the patient's subgraph.
-        val targets = attestReferences(params)
-        val parents: List<UUID> = targets.ifEmpty {
-            listOf(rootByPatient.computeIfAbsent(id.idPart) { _ ->
-                val rootCbor = EventPayloadCbor.encodeRootAssertStub()
-                EventPayloadCbor.decodeEventNode(core.createEvent(rootCbor, parentIds = emptyList())).id
-            })
+        val parents: List<UUID> = attestReferences(params).ifEmpty {
+            val entry = try {
+                UUID.fromString(id.idPart)
+            } catch (e: IllegalArgumentException) {
+                throw InvalidRequestException(
+                    "\$creda-attest needs a 'references' target, or a subgraph entry-point UUID " +
+                        "as the patient id; got '${id.idPart}'",
+                )
+            }
+            if (core.getEvent(EventPayloadCbor.uuidBytes(entry)) == null) {
+                throw ResourceNotFoundException(id)
+            }
+            listOf(entry)
         }
 
         val attestPayload = EventPayloadCbor.encodeAttest(targetEventIds = parents, purpose = purpose)
