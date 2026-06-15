@@ -17,7 +17,7 @@ plugins {
     kotlin("jvm") version "1.9.24"
     kotlin("plugin.spring") version "1.9.24"
     id("org.springframework.boot") version "3.3.2"
-    id("io.spring.dependency-management") version "1.1.6"
+    id("io.spring.dependency-management") version "1.1.7"
     id("com.google.protobuf") version "0.9.4"
 }
 
@@ -55,7 +55,7 @@ dependencies {
     // RFC 8949 deterministic CBOR (§3.4, see crates/creda-events/src/canonical.rs); the
     // upokecenter library supports the deterministic-encoding spec out of the box and is the
     // standard JVM choice for this. Used by AttestPayloadEncoder + ProvenanceMapper.
-    implementation("com.upokecenter:cbor:4.5.4")
+    implementation("com.upokecenter:cbor:4.5.6")
     // Needed for the @Generated annotation grpc-java emits when compiled with newer JDKs.
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 
