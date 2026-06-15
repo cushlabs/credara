@@ -1,3 +1,15 @@
+# Dependabot configuration.
+#
+# Version updates are PAUSED: `open-pull-requests-limit: 0` on every ecosystem, so Dependabot opens
+# no routine dependency-bump PRs. Pinned dependencies (e.g. libp2p, HAPI) are upgraded deliberately
+# and verified through `anchor creda` / `make bridge`, not auto-bumped — and for 0.x crates a
+# "minor" bump is breaking, which a semver-major ignore rule would not catch, so the whole ecosystem
+# is silenced rather than filtered.
+#
+# SECURITY updates are unaffected by this file: they are controlled in repo Settings -> Code security
+# and analysis ("Dependabot security updates"), have their own internal PR limit, and still open PRs
+# for real advisories. To resume version updates for an ecosystem, restore its limit (was 10 for
+# cargo/gradle, 5 for github-actions/docker).
 version: 2
 updates:
   # Rust workspace (root Cargo.toml + crates/*)
@@ -6,7 +18,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "rust"
@@ -24,7 +36,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "java"
@@ -42,7 +54,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "ci"
@@ -55,7 +67,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "docker"
