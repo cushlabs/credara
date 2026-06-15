@@ -259,6 +259,28 @@ impl Libp2pTransport {
         Self::spawn(keypair, listen_on, bootstrap, source).await
     }
 
+    /// Like [`generate_and_spawn`](Self::generate_and_spawn), but the libp2p identity is the
+    /// institution's Ed25519 **signing** key (§6.2.3) rather than a throwaway. The resulting
+    /// `PeerId` is the institution's signing public key, so any peer can verify "this peer is
+    /// institution X" against the participant registry it already holds — the transport-layer
+    /// foundation under the planned SPIFFE application-layer auth (§9.2). `ed25519_secret` is the
+    /// 32-byte secret seed; libp2p derives the same public key ed25519-dalek does, so the PeerId
+    /// matches the institution's `VerifyingKey`.
+    pub async fn from_ed25519_identity_and_spawn(
+        ed25519_secret: [u8; 32],
+        listen: &str,
+        bootstrap: Vec<String>,
+        source: Arc<dyn EventSource>,
+    ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
+        let keypair = libp2p::identity::Keypair::ed25519_from_bytes(ed25519_secret)
+            .map_err(|e| Error::Transport(format!("libp2p identity from institution key: {e}")))?;
+        let listen_on: Multiaddr = listen
+            .parse()
+            .map_err(|e| Error::Transport(format!("bad listen multiaddr {listen:?}: {e}")))?;
+        let bootstrap = parse_bootstrap(&bootstrap);
+        Self::spawn(keypair, listen_on, bootstrap, source).await
+    }
+
     async fn send<T>(&self, make: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
         let (tx, rx) = oneshot::channel();
         self.cmd_tx

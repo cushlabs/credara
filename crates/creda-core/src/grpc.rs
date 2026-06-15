@@ -518,6 +518,11 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                 InMemorySigner::generate()?
             }
         };
+        // §6.2.3 foundation: seed the libp2p transport identity from the institution's own signing
+        // key so a peer's PeerId is verifiable against the participant registry, not a throwaway.
+        // Captured before `signer` moves into the engine; None for non-Ed25519 signers.
+        #[cfg(feature = "libp2p")]
+        let libp2p_identity_secret = signer.libp2p_identity_secret();
         let core = Arc::new(CredaCore::new(Box::new(store), Box::new(signer), config.clone()));
         eprintln!(
             "creda serve: engine ready (events={}); listening on {}",
@@ -562,13 +567,33 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             // called on spawn_blocking inside the adapter.
             let event_source: Arc<dyn creda_net::EventSource> =
                 Arc::new(CoreEventSource { core: core.clone() });
-            let (transport, mut inbound) =
-                creda_net::Libp2pTransport::generate_and_spawn(
-                    &config.libp2p_listen,
-                    config.bootstrap_peers.clone(),
-                    event_source,
-                )
-                .await?;
+            let (transport, mut inbound) = match libp2p_identity_secret {
+                Some(secret) => {
+                    eprintln!(
+                        "creda serve: libp2p identity derived from the institution signing key \
+                         (PeerId verifiable against the participant registry, §6.2.3)"
+                    );
+                    creda_net::Libp2pTransport::from_ed25519_identity_and_spawn(
+                        secret,
+                        &config.libp2p_listen,
+                        config.bootstrap_peers.clone(),
+                        event_source,
+                    )
+                    .await?
+                }
+                None => {
+                    eprintln!(
+                        "creda serve: WARNING — non-Ed25519 signer; libp2p identity is a generated \
+                         throwaway (its PeerId is not the institution's, §6.2.3 follow-up)"
+                    );
+                    creda_net::Libp2pTransport::generate_and_spawn(
+                        &config.libp2p_listen,
+                        config.bootstrap_peers.clone(),
+                        event_source,
+                    )
+                    .await?
+                }
+            };
             // Resolve event-author keys from the configured participant registry (§3.6). The
             // registry's *source* (UDAP/TEFCA sync, cert-chain validation, rotation) is an open
             // question (App C); an empty registry means no participants are admitted yet, so

@@ -30,7 +30,7 @@ priority class of bug here.
 | `creda-graph` | ✅ | Subgraph materialize, **effective-identity projection** (confidence-weighted, attestation-amplified, disputed-flagged), 7-step authorization eval, link-chain defense. Confidence *weights* are ❓ calibration (§5.3.2). |
 | `creda-core` | ✅ | Engine + gRPC (`creda.proto`): CreateEvent, GetEvent, GetSubgraphEvents, GetEffectiveIdentity (structured), MatchByTokens, EvaluateAuthorization, GetMetrics, ListInstitutions, GetSubgraphIdentity (§8.2.2). Health server (§10.5.3): `/livez`, `/readyz`, and `/metrics` — a **real** Prometheus exporter (`crate::metrics`) of operational gauges (build/up/ready/process-start, event + institution counts). The §11.2.1 golden-signal counters/histograms (gRPC/FHIR/gossip/AE traffic, latency, errors) are the next request-path instrumentation slice — tracked, not emitted as fabricated zeros. |
 | `creda-export-gate`, `creda-verifier` | ✅ | Dual-control enforcement. Verifier stale-state policy is ❓ (§13.4.3). |
-| `creda-net` | ✅ (DHT privacy ❓) | Pure replication logic green with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic + gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter **compiles + clippy-cleanly against the pinned rust-libp2p 0.56**, guarded on every push by `ci-rust`'s `libp2p-adapter` job (the old `TODO(libp2p-verify)` gap is closed); live multi-peer convergence/AE tests run in the testbed. DHT query-privacy remains ❓ (§13.3). |
+| `creda-net` | ✅ (DHT privacy ❓) | Pure replication logic green with **cross-peer wire-contract golden vectors** (DHT key / bucket / topic + gossip-batch envelope — exact-value pins so routing can't silently drift). The rust-libp2p adapter **compiles + clippy-cleanly against the pinned rust-libp2p 0.56**, guarded on every push by `ci-rust`'s `libp2p-adapter` job (the old `TODO(libp2p-verify)` gap is closed); live multi-peer convergence/AE tests run in the testbed. The peer's libp2p identity is now its **institution signing key** (§6.2.3): `PeerId` = the institution's Ed25519 public key, verifiable against the participant registry rather than a throwaway (non-Ed25519 signers fall back to a generated id). Application-layer SPIFFE auth is the remaining production layer (tracked below). DHT query-privacy remains ❓ (§13.3). |
 
 ## FHIR Bridge (`bridge/`, Kotlin/HAPI) — partial
 
@@ -104,6 +104,12 @@ view: metrics + fleet-wide events + disclosures + stewardship + compliance). Moc
   production-real for a direct/in-cluster call. The cross-institution leg — routing a requester bridge's
   call to the **originating** bridge over libp2p Noise — is the one remaining dependency. Tracked, not
   stubbed; until it lands, cleartext fetch is same-institution only.
+- **SPIFFE production peer identity (§6.2.3, §9.2)** — the libp2p *transport* identity is now the
+  institution signing key (`PeerId` verifiable against the registry). The production layer is
+  application-layer **mutual SPIFFE/UDAP auth** on peer connect (SVID verification), trust-domain
+  federation across institutions, and SVID rotation — the §9.2 "UDAP cert auth at the application
+  layer." It's a SPIRE deployment + app-auth workstream, not a libp2p-keypair swap, and is beyond
+  the synthetic pilot; the signing-key transport identity is the foundation it sits on.
 - **DHT query-privacy (§13.3)** — security-relevant; closure plan + cost model in
   `docs/dht-query-privacy.md` (hard gate before real-PHI; fine for the synthetic pilot).
 - **Spec §13 Open Questions** — the canonical list (confidence calibration, DHT privacy, revocation
