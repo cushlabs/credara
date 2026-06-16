@@ -66,6 +66,14 @@ pub struct CredaConfig {
     /// fatal for a peer that needs to be recognized across restarts (its institution_id would
     /// change each time). Production mounts a k8s Secret at this path.
     pub signing_key_path: Option<String>,
+    /// Path to the peer's libp2p **transport** identity key (raw 32-byte Ed25519 secret). This is a
+    /// dedicated network credential, **not** the institutional signing key — they are kept separate
+    /// so the signing key never has to leave the signer (HSM/KMS-friendly). When `None`, the daemon
+    /// generates an ephemeral transport key per startup, so the `PeerId` changes on every restart
+    /// and churns the DHT routing tables and bootstrap — fine for tests/CLI, not for a long-lived
+    /// peer. Production mounts a k8s Secret at this path. *Which institution* operates a peer is a
+    /// separate, application-layer concern (UDAP, §9.2), not this transport key.
+    pub libp2p_key_path: Option<String>,
     /// `host:port` for the HTTP health endpoint (§10.5.3 — `/livez`, `/readyz`, `/metrics`).
     /// Bound by the daemon. Kubelet calls these for liveness and readiness probes; without it
     /// bound the chart's StatefulSet pod will never reach Ready.
@@ -96,6 +104,7 @@ impl Default for CredaConfig {
             participant_registry: None,
             bootstrap_peers: Vec::new(),
             signing_key_path: None,
+            libp2p_key_path: None,
             // Matches the chart's `ports.health` default (9090). Override per pod with
             // CREDA_HEALTH_LISTEN if you bind a different port.
             health_listen: "0.0.0.0:9090".into(),
@@ -117,6 +126,7 @@ struct Overlay {
     participant_registry: Option<String>,
     bootstrap_peers: Option<Vec<String>>,
     signing_key_path: Option<String>,
+    libp2p_key_path: Option<String>,
     health_listen: Option<String>,
     subscribe_all_buckets: Option<bool>,
 }
@@ -164,6 +174,9 @@ impl CredaConfig {
         if let Some(v) = overlay.signing_key_path {
             self.signing_key_path = Some(v);
         }
+        if let Some(v) = overlay.libp2p_key_path {
+            self.libp2p_key_path = Some(v);
+        }
         if let Some(v) = overlay.health_listen {
             self.health_listen = v;
         }
@@ -206,6 +219,9 @@ impl CredaConfig {
         }
         if let Ok(v) = std::env::var("CREDA_SIGNING_KEY_PATH") {
             self.signing_key_path = Some(v);
+        }
+        if let Ok(v) = std::env::var("CREDA_LIBP2P_KEY_PATH") {
+            self.libp2p_key_path = Some(v);
         }
         if let Ok(v) = std::env::var("CREDA_HEALTH_LISTEN") {
             self.health_listen = v;
@@ -309,5 +325,19 @@ default_posture = "deny-by-default"
             .unwrap();
         assert_eq!(c.bootstrap_peers.len(), 2);
         assert!(c.bootstrap_peers[0].ends_with("12D3KooWAlice"));
+    }
+
+    #[test]
+    fn libp2p_key_path_from_toml() {
+        let mut c = CredaConfig::default();
+        assert_eq!(c.libp2p_key_path, None);
+        c.apply_toml(r#"libp2p_key_path = "/run/secrets/libp2p-key""#)
+            .unwrap();
+        assert_eq!(
+            c.libp2p_key_path.as_deref(),
+            Some("/run/secrets/libp2p-key")
+        );
+        // Independent of the signing key — a separate transport credential.
+        assert_eq!(c.signing_key_path, None);
     }
 }

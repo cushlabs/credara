@@ -82,15 +82,6 @@ impl InMemorySigner {
     pub fn verifying_key(&self) -> VerifyingKey {
         self.key.verifying_key()
     }
-
-    /// The 32-byte Ed25519 secret to seed the libp2p **transport** identity (§6.2.3), so a peer's
-    /// `PeerId` is its institution's signing public key — directly verifiable against the
-    /// participant registry rather than a throwaway. `None` for PQC/hybrid signers (libp2p has no
-    /// ML-DSA key type), which fall back to a generated identity. Stays within the process; the
-    /// daemon hands it straight to the libp2p adapter and never serializes it.
-    pub fn libp2p_identity_secret(&self) -> Option<[u8; 32]> {
-        self.key.ed25519_secret_bytes()
-    }
 }
 
 impl Signer for InMemorySigner {
@@ -134,28 +125,5 @@ impl Signer for InMemorySigner {
             redistribution_policy,
             tag,
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn libp2p_identity_secret_is_the_institution_ed25519_key() {
-        // §6.2.3 foundation: the libp2p transport identity must be the institution's signing key,
-        // so the derived PeerId is verifiable against the participant registry, not a throwaway.
-        let signer = InMemorySigner::generate().unwrap(); // Ed25519 by default
-        let secret = signer
-            .libp2p_identity_secret()
-            .expect("an Ed25519 signer exposes a libp2p identity secret");
-
-        // Rebuilding a signing key from the exposed secret yields the same public identity — the
-        // libp2p key really is this institution's key, so the PeerId is its fingerprint.
-        let rebuilt = SigningKey::ed25519_from_secret_bytes(&secret).unwrap();
-        assert_eq!(
-            rebuilt.verifying_key().fingerprint(),
-            signer.verifying_key().fingerprint(),
-        );
     }
 }

@@ -259,21 +259,21 @@ impl Libp2pTransport {
         Self::spawn(keypair, listen_on, bootstrap, source).await
     }
 
-    /// Like [`generate_and_spawn`](Self::generate_and_spawn), but the libp2p identity is the
-    /// institution's Ed25519 **signing** key (§6.2.3) rather than a throwaway. The resulting
-    /// `PeerId` is the institution's signing public key, so any peer can verify "this peer is
-    /// institution X" against the participant registry it already holds — the transport-layer
-    /// foundation under the planned SPIFFE application-layer auth (§9.2). `ed25519_secret` is the
-    /// 32-byte secret seed; libp2p derives the same public key ed25519-dalek does, so the PeerId
-    /// matches the institution's `VerifyingKey`.
-    pub async fn from_ed25519_identity_and_spawn(
+    /// Like [`generate_and_spawn`](Self::generate_and_spawn), but the libp2p identity is loaded from
+    /// a **stable, persistent transport key** (`ed25519_secret`, a 32-byte Ed25519 seed, typically a
+    /// mounted Secret) rather than freshly generated. This makes the `PeerId` stable across restarts,
+    /// which is required so the DHT routing tables and bootstrap don't churn every time the peer
+    /// process cycles. The key is a dedicated **transport** credential, NOT the institution's signing
+    /// key; *which institution* operates a peer is established separately, at the application layer
+    /// (UDAP, §9.2), built with the cross-institution transport.
+    pub async fn from_persistent_identity_and_spawn(
         ed25519_secret: [u8; 32],
         listen: &str,
         bootstrap: Vec<String>,
         source: Arc<dyn EventSource>,
     ) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let keypair = libp2p::identity::Keypair::ed25519_from_bytes(ed25519_secret)
-            .map_err(|e| Error::Transport(format!("libp2p identity from institution key: {e}")))?;
+            .map_err(|e| Error::Transport(format!("libp2p identity from persistent key: {e}")))?;
         let listen_on: Multiaddr = listen
             .parse()
             .map_err(|e| Error::Transport(format!("bad listen multiaddr {listen:?}: {e}")))?;

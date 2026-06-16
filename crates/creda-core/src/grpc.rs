@@ -71,6 +71,21 @@ fn ids_from_bytes(raw: &[Vec<u8>]) -> std::result::Result<Vec<EventId>, Status> 
         .collect()
 }
 
+/// Read a peer's persistent libp2p transport key — exactly 32 raw Ed25519 secret bytes — from a
+/// mounted Secret / file. Same on-disk shape as the signing key (§10.1.4): no PEM, no hex. This is
+/// the transport credential only; it is never the institutional signing key.
+#[cfg(feature = "libp2p")]
+fn read_libp2p_key_file(path: &str) -> Result<[u8; 32]> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| Error::Config(format!("reading libp2p key file {path:?}: {e}")))?;
+    bytes.as_slice().try_into().map_err(|_| {
+        Error::Config(format!(
+            "libp2p key file {path:?} must be exactly 32 bytes, got {}",
+            bytes.len()
+        ))
+    })
+}
+
 /// Run a synchronous engine call on the blocking pool and normalize errors to `Status` (§10.1.5).
 async fn blocking<T, F>(f: F) -> std::result::Result<T, Status>
 where
@@ -518,11 +533,6 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                 InMemorySigner::generate()?
             }
         };
-        // §6.2.3 foundation: seed the libp2p transport identity from the institution's own signing
-        // key so a peer's PeerId is verifiable against the participant registry, not a throwaway.
-        // Captured before `signer` moves into the engine; None for non-Ed25519 signers.
-        #[cfg(feature = "libp2p")]
-        let libp2p_identity_secret = signer.libp2p_identity_secret();
         let core = Arc::new(CredaCore::new(Box::new(store), Box::new(signer), config.clone()));
         eprintln!(
             "creda serve: engine ready (events={}); listening on {}",
@@ -567,14 +577,30 @@ pub fn serve(config: CredaConfig) -> Result<()> {
             // called on spawn_blocking inside the adapter.
             let event_source: Arc<dyn creda_net::EventSource> =
                 Arc::new(CoreEventSource { core: core.clone() });
-            let (transport, mut inbound) = match libp2p_identity_secret {
-                Some(secret) => {
+            // Stable, persistent transport identity (§6.2.3): load the peer's libp2p key from the
+            // configured path so the PeerId is the same across restarts and the DHT/bootstrap don't
+            // churn. A dedicated transport credential — never the signing key. Unset => ephemeral,
+            // with a loud warning.
+            let libp2p_key: Option<[u8; 32]> = match config.libp2p_key_path.as_deref() {
+                Some(path) => Some(read_libp2p_key_file(path)?),
+                None => {
                     eprintln!(
-                        "creda serve: libp2p identity derived from the institution signing key \
-                         (PeerId verifiable against the participant registry, §6.2.3)"
+                        "creda serve: WARNING — no libp2p_key_path configured; generating an \
+                         ephemeral transport identity. The PeerId changes on every restart, churning \
+                         the DHT routing tables and bootstrap. Set CREDA_LIBP2P_KEY_PATH to a \
+                         Secret-mounted 32-byte file in production."
                     );
-                    creda_net::Libp2pTransport::from_ed25519_identity_and_spawn(
-                        secret,
+                    None
+                }
+            };
+            let (transport, mut inbound) = match libp2p_key {
+                Some(key) => {
+                    eprintln!(
+                        "creda serve: libp2p transport identity loaded from a persistent key \
+                         (stable PeerId across restarts)"
+                    );
+                    creda_net::Libp2pTransport::from_persistent_identity_and_spawn(
+                        key,
                         &config.libp2p_listen,
                         config.bootstrap_peers.clone(),
                         event_source,
@@ -582,10 +608,6 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                     .await?
                 }
                 None => {
-                    eprintln!(
-                        "creda serve: WARNING — non-Ed25519 signer; libp2p identity is a generated \
-                         throwaway (its PeerId is not the institution's, §6.2.3 follow-up)"
-                    );
                     creda_net::Libp2pTransport::generate_and_spawn(
                         &config.libp2p_listen,
                         config.bootstrap_peers.clone(),
