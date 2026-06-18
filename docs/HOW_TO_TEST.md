@@ -37,7 +37,7 @@ The two documents to read first:
   full `make` target list.
 
 The spec ([`docs/credara-technical-spec.md`](credara-technical-spec.md)) is
-authoritative but ~81 pages. You do not need to read it to start testing — pull it
+authoritative but ~90 pages. You do not need to read it to start testing — pull it
 up when a test fails and you need to understand which invariant was violated.
 
 ## The three test paths
@@ -65,11 +65,17 @@ separate doctest line). If `anchor creda` is green, the spine is healthy.
 Optional adjacent targets:
 
 ```sh
-make grpc        # opt-in gRPC server (feature `grpc`; needs protoc inside the container)
-make libp2p      # compile-check the shipped feature set — libp2p is still being reconciled
-make bridge      # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
-make ci          # fmt-check + clippy + test — everything CI gates on
+make grpc            # opt-in gRPC server (feature `grpc`; needs protoc inside the container)
+make libp2p          # compile + lint the shipped feature set (gRPC + libp2p) — green in CI
+make libp2p-adapter  # compile + clippy the rust-libp2p adapter against its pinned version (CI parity)
+make bridge          # build the HAPI FHIR Bridge (Java/Kotlin) in a Gradle + JDK container
+make ci              # fmt-check + clippy + test + grpc + libp2p + libp2p-adapter — everything CI gates on
 ```
+
+The rust-libp2p adapter (the `creda-net` `libp2p` feature) used to be the one surface never
+built in CI. It is now compiled and clippy-linted in CI on every push (the `ci-rust` →
+`libp2p-adapter` job), closing the old `TODO(libp2p-verify)` gap — so these targets should be
+**green** from a clean clone.
 
 If your test report references `creda-events`, `creda-store`, `creda-graph`,
 `creda-core`, or `creda-conformance`, this is the path that exercised it.
@@ -111,9 +117,12 @@ failure mode points at.
 
 `clients/` ports the five mockups in `design/` into real Vite + React + TypeScript apps,
 one per persona: **clinician**, **prior-auth**, **steward**, **patient**, **audit**. They
-talk to the HAPI FHIR Bridge through a typed client; until the bridge's M7
-`TODO(bridge-verify)` stubs land, the clients run in **mock mode** against fixtures whose
-shape matches the bridge response shape.
+talk to the HAPI FHIR Bridge through a typed client. By default they run in **mock mode**
+against fixtures shaped like the bridge response, so you can walk every screen with no
+backend. The bridge's core authorization and identity operations are now implemented, so you
+can also point the clients at a **real** bridge + peer (the `ui-up-real` path below). A few
+surfaces are still fixture-backed and show an amber `DEMO DATA` chip — `docs/STATUS.md` is the
+authoritative real-vs-fixture map.
 
 There are two flavours to run, depending on whether you want an automated check or want to
 poke at the UI yourself:
@@ -258,9 +267,10 @@ Common first-time hiccups:
   Docker is out of memory. Raise it to 6–8 GB, or use `make test JOBS=1`, or
   `make test-fast` to skip RocksDB entirely while iterating. See
   [`docs/DEVELOPMENT.md`](DEVELOPMENT.md#troubleshooting).
-- **`make libp2p` red.** Expected. The libp2p adapter is the one quarantined
-  surface still being reconciled against its pinned version. Do not file a bug
-  unless the failure is new and reproducible from a clean clone.
+- **`make libp2p` / `make libp2p-adapter` red.** No longer expected — the adapter is now
+  compiled and clippy-linted in CI, so a clean clone should be green. A *new* red here usually
+  means rust-libp2p API drift against the pinned version; that **is** worth a bug, with the
+  full compiler/clippy output.
 - **Bridge fails to build.** Try `make bridge-stock` (Debian fallback image) and
   note in the bug which path failed.
 - **`make ui-up` returns "Available: 0/1" / "context deadline exceeded".** The pod
@@ -295,11 +305,25 @@ Common first-time hiccups:
   `revocation-latency`, `rolling-upgrade`, `storage-class`, `rogue-link`) that
   testers can help bring up.
 - [`clients/README.md`](../clients/README.md) — the five persona front-end clients,
-  their FHIR-bridge wiring, and how to swap from mock mode to a real bridge once
-  the M7 stubs land.
+  their FHIR-bridge wiring, and how to swap from mock mode to a real bridge.
 - [`clients/mockups/personas.md`](../clients/mockups/personas.md) — what each persona is allowed to see
   and do. Useful as a checklist when walking the UI in UAT — if a persona's UI lets
   you do something `personas.md` says they cannot, that is a bug.
+
+## Coming soon: more end-to-end scenarios
+
+The end-to-end surface is still being built out. Today you get the in-process conformance
+suite, the two-peer gossip-convergence and anti-entropy testbed scenarios, and the persona
+UI smoke. Still in active development — and available soon — are:
+
+- the **real-effect integration smoke** (every client interaction driven against a real
+  bridge and asserted to produce a real on-wire event, not just a UI transition);
+- additional multi-peer testbed scenarios: **partition-rejoin**, **revocation-latency**,
+  **rolling-upgrade**, **storage-class**, and **rogue-link**.
+
+These are sign-posted in [`testbed/README.md`](../testbed/README.md) and `docs/STATUS.md`;
+testers are welcome to help bring them up. Until they land, treat end-to-end coverage as
+partial — the in-process suite is the definitive green.
 
 Thank you for testing. Pre-launch hardening is exactly the phase where outside
 eyes catch the things the maintainers have stopped being able to see.
