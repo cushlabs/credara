@@ -26,8 +26,8 @@ You do **not** need a local Rust toolchain, a JDK, Gradle, or `protoc`.
 ## Clone and orient
 
 ```sh
-git clone <repo-url> creda
-cd creda
+git clone https://github.com/cushlabs/credara.git
+cd credara
 ```
 
 The two documents to read first:
