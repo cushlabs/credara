@@ -12,9 +12,13 @@
 //! §5.3.2 requires — the tenth agreement adds less than the second. Independence is enforced by
 //! counting each institution at most once (its strongest assertion).
 //!
-//! **Calibration is an open question.** The concrete weights, the saturation constant `K`, and
-//! the decay curves below are defensible defaults, not calibrated values — they are network
-//! configuration (§5.3.2) and a Phase-0 calibration item. `TODO(open-question-confidence-calibration)`.
+//! **Calibration follows the documented methodology** (`docs/matching-calibration.md`, §5.3.2): the
+//! concrete weights, the saturation constant `K`, and the decay curves below are **bootstrap priors**,
+//! not calibrated values — loaded as network configuration and re-estimated per deployment against
+//! that population's data and a validation set. Same discipline as the `$match` scorer (a different
+//! model — evidence reliability, not record linkage — but the same per-deployment, validated, auditable
+//! process). `TODO(open-question-confidence-calibration)`: the *methodology* is resolved; the
+//! calibrated numbers remain a per-deployment step.
 
 use std::collections::{HashMap, HashSet};
 

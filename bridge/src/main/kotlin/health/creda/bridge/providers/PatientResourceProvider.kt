@@ -16,6 +16,7 @@ import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException
 import health.creda.bridge.cbor.EventPayloadCbor
 import health.creda.bridge.grpc.CredaCoreClient
+import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.CodeType
 import org.hl7.fhir.r4.model.CodeableConcept
 import org.hl7.fhir.r4.model.Coding
@@ -88,6 +89,82 @@ class PatientResourceProvider(
         return core.matchByTokens(tokenValues).map { idBytes ->
             Patient().apply { id = EventPayloadCbor.bytesToUuid(idBytes).toString() }
         }
+    }
+
+    /**
+     * `Patient/$match` (FHIR Patient `$match`): scored identity matching. The query Patient carries
+     * **tokenized** demographics (cleartext never reaches the Bridge, §9.2) — name tokens in `name`,
+     * other field tokens as identifiers under the match-token system. Core blocks on any token hit
+     * (MatchByTokens); each candidate is then scored by real per-field token agreement against its
+     * effective identity ([PatientMatcher]) and returned as a CredaPatient with `search.score` + the
+     * FHIR `match-grade` extension, best first. Honors `count` and `onlyCertainMatches`. The scoring
+     * weights/thresholds are uncalibrated (§5.3.2) — the ranking is on real agreement, not fabricated.
+     */
+    @Operation(name = "\$match")
+    fun match(@ResourceParam params: Parameters): Bundle {
+        val query = queryTokens(params)
+        if (query.isEmpty()) {
+            throw InvalidRequestException(
+                "\$match requires tokenized demographics on the query Patient: name tokens, or " +
+                    "identifiers under '$MATCH_TOKEN_SYS<field>'",
+            )
+        }
+        val limit = params.parameterFirstRep("count")?.toIntOrNull()
+        val onlyCertain = params.parameterFirstRep("onlyCertainMatches")?.toBoolean() ?: false
+
+        val ranked = core.matchByTokens(query.values.toList())
+            .mapNotNull { idBytes ->
+                val fields = core.effectiveIdentity(listOf(idBytes))
+                val candidate = fields
+                    .filter { it.values.isNotEmpty() }
+                    .associate { it.key to it.values.first().value }
+                val llr = PatientMatcher.logLikelihoodRatio(query, candidate)
+                val grade = PatientMatcher.grade(llr)
+                if (grade == "certainly-not" || (onlyCertain && grade != "certain")) {
+                    null
+                } else {
+                    val uuid = EventPayloadCbor.bytesToUuid(idBytes)
+                    val identity = core.subgraphIdentity(listOf(idBytes))
+                    Match(CredaPatientMapper.project(uuid.toString(), identity, fields), PatientMatcher.score01(llr), grade)
+                }
+            }
+            .sortedByDescending { it.score }
+            .let { if (limit != null && limit >= 0) it.take(limit) else it }
+
+        return Bundle().apply {
+            type = Bundle.BundleType.SEARCHSET
+            total = ranked.size
+            ranked.forEach { m ->
+                addEntry().apply {
+                    resource = m.patient
+                    search.apply {
+                        mode = Bundle.SearchEntryMode.MATCH
+                        setScore(java.math.BigDecimal.valueOf(m.score).setScale(3, java.math.RoundingMode.HALF_UP))
+                        addExtension(Extension(MATCH_GRADE_EXT).setValue(CodeType(m.grade)))
+                    }
+                }
+            }
+        }
+    }
+
+    private data class Match(val patient: Patient, val score: Double, val grade: String)
+
+    /** Per-field query tokens from the input Patient: name from `name`, others from match-token ids. */
+    private fun queryTokens(params: Parameters): Map<String, String> {
+        val patient = params.parameter.firstOrNull { it.name == "resource" }?.resource as? Patient
+            ?: return emptyMap()
+        val tokens = linkedMapOf<String, String>()
+        patient.nameFirstRep.let { n ->
+            if (n.hasFamily()) tokens["name-family"] = n.family
+            n.given.firstOrNull()?.value?.let { tokens["name-given"] = it }
+        }
+        for (id in patient.identifier) {
+            val sys = id.system ?: continue
+            if (sys.startsWith(MATCH_TOKEN_SYS) && id.hasValue()) {
+                tokens[sys.removePrefix(MATCH_TOKEN_SYS)] = id.value
+            }
+        }
+        return tokens
     }
 
     /**
@@ -168,7 +245,6 @@ class PatientResourceProvider(
     // documented stubs here (§8.2.5-§8.2.10):
     //   $creda-provenance (GET)   -> Core GetSubgraph -> Bundle<CredaProvenance>
     //   $creda-link / $creda-tombstone -> Core CreateEvent
-    //   $match            -> Core MatchByTokens (scored candidates)
     //   $creda-disambiguate / $creda-self-verify -> Core disambiguation RPCs (scaffolded)
     //   $export           -> Core + Bulk Data NDJSON (§8.2.14)
 }
@@ -176,6 +252,12 @@ class PatientResourceProvider(
 /** Helper: first valueString of a named FHIR Parameters parameter, or null. */
 private fun Parameters.parameterFirstRep(name: String): String? =
     parameter.firstOrNull { it.name == name }?.value?.primitiveValue()
+
+/** System under which a `Patient/$match` query carries non-name field tokens (e.g. `…/date-of-birth`). */
+private const val MATCH_TOKEN_SYS = "http://credara.network/fhir/sid/match-token/"
+
+/** FHIR match-grade extension on `Bundle.entry.search` (value from the match-grade CodeSystem). */
+private const val MATCH_GRADE_EXT = "http://hl7.org/fhir/StructureDefinition/match-grade"
 
 /**
  * Projects a subgraph's §8.2.2 identity envelope + effective identity into a **CredaPatient** — a
