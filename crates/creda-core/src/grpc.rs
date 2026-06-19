@@ -533,7 +533,8 @@ pub fn serve(config: CredaConfig) -> Result<()> {
                 InMemorySigner::generate()?
             }
         };
-        let core = Arc::new(CredaCore::new(Box::new(store), Box::new(signer), config.clone()));
+        // open() (not new()) so any persisted Tombstone is recovered and re-applied on boot (§3.4.6).
+        let core = Arc::new(CredaCore::open(Box::new(store), Box::new(signer), config.clone())?);
         eprintln!(
             "creda serve: engine ready (events={}); listening on {}",
             core.event_count().unwrap_or(0),

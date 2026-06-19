@@ -205,7 +205,7 @@ class PatientResourceProvider(
     @Operation(name = "\$creda-attest")
     fun attest(@IdParam id: IdType, @ResourceParam params: Parameters): Provenance {
         val purpose = params.parameterFirstRep("purpose")?.lowercase() ?: "treatment"
-        val parents: List<UUID> = attestReferences(params).ifEmpty {
+        val parents: List<UUID> = referencedEventIds(params).ifEmpty {
             val entry = try {
                 UUID.fromString(id.idPart)
             } catch (e: IllegalArgumentException) {
@@ -226,12 +226,51 @@ class PatientResourceProvider(
     }
 
     /**
+     * `$creda-tombstone` (§3.4.6): right-to-be-forgotten. Records a signed `Tombstone` over the
+     * events named in `references`; Core then scrubs those targets' stored demographic content to
+     * husks — the demographics become irrecoverable and unfindable by token, while the structural
+     * envelope and the signed tombstone remain for audit. This deliberately breaks the targets'
+     * content signatures: per §3.4.6 the tombstone is the integrity anchor, not the husk.
+     *
+     * `legal-basis` is one of right-to-be-forgotten | state-law | court-order | other (default
+     * right-to-be-forgotten). Targets are also the parents, so the tombstone lands inside the
+     * patient's subgraph; at least one real target event UUID is required (the entry-point id is
+     * used when `references` is empty), or this 404s.
+     */
+    @Operation(name = "\$creda-tombstone")
+    fun tombstone(@IdParam id: IdType, @ResourceParam params: Parameters): Provenance {
+        val basis = params.parameterFirstRep("legal-basis")?.lowercase() ?: "right-to-be-forgotten"
+        val targets: List<UUID> = referencedEventIds(params).ifEmpty {
+            val entry = try {
+                UUID.fromString(id.idPart)
+            } catch (e: IllegalArgumentException) {
+                throw InvalidRequestException(
+                    "\$creda-tombstone needs a 'references' target, or a real event UUID as the " +
+                        "patient id; got '${id.idPart}'",
+                )
+            }
+            if (core.getEvent(EventPayloadCbor.uuidBytes(entry)) == null) {
+                throw ResourceNotFoundException(id)
+            }
+            listOf(entry)
+        }
+
+        val payload = try {
+            EventPayloadCbor.encodeTombstone(targetEventIds = targets, legalBasis = basis)
+        } catch (e: IllegalArgumentException) {
+            throw InvalidRequestException(e.message ?: "invalid \$creda-tombstone request")
+        }
+        val eventCbor = core.createEvent(payload, targets.map { EventPayloadCbor.uuidBytes(it) })
+        return ProvenanceMapper.fromEventCbor(eventCbor)
+    }
+
+    /**
      * Extract target event UUIDs from the `references` parameter(s). Tolerant by construction: the
      * value may arrive as proper repeated params, a `Provenance/<uuid>` reference, or (legacy) a
      * single JSON-stringified array `["<uuid>", …]` — we regex every UUID out of whatever form
      * shows up, so the operation is robust to client encoding drift.
      */
-    private fun attestReferences(params: Parameters): List<UUID> {
+    private fun referencedEventIds(params: Parameters): List<UUID> {
         val uuidRe = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
         return params.parameter
             .filter { it.name == "references" }
@@ -244,7 +283,7 @@ class PatientResourceProvider(
     // Core CreateEvent (or query) and map the response to FHIR — and are intentionally left as
     // documented stubs here (§8.2.5-§8.2.10):
     //   $creda-provenance (GET)   -> Core GetSubgraph -> Bundle<CredaProvenance>
-    //   $creda-link / $creda-tombstone -> Core CreateEvent
+    //   $creda-link               -> Core CreateEvent
     //   $creda-disambiguate / $creda-self-verify -> Core disambiguation RPCs (scaffolded)
     //   $export           -> Core + Bulk Data NDJSON (§8.2.14)
 }

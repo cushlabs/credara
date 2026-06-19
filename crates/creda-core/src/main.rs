@@ -135,11 +135,8 @@ fn cmd_serve(config: CredaConfig) -> Result<()> {
 fn open_core(config: &CredaConfig) -> Result<CredaCore> {
     let store = RocksdbStore::open(&config.data_dir)?;
     let signer = InMemorySigner::generate()?;
-    Ok(CredaCore::new(
-        Box::new(store),
-        Box::new(signer),
-        config.clone(),
-    ))
+    // open() (not new()) so any persisted Tombstone is recovered and re-applied on boot (§3.4.6).
+    CredaCore::open(Box::new(store), Box::new(signer), config.clone())
 }
 
 fn hex(bytes: &[u8]) -> String {

@@ -9,6 +9,7 @@
 
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use creda_events::{
@@ -59,6 +60,11 @@ pub struct CredaCore {
     // this per-peer monotonic counter is a sufficient Lamport-style stand-in for M5 — a proper
     // per-subgraph clock keyed off the materialized subgraph is a refinement.
     clock: AtomicU64,
+    // Event ids a stored `Tombstone` has scrubbed (§3.4.6). Consulted before persisting any event,
+    // so a tombstone that arrives — or is replayed after a restart — before its target still forces
+    // that target into husk form on arrival, and a re-received original can never un-scrub a husk.
+    // Derived state: rebuilt from the stored `Tombstone` events by [`CredaCore::open`].
+    tombstoned: RwLock<BTreeSet<EventId>>,
 }
 
 impl CredaCore {
@@ -70,7 +76,74 @@ impl CredaCore {
             config,
             confidence: ConfidenceConfig::default(),
             clock: AtomicU64::new(1),
+            tombstoned: RwLock::new(BTreeSet::new()),
         }
+    }
+
+    /// Build the engine and **recover tombstone state** from the store (§3.4.6). Every stored
+    /// `Tombstone` re-asserts its scrub: the tombstoned-id set is repopulated, and any target still
+    /// held in un-scrubbed form is reduced to a husk now. This makes the right-to-be-forgotten
+    /// durable across restarts and self-healing after a crash between persisting a target and
+    /// scrubbing it. The persistent daemon constructs the engine this way; [`Self::new`] (no
+    /// recovery) is for fresh, empty in-memory cores in tests.
+    pub fn open(
+        store: Box<dyn Store>,
+        signer: Box<dyn Signer>,
+        config: CredaConfig,
+    ) -> Result<Self> {
+        let core = Self::new(store, signer, config);
+        core.recover_tombstones()?;
+        Ok(core)
+    }
+
+    /// Whether an event id has been scrubbed by an applied `Tombstone`.
+    fn is_tombstoned(&self, id: &EventId) -> bool {
+        let set = self.tombstoned.read().unwrap_or_else(|e| e.into_inner());
+        set.contains(id)
+    }
+
+    /// Apply a `Tombstone`'s scrub to its targets (§3.4.6): record each target as tombstoned and,
+    /// for any already held in un-scrubbed PII-bearing form, overwrite it with its husk. The
+    /// demographic-token secondary index is then rebuilt so a scrubbed value can no longer be found
+    /// by its token (§5.2.5) — without that, the index would still resolve the deleted value.
+    fn apply_tombstone_targets(&self, targets: &[EventId]) -> Result<()> {
+        {
+            let mut set = self.tombstoned.write().unwrap_or_else(|e| e.into_inner());
+            set.extend(targets.iter().copied());
+        }
+        let mut scrubbed_any = false;
+        for id in targets {
+            if let Some(node) = self.store.get_event(id)? {
+                if node.carries_demographics() && !node.content_hash_voided {
+                    self.store.put_event(&node.into_tombstoned_husk())?;
+                    scrubbed_any = true;
+                }
+            }
+        }
+        if scrubbed_any {
+            self.store.rebuild_indexes()?;
+        }
+        Ok(())
+    }
+
+    /// Rebuild [`Self::tombstoned`] from the stored `Tombstone` events and re-apply any scrub that
+    /// did not survive a crash. Called by [`Self::open`].
+    fn recover_tombstones(&self) -> Result<()> {
+        let mut targets = Vec::new();
+        for id in self.store.all_event_ids()? {
+            if let Some(node) = self.store.get_event(&id)? {
+                if let EventPayload::Tombstone {
+                    target_event_ids, ..
+                } = &node.payload
+                {
+                    targets.extend_from_slice(target_event_ids);
+                }
+            }
+        }
+        if !targets.is_empty() {
+            self.apply_tombstone_targets(&targets)?;
+        }
+        Ok(())
     }
 
     /// This peer's institution fingerprint.
@@ -102,6 +175,13 @@ impl CredaCore {
                 .create_event(payload, parent_ids, clock, now_rfc3339(), None)?
         };
         self.store.put_event(&node)?;
+        // Applying a tombstone scrubs its targets' stored PII here, not just at projection time.
+        if let EventPayload::Tombstone {
+            target_event_ids, ..
+        } = &node.payload
+        {
+            self.apply_tombstone_targets(target_event_ids)?;
+        }
         Ok(node)
     }
 
@@ -169,7 +249,23 @@ impl CredaCore {
                 "synthetic-only network: refusing untagged (non-test-data) event".into(),
             ));
         }
+        // Enforce an existing tombstone: if this id was already scrubbed (the tombstone arrived or
+        // was replayed before its target), persist it only as a husk — a re-received original must
+        // never resurrect scrubbed PII. (`has_event` above already makes a husk we hold idempotent;
+        // this closes the tombstone-before-target ordering.)
+        let node = if node.carries_demographics() && self.is_tombstoned(&node.id) {
+            node.into_tombstoned_husk()
+        } else {
+            node
+        };
         self.store.put_event(&node)?;
+        // If this event is itself a tombstone, scrub any targets already held locally.
+        if let EventPayload::Tombstone {
+            target_event_ids, ..
+        } = &node.payload
+        {
+            self.apply_tombstone_targets(target_event_ids)?;
+        }
         Ok(Ingest::Accepted)
     }
 

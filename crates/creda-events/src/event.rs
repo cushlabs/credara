@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::canonical;
 use crate::crypto::{CryptoSignature, SignatureAlgorithm, SigningKey, VerifyingKey};
+use crate::demographics::Demographics;
 use crate::error::{Error, Result};
 use crate::hash::ContentHash;
 use crate::ids::{new_event_id, CertificateFingerprint, EventId};
@@ -298,6 +299,47 @@ impl IdentityEventNode {
     pub fn void_content_hash(&mut self) {
         self.content_hash = None;
         self.content_hash_voided = true;
+    }
+
+    /// Whether this event carries demographic PII in its payload. These are the events a
+    /// tombstone must physically scrub from storage (not merely exclude from projection): only
+    /// `Assert` (original demographics) and `Amend` (updated demographics) hold tokenized
+    /// demographic content. Every other type is a husk-free structural node.
+    pub fn carries_demographics(&self) -> bool {
+        matches!(
+            self.payload,
+            EventPayload::Assert { .. } | EventPayload::Amend { .. }
+        )
+    }
+
+    /// Reduce this node to a **tombstoned husk** (§3.4.6): strip the demographic payload to an
+    /// empty [`Demographics`] and void the content hash, while keeping the structural envelope —
+    /// id, type, parents, clocks, institution, and the now-historical signature. The content is
+    /// then irrecoverable from this node; the signed `Tombstone` event that authorized the scrub
+    /// is the integrity anchor. `verify_content_hash` returns `None` (not `Some(false)`) for the
+    /// result, so a husk is never read as a hash mismatch; the original signature no longer
+    /// verifies, by design — a husk is a local storage artifact, never a wire object. A no-op for
+    /// payloads that carry no demographics.
+    #[must_use]
+    pub fn into_tombstoned_husk(mut self) -> Self {
+        let scrubbed = match &mut self.payload {
+            EventPayload::Assert { demographics, .. } => {
+                *demographics = Demographics::default();
+                true
+            }
+            EventPayload::Amend {
+                updated_demographics,
+                ..
+            } => {
+                *updated_demographics = Demographics::default();
+                true
+            }
+            _ => false,
+        };
+        if scrubbed {
+            self.void_content_hash();
+        }
+        self
     }
 
     /// Check the structural invariants that are verifiable from this event alone.

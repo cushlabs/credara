@@ -74,6 +74,27 @@ object EventPayloadCbor {
         }).EncodeToBytes(canonical)
     }
 
+    /** Valid `TombstoneBasis` values (§3.4.6), kebab-case to mirror the Rust enum. */
+    val TOMBSTONE_BASES = setOf(
+        "right-to-be-forgotten", "state-law", "court-order", "other",
+    )
+
+    /**
+     * Build the canonical CBOR for `EventPayload::Tombstone { target_event_ids, legal_basis }`
+     * (§3.4.6, right-to-be-forgotten). The targets are the events whose stored demographic content
+     * Core scrubs to husks on applying this event; `legalBasis` is one of [TOMBSTONE_BASES]. Shape
+     * mirrors `encodeAttest`: a `Vec<EventId>` of 16-byte UUID byte strings plus a kebab-case
+     * unit-enum string (`TombstoneBasis` carries `#[serde(rename_all = "kebab-case")]`).
+     */
+    fun encodeTombstone(targetEventIds: List<UUID>, legalBasis: String): ByteArray {
+        require(targetEventIds.isNotEmpty()) { "Tombstone must reference at least one target event" }
+        require(legalBasis in TOMBSTONE_BASES) { "invalid tombstone legal basis: $legalBasis" }
+        return wrapVariant("Tombstone", CBORObject.NewMap().apply {
+            Add("target_event_ids", uuidArray(targetEventIds))
+            Add("legal_basis", legalBasis)
+        }).EncodeToBytes(canonical)
+    }
+
     // ---- Decoder for the IdentityEventNode response shape ----------------------------------
 
     /**
