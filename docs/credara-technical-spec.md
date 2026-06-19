@@ -3535,15 +3535,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Closure condition:** Build and document reference Export Gate integrations for the three or four most common egress patterns, validated with founding institutions. Publish integration guides per pattern.
 
-#### 13.4.3 Verifier Stale-State Policy
+#### 13.4.3 Verifier Stale-State Policy — RESOLVED as structure + recommended defaults
 
-**Reference:** Section 10.3.3
+**Reference:** Section 10.3.3; guidance `docs/staleness-policy.md`; implementation `creda-verifier` `StalenessPolicy`.
 
 **The question:** The Verifier can operate offline against stale DAG state and reports the age of its view, but the policy for when stale-state verification is acceptable — and who decides — is left to the relying institution. There is no network-level guidance on acceptable staleness by use type.
 
-**Why it's open:** Acceptable staleness is use-dependent (a routine read tolerates more staleness than a fresh authorization check before a bulk export) and risk-tolerance-dependent (institutions differ). A universal threshold would be wrong for someone.
+**Resolution (June 2026): per-use-type policy with institutional override.** Like §5.3.2, the *structure* is resolved now and the *calibrated numbers* are operational (pilot-informed), not universal constants. The Verifier classifies each request into a use class — pre-export, sensitive read, research/AI, or routine read — from signals already on the `AuthorizationQuery` (`use_mode`, `purpose`, `requested_data_categories`), most-protective first, and applies that class's staleness threshold. Staleness stays advisory: the report carries the classified use class, the applied threshold, the view age, and a `stale` flag, and the relying party applies its own policy. Recommended bootstrap defaults are 5 min (pre-export), 1 h (sensitive), 12 h (research/AI), and 24 h (routine), documented as defaults to refine per deployment. The relying institution constructs the `StalenessPolicy`, so overriding any threshold or the sensitive-category set is its authority. See `docs/staleness-policy.md`.
 
-**Closure condition:** Publish recommended staleness thresholds by use type (routine read, sensitive read, pre-export check, AI/research use) as operational guidance, with the relying institution retaining override authority. Pilot data informs the recommendations.
+**Closure condition (met for the structure; ongoing for the numbers):** The per-use-type structure, classifier, recommended defaults, and institutional override ship now. The calibrated threshold values and each institution's sensitive-category mapping are deployment configuration informed by pilot data (replication-lag and revocation-propagation distributions, per `docs/staleness-policy.md`). Publish updated recommended defaults as pilot evidence accumulates.
 
 ### 13.5 Security and Cryptography
 
