@@ -15,7 +15,7 @@ guide before opening a pull request.
 
 2. **Assemble, don't reinvent.** Appendix C of the spec is the build-vs-buy contract.
    Credara is a thin healthcare-domain layer (~8,000–15,000 lines of genuinely new code) on
-   top of mature libraries — libp2p, HAPI FHIR, RocksDB/libgit2, the `pqcrypto` family,
+   top of mature libraries — libp2p, HAPI FHIR, RocksDB, the `pqcrypto` family,
    ciborium, blake3, SPIRE, cert-manager, libpostal, and others. **If you find yourself
    writing a gossip protocol, a DHT, a FHIR server, or a cryptographic primitive from
    scratch, stop** — the spec says to use an existing component.

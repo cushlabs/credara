@@ -9,8 +9,8 @@ Will contain: the `Store` trait; a RocksDB-backed implementation; the secondary 
 §5.2.5 (demographic-token→entry-points, institution→events, event-UUID→node, parent→children);
 index rebuild-on-startup.
 
-**Assemble:** rust-rocksdb. **Scaffold:** a libgit2-backed `Store` impl behind the same trait —
-`TODO(open-question-13.1)`, the storage-substrate trade study is unresolved.
+**Assemble:** rust-rocksdb. The storage-substrate question (§13.1.1) is **resolved — RocksDB**
+(see `docs/storage-substrate.md`); the libgit2 alternative was retired without going past a scaffold.
 
 ## Status: implemented and verified (M2) ✓
 
@@ -24,8 +24,6 @@ memory-hungry — on a constrained Docker VM use `make test JOBS=1` or raise Doc
   want the RocksDB compile (depend with `default-features = false`).
 - `RocksdbStore` (feature `rocksdb`, **default**) — embedded, one column family per index;
   composite-key prefix scans (no read-modify-write of serialized sets).
-- `GitStore` (feature `libgit2`) — scaffold only; methods return `Unimplemented` with
-  `TODO(open-question-13.1)`.
 
 ### The four secondary indexes (§5.2.5)
 1. demographic token → entry points (`entry_points_by_token`)
@@ -42,5 +40,5 @@ RocksDB's `librocksdb-sys` compiles RocksDB from source and runs bindgen, so the
 a C++ compiler + libclang — already provisioned in the dev container (`.devcontainer/Dockerfile`).
 
 ### Module map
-`store.rs` (trait) · `memory.rs` · `rocks.rs` · `git.rs` (scaffold) · `tokens.rs`
+`store.rs` (trait) · `memory.rs` · `rocks.rs` · `tokens.rs`
 (demographic token extraction) · `error.rs`.

@@ -11,7 +11,7 @@ spec wins.
 
 Credara is **assembled, not reinvented** (spec Appendix C). The Rust crates and the
 Java bridge below contain only the genuinely-new healthcare-domain layer
-(~8,000–15,000 lines) on top of mature libraries: libp2p, HAPI FHIR, RocksDB/libgit2,
+(~8,000–15,000 lines) on top of mature libraries: libp2p, HAPI FHIR, RocksDB,
 the `pqcrypto` family, ciborium, blake3, SPIRE, cert-manager, and others. If a
 component starts reimplementing a gossip protocol, a DHT, a FHIR server, or a crypto
 primitive, that is a mistake — assemble it instead.
@@ -64,9 +64,9 @@ creda/
 │   │                          #   blake3 hashing, UUIDv7, algorithm-agile signatures.
 │   │                          #   Spec §3 (Identity Model), §4 (Portable Authorization),
 │   │                          #   §5 (Data Structures). Pure data + crypto, no I/O.
-│   ├── creda-store/           # M2 — `Store` trait + RocksDB impl; libgit2 scaffolded
-│   │                          #   behind the trait. Secondary indexes (§5.2.5).
-│   │                          #   Spec §5.2, §7.3, Appendix C.1/C.3. TODO(open-question-13.1).
+│   ├── creda-store/           # M2 — `Store` trait + RocksDB impl (the substrate, §13.1.1
+│   │                          #   resolved). Secondary indexes (§5.2.5).
+│   │                          #   Spec §5.2, §7.3, Appendix C.1/C.3.
 │   ├── creda-graph/           # M3 — subgraph materialization, effective-identity
 │   │                          #   projection, 7-step authorization evaluation, confidence
 │   │                          #   scoring (Fellegi-Sunter, ported). Spec §5.2.4, §4.6, §5.3.
@@ -132,7 +132,7 @@ last. See the milestone table in `README.md`.
 Where the spec marks a decision unresolved (§13), the relevant directory carries a
 clearly-marked `TODO(open-question-13.x)` at the scaffolded interface and a tracked
 issue, rather than a quietly-chosen permanent answer. The currently-open items that
-affect the build are storage substrate (13.1), the disambiguation question-selection
+affect the build are the disambiguation question-selection
 algorithm (13.2.x), pairwise vs. deterministic subject identifier, DHT query-privacy
 (13.3 / §8.5), and revocation latency bounds 2 & 3 plus Export Gate integration and
 Verifier stale-state policy (13.4.x).

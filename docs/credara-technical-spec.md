@@ -2090,9 +2090,9 @@ The same binary supports both modes — there is no separate CLI tool. CLI mode 
 Credara Core is internally organized into modules with clear boundaries:
 
 - **`events`**: identity event types, schema validation, signing, signature verification.
-- **`dag`**: DAG operations — likely libgit2-backed per Appendix C.7. Subgraph traversal, root discovery, fork/split semantics, parent reference management.
+- **`dag`**: DAG operations over the RocksDB-backed `Store` (§13.1.1 resolved). Subgraph traversal, root discovery, fork/split semantics, parent reference management.
 - **`network`**: libp2p wrapper. Peer connections, gossip publish/subscribe, DHT operations, anti-entropy protocol. Hidden behind a `NetworkTransport` trait to allow alternative implementations.
-- **`storage`**: persistence interface. Hidden behind a `Store` trait. Default implementation uses libgit2; alternative implementations (e.g., RocksDB, sled) can be plugged in for testing or specialized deployments.
+- **`storage`**: persistence interface. Hidden behind a `Store` trait. Default implementation uses RocksDB (§13.1.1 resolved); an in-memory implementation backs tests, and other backends can be plugged in for specialized deployments.
 - **`authorization`**: authorization evaluation engine. Executes the seven-step evaluation algorithm (Section 4.6) over AuthorizationGrant and AuthorizationRevocation events; backs both the responding-peer query path and the Verifier.
 - **`confidence`**: confidence scoring engine. Implements per-field confidence (Section 5.3.2), temporal decay, attestation amplification, agreement amplification.
 - **`disambiguation`**: question selection and answer scoring for `$creda-disambiguate` (Section 8.2.9).
@@ -2122,7 +2122,7 @@ The API is designed to be stable across minor versions. Major-version bumps are 
 Each major dependency is hidden behind a Rust trait with a well-defined interface:
 
 - **`NetworkTransport`**: abstracts libp2p. Allows swapping for QUIC-based or other transports if libp2p proves unfit.
-- **`Store`**: abstracts the storage engine. Default libgit2 implementation; alternatives can be plugged in.
+- **`Store`**: abstracts the storage engine. Default RocksDB implementation (§13.1.1 resolved); alternatives can be plugged in.
 - **`Signer`**: abstracts the signing key. Default uses an in-memory key (with the private key sourced from a k8s Secret); alternative implementations can wrap an HSM, cloud KMS, or hardware token.
 - **`RegistryClient`**: abstracts the Participant Registry. Default consumes registry update events from the network; alternative implementations can read from a static configuration file for air-gapped deployments.
 
@@ -3377,15 +3377,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 ### 13.1 Storage and DAG Layer
 
-#### 13.1.1 libgit2 vs. RocksDB as Storage Foundation
+#### 13.1.1 libgit2 vs. RocksDB as Storage Foundation — RESOLVED: RocksDB
 
-**Reference:** Appendix C.7
+**Reference:** Appendix C.7; decision record `docs/storage-substrate.md`.
 
 **The question:** Should Credara Core's DAG and storage layer be built on libgit2 (using Git's data model directly) or on RocksDB with a custom Merkle-DAG implementation?
 
-**Why it's open:** libgit2 offers significant code reduction and inherits decades of Git hardening, but it requires reconciling UUID-based addressing with Git's content-addressing and adapting Git's repository organization to handle millions of patient subgraphs. RocksDB offers more flexibility but requires building DAG primitives ourselves. Until parallel prototypes are built and compared on lines of code, performance, and operational characteristics, both options remain live.
+**Resolution (June 2026): RocksDB.** The libgit2 alternative is retired and its scaffold removed. The decision is made on architectural grounds rather than a benchmark bake-off, because the mismatches are structural: (a) right-to-be-forgotten (§3.4.6) requires in-place content destruction, which Git's immutable content-addressed objects resist — the scrub becomes a filter/repack — whereas RocksDB does a point overwrite, exactly the engine's husk-on-`put_event` path; (b) "patient subgraphs as refs" implies millions of refs, and libgit2 still does not implement the reftable backend that makes that scale; (c) high-rate writes of small immutable objects incur loose-object/gc and per-ref-lock pressure versus RocksDB's batched WAL/LSM; (d) Credara's content-agnostic anti-entropy (a Merkle root over the sorted UUID set, so tombstones never diverge peers) is not Git's reachability-based pack negotiation; (e) UUIDv7 + Blake3 addressing still needs a UUID→OID translation index, so "native" storage is not free. RocksDB was already the complete, tested backend. The `Store` trait (§7.4.1) keeps the choice reversible without touching other crates. See `docs/storage-substrate.md` for the full rationale.
 
-**Closure condition:** Build prototype implementations of Credara Core on both backends with equivalent functionality (event creation, retrieval, subgraph traversal, signature verification, anti-entropy). Compare on: total lines of Credara-specific code, throughput for representative workloads, recovery time after PV loss, debugging tooling availability. Decide before locking in production architecture. Estimated effort: 2-4 engineer-weeks per prototype.
+**Closed.** The original closure condition — build both prototypes and compare on lines of code, throughput, and recovery — is superseded: items (a) and (b) are disqualifying independently of any throughput measurement. Note that §13.1.2 (the tombstone content-integrity governance review) is a separate question and remains open.
 
 #### 13.1.2 Tombstone Integrity Tradeoff
 
@@ -3780,7 +3780,7 @@ Credara is assembled from mature standards and components rather than invented f
 
 ### A.8 Implementation components
 
-- RocksDB (<https://rocksdb.org>) and libgit2 (<https://libgit2.org>) — candidate `Store` substrates (Section 5.2; open question 13.1).
+- RocksDB (<https://rocksdb.org>) — the `Store` substrate (Section 5.2; §13.1.1 resolved, see `docs/storage-substrate.md`). libgit2 was evaluated as the alternative and retired.
 - HAPI FHIR — HL7's reference Java FHIR implementation, used by the Bridge. <https://hapifhir.io>
 - cert-manager (<https://cert-manager.io>), Helm, Kubernetes, and Ansible — deployment and certificate lifecycle.
 - Prometheus, Grafana, and OpenTelemetry — observability.
@@ -3845,6 +3845,8 @@ This appendix annotates every significant technical decision in the spec with th
 The principle: if a section of the spec describes building something that already exists in a mature, maintained, and appropriately-licensed form, we should use that thing. New code should be reserved for what is genuinely Credara-specific: the healthcare-specific event semantics, the consent model, the disambiguation operations, and the integration glue.
 
 ### C.1 DAG, Storage, and Cryptographic Primitives
+
+> **Storage-substrate note:** the rows below that recommend **libgit2** (e.g. §4.1 DAG foundation, §5.1.8 anti-entropy, §6.3.1 KV store) are **superseded** — §13.1.1 is resolved to **RocksDB** and libgit2 is retired (`docs/storage-substrate.md`). The DAG, anti-entropy, and snapshot logic is built on the RocksDB-backed `Store` instead.
 
 | Spec Section | Decision | Use This | Notes |
 |---|---|---|---|
@@ -3957,6 +3959,8 @@ That's a manageable scope. Roughly: a healthcare-domain event-semantics layer, a
 
 ### C.7 Reconsidering libgit2 as the DAG Foundation
 
+> **Resolved (§13.1.1, June 2026): RocksDB was chosen; libgit2 is retired.** This section is kept as design-rationale history. Where it recommends libgit2 or a prototype bake-off below, that recommendation is **superseded** — see `docs/storage-substrate.md`. In short: Git's immutable, content-addressed objects resist the §3.4.6 right-to-be-forgotten scrub (which RocksDB performs as a point overwrite), libgit2 lacks the reftable backend needed for millions of subgraph refs, and Credara's content-agnostic anti-entropy is not Git's reachability-based pack negotiation.
+
 The single largest "don't reinvent" opportunity is using libgit2 as the storage and replication foundation rather than building on RocksDB directly. The case for it:
 
 **Wins:**
@@ -3995,7 +3999,7 @@ The honest accounting:
 - **Cryptographic primitives**: 100% existing libraries (ciborium, blake3, ed25519-dalek, pqcrypto).
 - **Identity and auth**: 100% existing standards and implementations (UDAP, SPIRE, SMART, WebAuthn, OIDC).
 - **Tokenization**: 100% existing scheme (TEFCA IAS), possibly extended.
-- **Storage and replication**: Very likely libgit2; otherwise RocksDB. Either way, existing.
+- **Storage and replication**: RocksDB (§13.1.1 resolved; libgit2 retired). Existing.
 - **Observability, deployment, operations**: 100% existing tooling (Prometheus, Grafana, OTel, Helm, k8s, Argo, MinIO, cert-manager).
 - **Audit trail**: Pattern from sigstore Rekor; resource format from FHIR.
 

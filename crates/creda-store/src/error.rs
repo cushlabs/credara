@@ -19,10 +19,6 @@ pub enum Error {
     /// Stored data was structurally corrupt (e.g. an index key of unexpected length).
     #[error("store corruption: {0}")]
     Corrupt(String),
-
-    /// A backend method is scaffolded but not yet implemented.
-    #[error("not implemented: {0}")]
-    Unimplemented(&'static str),
 }
 
 impl From<creda_events::Error> for Error {

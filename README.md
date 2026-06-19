@@ -81,7 +81,7 @@ migration.
   enforced by **dual control**: an Export Gate at the source and a Verifier at the
   relying party, neither able to unilaterally circumvent authorization.
 - **Standards over invention.** The system is assembled from mature components (libp2p,
-  HAPI FHIR, RocksDB/libgit2, the `pqcrypto` family, SPIRE, cert-manager, TEFCA
+  HAPI FHIR, RocksDB, the `pqcrypto` family, SPIRE, cert-manager, TEFCA
   tokenization). Only the healthcare-domain layer is new code. See spec **Appendix C**.
 
 ## What peers exchange
@@ -175,7 +175,7 @@ sequenceDiagram
 | FHIR Bridge | **Java/Kotlin** — HAPI FHIR, Plain Server mode (not JPA) |
 | FHIR version | **R4** (R5 deferred — open question 13.6.1) |
 | Networking | **libp2p** — gossipsub, Kademlia DHT, Noise transport |
-| Storage | `Store` trait — **RocksDB** impl first, **libgit2** scaffolded (open question 13.1) |
+| Storage | `Store` trait — **RocksDB** (substrate decided, §13.1.1; libgit2 retired — `docs/storage-substrate.md`) |
 | Serialization | **Canonical CBOR** (ciborium, RFC 8949 deterministic encoding) |
 | Hashing | **Blake3** (content integrity, Merkle roots) · **SHA-512** (DHT routing key, FIPS-validated) |
 | Node IDs | **UUIDv7** |
