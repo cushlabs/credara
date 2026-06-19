@@ -3389,13 +3389,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 #### 13.1.2 Tombstone Integrity Tradeoff
 
-**Reference:** Section 7.2.2
+**Reference:** Section 7.2.2; review package `docs/tombstone-integrity-review.md`.
 
 **The question:** Tombstoned nodes lose content integrity (the original signature no longer verifies because the signed content has been scrubbed). The graph topology and references remain intact, but cryptographic verification of "this node originally contained X" is no longer possible after tombstoning. Is this acceptable to compliance reviewers, security architects, and auditors?
 
-**Why it's open:** This tradeoff is the right answer for our regulatory constraints — right-to-be-forgotten requires actual content destruction — but it leaves a gap in the cryptographic audit story. An auditor cannot retroactively verify what a tombstoned event originally said. We have not yet had this design reviewed by privacy counsel, healthcare auditors, or institutional security architects.
+**Why it's open:** This tradeoff is the right answer for our regulatory constraints — right-to-be-forgotten requires actual content destruction — but it leaves a gap in the cryptographic audit story. An auditor cannot retroactively verify what a tombstoned event originally said. The closure is governance sign-off, not engineering; the mechanism itself is implemented (§3.4.6).
 
-**Closure condition:** Review the design with: (a) privacy counsel familiar with HIPAA, GDPR, and state-law right-to-be-forgotten requirements; (b) representative institutional security architects from founding institutions; (c) HL7 Security work group reviewers during the IG ballot process. Document any required adjustments — for example, an option to retain a hash of the original content (without the content itself) for "what was tombstoned" audit purposes, while still satisfying the legal requirement that the PHI itself is destroyed.
+**Review package & recommended posture (June 2026):** The open item is narrow — content attestation, not the action-audit. The `Tombstone` is already a signed, immutable record of who/when/why/what, so the scrub *action* is fully attested; what is lost is only cryptographic verification of the destroyed *content*. `docs/tombstone-integrity-review.md` packages the tradeoff for review and recommends: keep the signed action-attestation (done); **default to retaining no content digest** (cleanest right-to-be-forgotten posture, zero re-identification surface); and offer an **off-by-default, per-deployment, counsel-approved keyed-HMAC** content attestation for institutions whose auditors require it — HMAC rather than a bare hash, to defeat the confirmation-oracle risk on low-entropy demographics. The engineering for the optional attestation is small and intentionally **not** built ahead of the review.
+
+**Closure condition:** Review the design with: (a) privacy counsel familiar with HIPAA, GDPR, and state-law right-to-be-forgotten requirements; (b) representative institutional security architects from founding institutions; (c) HL7 Security work group reviewers during the IG ballot process. Record each group's disposition in the decision-record table of `docs/tombstone-integrity-review.md`; this question stays **open** until all three are recorded, then update this section with the ratified posture.
 
 #### 13.1.3 Bucket Count for Topic Gossip
 
