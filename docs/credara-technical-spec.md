@@ -3389,13 +3389,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 #### 13.1.2 Tombstone Integrity Tradeoff
 
-**Reference:** Section 7.2.2
+**Reference:** Section 7.2.2; review package `docs/tombstone-integrity-review.md`.
 
 **The question:** Tombstoned nodes lose content integrity (the original signature no longer verifies because the signed content has been scrubbed). The graph topology and references remain intact, but cryptographic verification of "this node originally contained X" is no longer possible after tombstoning. Is this acceptable to compliance reviewers, security architects, and auditors?
 
-**Why it's open:** This tradeoff is the right answer for our regulatory constraints — right-to-be-forgotten requires actual content destruction — but it leaves a gap in the cryptographic audit story. An auditor cannot retroactively verify what a tombstoned event originally said. We have not yet had this design reviewed by privacy counsel, healthcare auditors, or institutional security architects.
+**Why it's open:** This tradeoff is the right answer for our regulatory constraints — right-to-be-forgotten requires actual content destruction — but it leaves a gap in the cryptographic audit story. An auditor cannot retroactively verify what a tombstoned event originally said. The closure is governance sign-off, not engineering; the mechanism itself is implemented (§3.4.6).
 
-**Closure condition:** Review the design with: (a) privacy counsel familiar with HIPAA, GDPR, and state-law right-to-be-forgotten requirements; (b) representative institutional security architects from founding institutions; (c) HL7 Security work group reviewers during the IG ballot process. Document any required adjustments — for example, an option to retain a hash of the original content (without the content itself) for "what was tombstoned" audit purposes, while still satisfying the legal requirement that the PHI itself is destroyed.
+**Review package & recommended posture (June 2026):** The open item is narrow — content attestation, not the action-audit. The `Tombstone` is already a signed, immutable record of who/when/why/what, so the scrub *action* is fully attested; what is lost is only cryptographic verification of the destroyed *content*. `docs/tombstone-integrity-review.md` packages the tradeoff for review and recommends: keep the signed action-attestation (done); **default to retaining no content digest** (cleanest right-to-be-forgotten posture, zero re-identification surface); and offer an **off-by-default, per-deployment, counsel-approved keyed-HMAC** content attestation for institutions whose auditors require it — HMAC rather than a bare hash, to defeat the confirmation-oracle risk on low-entropy demographics. The engineering for the optional attestation is small and intentionally **not** built ahead of the review.
+
+**Closure condition:** Review the design with: (a) privacy counsel familiar with HIPAA, GDPR, and state-law right-to-be-forgotten requirements; (b) representative institutional security architects from founding institutions; (c) HL7 Security work group reviewers during the IG ballot process. Record each group's disposition in the decision-record table of `docs/tombstone-integrity-review.md`; this question stays **open** until all three are recorded, then update this section with the ratified posture.
 
 #### 13.1.3 Bucket Count for Topic Gossip
 
@@ -3533,15 +3535,15 @@ Each question includes the relevant section, a description of what is unresolved
 
 **Closure condition:** Build and document reference Export Gate integrations for the three or four most common egress patterns, validated with founding institutions. Publish integration guides per pattern.
 
-#### 13.4.3 Verifier Stale-State Policy
+#### 13.4.3 Verifier Stale-State Policy — RESOLVED as structure + recommended defaults
 
-**Reference:** Section 10.3.3
+**Reference:** Section 10.3.3; guidance `docs/staleness-policy.md`; implementation `creda-verifier` `StalenessPolicy`.
 
 **The question:** The Verifier can operate offline against stale DAG state and reports the age of its view, but the policy for when stale-state verification is acceptable — and who decides — is left to the relying institution. There is no network-level guidance on acceptable staleness by use type.
 
-**Why it's open:** Acceptable staleness is use-dependent (a routine read tolerates more staleness than a fresh authorization check before a bulk export) and risk-tolerance-dependent (institutions differ). A universal threshold would be wrong for someone.
+**Resolution (June 2026): per-use-type policy with institutional override.** Like §5.3.2, the *structure* is resolved now and the *calibrated numbers* are operational (pilot-informed), not universal constants. The Verifier classifies each request into a use class — pre-export, sensitive read, research/AI, or routine read — from signals already on the `AuthorizationQuery` (`use_mode`, `purpose`, `requested_data_categories`), most-protective first, and applies that class's staleness threshold. Staleness stays advisory: the report carries the classified use class, the applied threshold, the view age, and a `stale` flag, and the relying party applies its own policy. Recommended bootstrap defaults are 5 min (pre-export), 1 h (sensitive), 12 h (research/AI), and 24 h (routine), documented as defaults to refine per deployment. The relying institution constructs the `StalenessPolicy`, so overriding any threshold or the sensitive-category set is its authority. See `docs/staleness-policy.md`.
 
-**Closure condition:** Publish recommended staleness thresholds by use type (routine read, sensitive read, pre-export check, AI/research use) as operational guidance, with the relying institution retaining override authority. Pilot data informs the recommendations.
+**Closure condition (met for the structure; ongoing for the numbers):** The per-use-type structure, classifier, recommended defaults, and institutional override ship now. The calibrated threshold values and each institution's sensitive-category mapping are deployment configuration informed by pilot data (replication-lag and revocation-propagation distributions, per `docs/staleness-policy.md`). Publish updated recommended defaults as pilot evidence accumulates.
 
 ### 13.5 Security and Cryptography
 

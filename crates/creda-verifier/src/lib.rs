@@ -11,12 +11,17 @@
 //!
 //! It runs **locally and offline** (§10.3.3): it only reads a local read-only DAG replica behind
 //! the [`creda_store::Store`] trait and never calls the source system. When its DAG view is older
-//! than a configurable threshold it reports staleness and the view's age, so the relying party
-//! can decide whether stale-state verification is acceptable for the use at hand. The exact
-//! stale-state policy is `TODO(open-question-13.4.3)`.
+//! than the threshold for the use's class it reports staleness, the view's age, the classified
+//! [`UseClass`], and the applied threshold, so the relying party can apply its own override. The
+//! stale-state policy is **per use type** ([`StalenessPolicy`], §13.4.3): a fresh-auth check before
+//! a bulk export tolerates far less lag than a routine read. The recommended thresholds are
+//! bootstrap defaults to be refined with pilot data (see `docs/staleness-policy.md`); the relying
+//! institution keeps override authority.
 
 mod error;
+mod staleness;
 mod verifier;
 
 pub use error::{Error, Result};
+pub use staleness::{StalenessPolicy, UseClass};
 pub use verifier::{VerificationReport, Verifier, VerifyRequest};

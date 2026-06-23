@@ -7,6 +7,7 @@ use creda_graph::{evaluate, AuthorizationQuery, DefaultPosture, Subgraph};
 use creda_store::Store;
 
 use crate::error::Result;
+use crate::staleness::{StalenessPolicy, UseClass};
 
 /// What to verify: the patient subgraph entry points, the governing Grant (the artifact under
 /// which the data was obtained), and the authorization query describing the intended use.
@@ -24,10 +25,14 @@ pub struct VerificationReport {
     pub authorized: bool,
     pub identity_continuity: bool,
     pub provenance_intact: bool,
-    /// True when the local DAG view is older than the configured threshold.
+    /// True when `dag_age_secs` exceeds the staleness threshold for this use's class (§13.4.3).
     pub stale: bool,
     /// Age of the local DAG view in seconds (now − last sync).
     pub dag_age_secs: i64,
+    /// The class the request was classified into, and the staleness threshold (seconds) applied
+    /// for it (§13.4.3). Reported so the relying party can apply its own override policy.
+    pub use_class: UseClass,
+    pub staleness_threshold_secs: i64,
     pub reason: String,
 }
 
@@ -41,15 +46,21 @@ impl VerificationReport {
 
 /// Relying-side enforcement point. Operates against a local read-only DAG replica.
 pub struct Verifier {
-    /// DAG views older than this are flagged stale (§10.3.3). `TODO(open-question-13.4.3)`.
-    staleness_threshold_secs: i64,
+    /// Per-use-type stale-state policy (§13.4.3). The relying institution supplies it and keeps
+    /// override authority; staleness is advisory, reported alongside the substantive checks.
+    policy: StalenessPolicy,
 }
 
 impl Verifier {
-    pub fn new(staleness_threshold_secs: i64) -> Self {
-        Self {
-            staleness_threshold_secs,
-        }
+    /// Build a Verifier with a per-use-type [`StalenessPolicy`] (§13.4.3).
+    pub fn new(policy: StalenessPolicy) -> Self {
+        Self { policy }
+    }
+
+    /// Convenience: a Verifier whose every use class shares one staleness threshold (the
+    /// pre-§13.4.3 single-threshold behavior, useful for tests and simple deployments).
+    pub fn uniform(staleness_threshold_secs: i64) -> Self {
+        Self::new(StalenessPolicy::uniform(staleness_threshold_secs))
     }
 
     /// Verify a use against the local store. `last_sync_unix_secs` is the time of the most recent
@@ -100,11 +111,15 @@ impl Verifier {
         }
 
         let dag_age_secs = (now_unix_secs - last_sync_unix_secs).max(0);
-        let stale = dag_age_secs > self.staleness_threshold_secs;
+        let (use_class, staleness_threshold_secs) = self.policy.threshold_for(&request.query);
+        let stale = dag_age_secs > staleness_threshold_secs;
 
         let reason = if authorized && identity_continuity && provenance_intact {
             if stale {
-                format!("valid, but local DAG view is stale ({dag_age_secs}s old)")
+                format!(
+                    "valid, but local DAG view is stale for {} use ({dag_age_secs}s old, limit {staleness_threshold_secs}s)",
+                    use_class.label()
+                )
             } else {
                 "valid".to_string()
             }
@@ -122,6 +137,8 @@ impl Verifier {
             provenance_intact,
             stale,
             dag_age_secs,
+            use_class,
+            staleness_threshold_secs,
             reason,
         })
     }
