@@ -32,6 +32,7 @@ pub enum IdentityEventType {
     AuthorizationGrant,
     AuthorizationRevocation,
     ExportReceipt,
+    TPODisclosure,
 }
 
 impl IdentityEventType {
@@ -48,6 +49,7 @@ impl IdentityEventType {
             IdentityEventType::AuthorizationGrant
                 | IdentityEventType::AuthorizationRevocation
                 | IdentityEventType::ExportReceipt
+                | IdentityEventType::TPODisclosure
         )
     }
 }

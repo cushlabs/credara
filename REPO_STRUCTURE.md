@@ -60,7 +60,7 @@ creda/
 │   └── HOW_TO_TEST.md            # Getting-started reference for new testers.
 │
 ├── crates/                    # The Rust workspace members (Core, Export Gate, Verifier).
-│   ├── creda-events/          # M1 — event node schema, 10 event types, canonical CBOR,
+│   ├── creda-events/          # M1 — event node schema, 11 event types, canonical CBOR,
 │   │                          #   blake3 hashing, UUIDv7, algorithm-agile signatures.
 │   │                          #   Spec §3 (Identity Model), §4 (Portable Authorization),
 │   │                          #   §5 (Data Structures). Pure data + crypto, no I/O.

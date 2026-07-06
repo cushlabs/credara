@@ -3,14 +3,14 @@
 //! The Creda event model — the heart of the system (build milestone M1).
 //!
 //! This crate is **pure data + cryptography**: it has no network or storage dependencies.
-//! It defines the signed DAG event node, the ten event types spanning identity continuity
+//! It defines the signed DAG event node, the eleven event types spanning identity continuity
 //! and portable authorization, their payloads, canonical (deterministic) CBOR
 //! serialization, Blake3 content hashing, UUIDv7 identifiers, and the algorithm-agile
 //! signature scheme.
 //!
 //! Governing specification sections (see `docs/credara-technical-spec.md`):
 //! - §3  Identity Model — the seven identity event types and the signature model.
-//! - §4  Portable Authorization — the three authorization event types.
+//! - §4  Portable Authorization — the four authorization event types.
 //! - §5  Data Structures — the event node schema, PQC requirements, payload schemas, UUIDv7
 //!   generation, and the Demographics struct.
 //!

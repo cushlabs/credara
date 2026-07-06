@@ -46,8 +46,8 @@ those operations are not yet functional — see below.
 Every provider method does only FHIR↔gRPC mapping.
 
 **Implemented (F0, §8.5.6):** the authorization FHIR↔CBOR mappers and the four authorization
-operations. `EventPayloadCbor` now encodes/decodes the three authorization payloads
-(`AuthorizationGrant`, `AuthorizationRevocation`, `ExportReceipt`) as canonical CBOR, and
+operations. `EventPayloadCbor` now encodes/decodes the four authorization payloads
+(`AuthorizationGrant`, `AuthorizationRevocation`, `ExportReceipt`, and `TPODisclosure` — the grant-less §4.3.5 disclosure) as canonical CBOR, and
 `AuthorizationResourceProvider` wires `$creda-authorize` → Consent, `$creda-revoke` → Consent
 (inactive), `$creda-export` → AuditEvent, and `$creda-verify` → decision. Wire shapes are pinned
 by golden-vector tests (`src/test/.../AuthorizationPayloadCborTest.kt`) generated from an

@@ -110,6 +110,42 @@ class AuthorizationPayloadCborTest {
         assertEquals(gid, v.targetGrantId)
     }
 
+    @Test
+    fun `tpo disclosure matches golden vector`() {
+        val bytes = EventPayloadCbor.encodeTPODisclosure(
+            recipient = fp,
+            purpose = "treatment",
+            disclosedScope = EventPayloadCbor.Scope(),
+        )
+        assertEquals(GOLDEN_TPO, toHex(bytes))
+    }
+
+    @Test
+    fun `decodeTPODisclosureNode round-trips and matches the full golden vector`() {
+        val payload = EventPayloadCbor.encodeTPODisclosure(
+            recipient = fp,
+            purpose = "payment",
+            disclosedScope = EventPayloadCbor.Scope(subgraphSegments = listOf(gid)),
+            dataReference = "Claim/abc",
+        )
+        assertEquals(GOLDEN_TPO_FULL, toHex(payload))
+
+        val node = nodeWrapping(payload, gid, fp, "2026-06-03T12:00:00Z")
+        val v = EventPayloadCbor.decodeTPODisclosureNode(node)
+        assertEquals(gid, v.id)
+        assertArrayEquals(fp, v.institutionFingerprint)
+        assertArrayEquals(fp, v.recipient)
+        assertEquals("payment", v.purpose)
+        assertEquals("Claim/abc", v.dataReference)
+    }
+
+    @Test
+    fun `encodeTPODisclosure rejects a non-TPO purpose`() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            EventPayloadCbor.encodeTPODisclosure(fp, "research", EventPayloadCbor.Scope())
+        }
+    }
+
     // ---- helpers ---------------------------------------------------------------------------
 
     /**
@@ -141,5 +177,11 @@ class AuthorizationPayloadCborTest {
             "a177417574686f72697a6174696f6e5265766f636174696f6ea16f7461726765745f6772616e745f696450000102030405060708090a0b0c0d0e0f"
         const val GOLDEN_EXPORT =
             "a16d4578706f727452656365697074a36e72656c65617365645f73636f7065a072676f7665726e696e675f6772616e745f696450000102030405060708090a0b0c0d0e0f7672657175657374696e675f696e737469747574696f6e8618aa18bb18cc18dd18ee18ff"
+        // TPODisclosure (§4.3.5): recipient fingerprint AA..FF, purpose "treatment", empty scope.
+        const val GOLDEN_TPO =
+            "a16d54504f446973636c6f73757265a367707572706f73656974726561746d656e7469726563697069656e748618aa18bb18cc18dd18ee18ff6f646973636c6f7365645f73636f7065a0"
+        // Full: purpose "payment", disclosed_scope.subgraph_segments=[gid], data_reference "Claim/abc".
+        const val GOLDEN_TPO_FULL =
+            "a16d54504f446973636c6f73757265a467707572706f7365677061796d656e7469726563697069656e748618aa18bb18cc18dd18ee18ff6e646174615f7265666572656e636569436c61696d2f6162636f646973636c6f7365645f73636f7065a17173756267726170685f7365676d656e74738150000102030405060708090a0b0c0d0e0f"
     }
 }

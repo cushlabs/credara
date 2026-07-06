@@ -175,6 +175,9 @@ pub fn referenced_ids(node: &IdentityEventNode) -> Vec<EventId> {
             governing_grant_id, ..
         } => vec![*governing_grant_id],
         EventPayload::AuthorizationGrant { scope, .. } => scope.subgraph_segments.clone(),
+        EventPayload::TPODisclosure {
+            disclosed_scope, ..
+        } => disclosed_scope.subgraph_segments.clone(),
         EventPayload::Assert { .. } | EventPayload::DeceasedDeclaration { .. } => Vec::new(),
     }
 }

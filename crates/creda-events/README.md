@@ -6,7 +6,7 @@ The event model — the heart of Creda. Pure data + cryptography, no network or 
 
 Will contain: the event node schema; the `IdentityEventType` enum (Assert, Link, Contest,
 Attest, Amend, Tombstone, DeceasedDeclaration, AuthorizationGrant, AuthorizationRevocation,
-ExportReceipt); the per-type `EventPayload` tagged union; the `Demographics` struct; canonical
+ExportReceipt, TPODisclosure); the per-type `EventPayload` tagged union; the `Demographics` struct; canonical
 CBOR serialization (ciborium); Blake3 content hashing; UUIDv7 generation; and the
 algorithm-agile `CryptoSignature` (Ed25519 + ML-DSA-65 + SLH-DSA + hybrid).
 
@@ -34,7 +34,7 @@ Verified-good versions (pinned in `Cargo.lock`): `pqcrypto-mldsa 0.1.2`,
 
 ### Module map
 
-- `event.rs` — `IdentityEventNode`, `IdentityEventType` (10 types), builder/sign/verify, the
+- `event.rs` — `IdentityEventNode`, `IdentityEventType` (11 types), builder/sign/verify, the
   in-isolation structural invariants, `RedistributionPolicy`.
 - `payload.rs` — `EventPayload` tagged union and the per-type enums/structs.
 - `demographics.rs` — `Demographics` and tokenized field types.

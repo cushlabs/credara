@@ -65,6 +65,22 @@ pub enum EventPayload {
         requesting_institution: CertificateFingerprint,
         released_scope: AuthorizationScope,
     },
+    /// A disclosure made on a presumptive HIPAA TPO basis with **no** governing Grant
+    /// (§4.3.5) — the grant-less sibling of `ExportReceipt`. Signed by the disclosing
+    /// institution (the author); never authored by intermediary infrastructure.
+    TPODisclosure {
+        /// The institution disclosed to (e.g. the payer).
+        recipient: CertificateFingerprint,
+        /// The HIPAA TPO basis. Restricted to Treatment/Payment/Operations so a presumptive
+        /// Research/AI/federal disclosure is structurally unrepresentable (§9.3.2).
+        purpose: TPOPurpose,
+        /// What was disclosed.
+        disclosed_scope: AuthorizationScope,
+        /// Opaque reference to the disclosed artifact (e.g. a PAS Claim id). Never PHI.
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        data_reference: Option<String>,
+        // No governing_grant_id: the basis is presumptive TPO, not a Grant.
+    },
 
     // ---- Lifecycle (§3.4.7) ----
     DeceasedDeclaration {
@@ -90,6 +106,7 @@ impl EventPayload {
                 IdentityEventType::AuthorizationRevocation
             }
             EventPayload::ExportReceipt { .. } => IdentityEventType::ExportReceipt,
+            EventPayload::TPODisclosure { .. } => IdentityEventType::TPODisclosure,
         }
     }
 }
@@ -183,6 +200,18 @@ pub enum GrantPurpose {
     AiTraining,
     AiInference,
     FederalProgram,
+}
+
+/// The HIPAA TPO basis for a `TPODisclosure` (§4.3.5). Deliberately restricted to the three
+/// treatment/payment/operations purposes that may be served under the treatment-presumed posture
+/// (§9.3.2) with no explicit Grant. Research/AI/federal disclosures always require an explicit
+/// Grant, so a "presumptive" one is unrepresentable here — the type enforces §4.3.5.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TPOPurpose {
+    Treatment,
+    Payment,
+    Operations,
 }
 
 /// Use-mode constraint on a grant (§4.3.1).

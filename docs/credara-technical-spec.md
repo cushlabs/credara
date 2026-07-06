@@ -1,9 +1,9 @@
 # Credara: Technical Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Released
 **Audience:** Engineering Team
-**Last Updated:** 2026-06-13
+**Last Updated:** 2026-07-06
 
 ---
 
@@ -30,6 +30,8 @@ These are the system-level architectural principles that govern every design dec
 **Institutional sovereignty.** Each institution owns and controls only what it created. No institution can modify, censor, or override another institution's assertions. The system has no privileged actor that can rewrite history on behalf of others. Trust between institutions is established through cryptographic signatures and reputation, not through deference to a centralized authority. This principle is what makes peer-to-peer participation politically viable — institutions adopt the network because participation does not require ceding control.
 
 **Standards over invention.** Build on UDAP, SMART on FHIR, HAPI FHIR, HL7 Implementation Guide processes, libp2p, SPIFFE, TEFCA tokenization, and NIST post-quantum cryptography. Reinvent only what is genuinely Credara-specific: the healthcare event semantics, the consent model, the disambiguation algorithm, the integration glue. New code is reserved for the healthcare-domain layer; everything else is assembled from existing components. Appendix C documents the specific component for each technical decision.
+
+**Conform to the domain authorities: Da Vinci and FAST.** Where Credara models a healthcare-domain concept that HL7's Da Vinci accelerator or the FHIR-at-Scale Taskforce (FAST) has already modeled — a consent directive, a disclosure record, the provenance of exchanged data, a member-authorization or prior-authorization artifact — Credara conforms to their profiles, operation semantics, and vocabularies rather than inventing its own. This is narrower and more binding than *Standards over invention* above: it names the specific authorities Credara defers to when a domain-modeling choice is otherwise underdetermined, so that a Credara artifact is legible to the existing US Health IT ecosystem by construction. Da Vinci is the authority for the payer–provider exchange surface — CDex for clinical-data exchange and its Provenance and signature model, PDex and HRex for member Consent and author-versus-transmitter provenance, PAS/CRD/DTR for prior authorization; FAST is the authority for consent management at scale. The single exception is **direct contradiction with a principle in this section**: where an authority's *mechanism* would force Credara to violate one — most often *Decentralization is structural* — Credara adopts the authority's semantics and supplies its own fabric. The worked example is FAST's scale model, which achieves consistency through repository federation (Admin Services acting as holders of record, kept consistent over a SubscriptionTopic); adopting that transport would reintroduce the central runtime authority Section 10.0 rules out, so Credara takes the `FASTConsent` profile shape, the three operation semantics, and the value sets but replicates over the signed-event DAG instead — which is strictly stronger (Section 8.5). The rule generalizes: separate an authority's semantics from its infrastructure, conform to the former, and override the authority only on a genuine, explicitly-named conflict with a Section 2 principle (as accounted for in Section 8.5.5).
 
 **Additive, not invasive.** Credara extends the existing FHIR and US Health IT ecosystem rather than replacing it. Non-Credara consumers see standard FHIR resources with extensions they can ignore. Institutions retain their existing MPIs, EHRs, and FHIR endpoints; Credara joins as a complementary identity provenance layer. Adoption is incremental — institutions can start as Observers (consuming through a participating QHIN), graduate to Light participants, and eventually become Full participants over multi-year arcs. The architecture is designed for a decade of coexistence with legacy infrastructure, not a forklift cutover.
 
@@ -218,7 +220,7 @@ Credara verifies authorization state. It does not itself grant, deny, broker, or
 
 ### 4.3 Authorization Event Types
 
-Authorization introduces three event types that join the identity event types in the shared `IdentityEventType` enum (Section 5.1.3). They are listed here with identity events for completeness; the enum is the single source of truth.
+Authorization introduces four event types — AuthorizationGrant, AuthorizationRevocation, ExportReceipt, and TPODisclosure — that join the identity event types in the shared `IdentityEventType` enum (Section 5.1.3). They are listed here with identity events for completeness; the enum is the single source of truth. (Section 4.3.4 is not an event type; it explains why access *requests* remain off-chain.)
 
 #### 4.3.1 AuthorizationGrant
 
@@ -250,13 +252,25 @@ ExportReceipts create a non-repudiable chain of custody. The source can prove it
 
 #### 4.3.4 Access requests are deliberately off-chain (hybrid workflow)
 
-A relying institution often wants to *ask* a patient for access before any Grant exists. Credara models this request as **off-chain** — it is **not** a DAG event — while the patient's *answer* is the existing on-chain AuthorizationGrant (Section 4.3.1) and any resulting disclosure is the existing on-chain ExportReceipt (Section 4.3.3). This hybrid split is deliberate:
+A relying institution often wants to *ask* a patient for access before any Grant exists. Credara models this request as **off-chain** — it is **not** a DAG event — while the patient's *answer* is the existing on-chain AuthorizationGrant (Section 4.3.1) and any resulting disclosure is an on-chain disclosure record — the ExportReceipt of Section 4.3.3 when the disclosure is made under that Grant, or the TPODisclosure of Section 4.3.5 when it is made on a presumptive TPO basis with no Grant. This hybrid split is deliberate:
 
 - An access request is transient *intent*, not constitutive of identity. Admitting it to the append-forward DAG would permanently retain frivolous or spam requests (the graph cannot forget) and would broadcast "institution X is interested in patient Y" to every peer holding the subgraph — precisely the value-privacy leak tracked as a hard gate in Section 13.3. Keeping the request off-chain confines that interest signal to the requester and the patient.
 - The request needs to reach exactly one party (the patient), not be replicated and enforced network-wide. Only the *answer* (the Grant) must be portable and auditable, and it already is.
 - The Grant that answers a request MAY reference the request (e.g. by hash) for audit linkage without putting the request itself on-chain.
 
 In the current implementation the off-chain request is an **ephemeral FHIR `Task`** held in the Bridge (Section 8), not persisted and not gossiped — lost on restart by design. Delivery is single-Bridge for the pilot; **cross-peer off-chain request delivery (an encrypted requester→patient channel) is an open design item for real-PHI deployment**, tracked with the Section 13.3 privacy work. On-chain gossip is the alternative explicitly not chosen for the request leg.
+
+#### 4.3.5 TPODisclosure
+
+An ExportReceipt (Section 4.3.3) records a disclosure made *under a Grant* — it hard-requires a `governing_grant_id`. But not every lawful disclosure is made under a Grant. Under the treatment-presumed posture (Section 9.3.2), a disclosure for Treatment, Payment, or Operations is permitted by HIPAA's TPO exception with **no** AuthorizationGrant — the paradigmatic case being a provider submitting a prior authorization, with its supporting clinical documentation, to the patient's payer. Such a disclosure has no governing Grant to cite, so it cannot be an ExportReceipt; yet it is a disclosure of the patient's data that the patient is entitled to see in their accounting of disclosures (Section 9.4.3). A **TPODisclosure** is the event that records it: the grant-less sibling of the ExportReceipt.
+
+A TPODisclosure records that an institution disclosed data on a presumptive TPO basis — the recipient institution, the TPO purpose, the scope disclosed, and an opaque reference to the disclosed artifact (never PHI; the data-minimization rules of Section 9.2 bind every event). It carries **no** `governing_grant_id`, and its `purpose` is deliberately restricted to Treatment, Payment, and Operations, so a "presumptive" Research, AI, or federal-program disclosure is structurally unrepresentable — those purposes always require an explicit Grant (Section 9.3.2), and the type system enforces it.
+
+**Authorship is the point.** A TPODisclosure is signed by the **disclosing institution** — the author of the disclosure, a vetted participant accountable for it — for the same reason an institution signs any event: to make a claim it stands behind. It is emphatically **not** authored by a gateway, bridge, connector, or any observing intermediary. The DAG records institutions and patients (Section 2, *Provenance is first-class*; *Institutional sovereignty*); infrastructure that merely moves or observes data is never a DAG author. A disclosure appears in the graph because the institution that made it attests to it — never because a pipe echoed its own telemetry into the record. This is the structural guarantee that keeps the accounting of disclosures a ledger of accountable acts rather than a log a bystander could pad.
+
+A TPODisclosure is a **record, not a predicate.** Like an ExportReceipt, and unlike a Grant, it is never an input to the seven-step evaluation (Section 4.6); it authorizes nothing. Its sole role is accountability: a signed, gossip-replicated, tamper-evident disclosure record that travels to every peer holding the subgraph and surfaces in the patient's accounting of disclosures. Together, ExportReceipt (governed disclosures) and TPODisclosure (presumptive-basis disclosures) give a patient a complete, portable ledger of *what data moved and on what basis* — every entry signed by the institution that moved it.
+
+Per Section 2 (*Conform to the domain authorities*), the FHIR projection follows Da Vinci: a TPODisclosure projects to a CDex/PDex-conformant **Provenance** that attributes the disclosure to its author (`Provenance.agent.type = author`, the disclosing institution) and marks any routing intermediary as a `transmitter` — which, consistent with the authorship rule above, is never itself a DAG author. The same event also surfaces as a disclosure-category **AuditEvent** for HIPAA accounting of disclosures (Sections 8.2.4, 9.4.3), aligning with FAST `$record-disclosure`.
 
 ### 4.4 The Portable Authorization Artifact
 
@@ -488,6 +502,15 @@ enum EventPayload {
         released_scope: AuthorizationScope, // what was actually released
         // A paired downstream ExportReceipt may acknowledge receipt
         // under the same governing Grant, completing the chain of custody.
+    },
+    TPODisclosure {
+        recipient: CertificateFingerprint,    // the institution disclosed TO (e.g., the payer)
+        purpose: TPOPurpose,                  // Treatment, Payment, Operations — the HIPAA TPO basis
+        disclosed_scope: AuthorizationScope,  // what was disclosed
+        data_reference: Option<String>,       // opaque ref to the disclosed artifact (never PHI)
+        // No governing_grant_id: the basis is presumptive TPO (Section 9.3.2), not a Grant.
+        // Restricted purpose enum: Research/AI/federal-program disclosures cannot be presumptive.
+        // Signed by the DISCLOSING institution (the author); infrastructure never authors it.
     },
     DeceasedDeclaration {
         date_of_death: RFC3339Date,
@@ -1249,6 +1272,8 @@ Credara events are conceptually closer to **Provenance** than to **AuditEvent**,
 
 The split: identity events are CredaProvenance resources. Reads, queries, and access checks generate FHIR AuditEvent resources via the standard HAPI auditing infrastructure, stored separately from the identity DAG. Consumers looking for "what happened to this patient's identity" query Provenance. Consumers looking for "who looked at this patient" query AuditEvent.
 
+**Disclosure records project to both.** An authorization-plane disclosure event — an ExportReceipt (Section 4.3.3) or a TPODisclosure (Section 4.3.5) — is not an identity event, but it is a write-side, discloser-authored fact, so it projects two ways. Following Da Vinci (Section 2, *Conform to the domain authorities*), it maps to a CDex/PDex-conformant Provenance that attributes the disclosure to its author (`agent.type = author`, the disclosing institution) and marks any routing intermediary as a `transmitter`, never an author. For the patient's HIPAA accounting of disclosures it also surfaces as a disclosure-category AuditEvent (Section 9.4.3), aligning with FAST `$record-disclosure`. Both projections derive from the one signed DAG event; the DAG remains the source of truth.
+
 #### 8.2.5 Operation: $creda-provenance
 
 ```
@@ -1701,6 +1726,40 @@ Deferred, demand-driven (F3–F5) — not in the default build:
 
 This staging is what keeps the implementation evolvable rather than a Frankenstein: Credara commits only to the FAST data shape and operation surface, so when the IG advances — most likely adding a runtime decision/enforcement operation in a later edition — Credara maps its existing evaluator (Section 4.6) and Verifier (Section 4.5.2) onto the new operation rather than refactoring storage or replication.
 
+### 8.6 Da Vinci Alignment
+
+Per Section 2 (*Conform to the domain authorities*), Da Vinci is the design authority for the payer–provider exchange surface — but Credara's relationship to it differs from its relationship to FAST Consent (Section 8.5). FAST Consent overlaps Credara's authorization layer directly (both are consent systems), so Credara can present a conformant FAST face at the Bridge. Da Vinci is instead a family of *exchange* IGs: the transactions by which providers and payers discover coverage, request documentation, and submit prior authorizations. Credara does not run those exchanges — *verification, not mediation* (Section 2) — so it does not implement Da Vinci's transactions. What it adopts is Da Vinci's *data models*: how a disclosure, its provenance, and a member's consent are represented, so that the identity and authorization facts Credara authors are legible to the exchange systems that consume them. Da Vinci is an authority for Credara's **shapes**, not its **transactions**.
+
+#### 8.6.1 Which Da Vinci IGs, and for What
+
+- **CDex** (Clinical Data Exchange) — the authority for attributing *exchanged clinical data*: its Provenance model and its optional data-source Signature profiles. Credara's disclosure records (ExportReceipt, Section 4.3.3; TPODisclosure, Section 4.3.5) follow CDex's Provenance shape, and Credara's mandatory per-event signature (Sections 3.6, 5.1) is the always-on analog of CDex's optional one.
+- **PDex** (Payer Data Exchange) — the authority for the source-versus-transmitter Provenance distinction (a transmitting party is marked as such, not as the author) and for payer-held member Consent. Credara's author-vs-transmitter rule (Sections 4.3.5, 8.2.4) is exactly this typing.
+- **HRex** (Health Record Exchange) — the foundational member Consent profile that PDex and the prior-authorization workflow build on. Credara's AuthorizationGrant (Section 4.3.1) is the substrate for an HRex/PDex Consent projection; because HRex Consent and FAST Consent share the FHIR `Consent` base, the mapping is the one already given in Section 8.5.2.
+- **PAS / CRD / DTR** (the prior-authorization transactions — `Claim/$submit`, CDS Hooks coverage discovery, and questionnaire packaging/population) — the *context* Credara sits beside, not inside. Credara supplies the identity continuity and the consent/authorization verification these exchanges consume; it does not submit the claim, answer the hook, or populate the questionnaire. Those remain with the exchange systems.
+
+#### 8.6.2 Provenance: Author Versus Transmitter
+
+The load-bearing Da Vinci concept for Credara is Provenance's separation of **author** from **transmitter**. A disclosure is authored by the institution that made it (`Provenance.agent.type = author`), signed with that institution's admitted credential; a party that merely routes the data is a `transmitter` and authors nothing. This is not a stylistic mapping — it is the FHIR-level statement of Credara's authorship invariant (Section 4.3.5): the DAG records institutions and patients, never the infrastructure that moves data between them. Every Credara disclosure event projects to a CDex/PDex Provenance in which the DAG event's signer is the `author`; a transmitter, where represented at all, exists only in the FHIR projection and is never itself a DAG node.
+
+#### 8.6.3 Artifact Mapping
+
+Status values follow Section 8.5.3, plus **Out of scope (by design)** for the exchange transactions Credara deliberately does not implement.
+
+| Da Vinci artifact | Kind | Credara counterpart | Status |
+|---|---|---|---|
+| CDex Provenance (exchanged-data attribution) | Profile | CredaProvenance (Section 8.2.3); disclosure-record projection (Section 8.2.4) | Bridge-mappable |
+| CDex Signature / Digital Signature (optional attestation) | Profile | Mandatory per-event signature (Sections 3.6, 5.1) | Native (stronger: always-on) |
+| PDex Provenance (source vs. transmitting agent) | Profile | Author-vs-transmitter typing on disclosure records (Sections 4.3.5, 8.2.4) | Bridge-mappable |
+| PDex / HRex Consent (member authorization) | Profile | AuthorizationGrant (Section 4.3.1); shared with the FAST mapping (Section 8.5.2) | Bridge-mappable |
+| PAS `Claim` / `ClaimResponse` (`$submit`) | Transaction | Credara does not submit or adjudicate claims | Out of scope (by design) |
+| CRD (CDS Hooks coverage discovery) | Transaction | Credara supplies the identity/consent the hook consumes | Out of scope (by design) |
+| DTR (`$questionnaire-package` / `$populate`) | Transaction | Credara supplies the identity/consent; it does not populate | Out of scope (by design) |
+| Accounting of disclosures | Workflow | Disclosure records (Sections 4.3.3, 4.3.5) projected as AuditEvent (Section 9.4.3) | Native |
+
+#### 8.6.4 The Boundary Is the Point
+
+Credara is not a Da Vinci exchange endpoint, and the "Out of scope" rows above are a design statement, not a gap. Credara does not originate, route, or adjudicate a prior authorization; it verifies the identity and the authorization those exchanges depend on, and — when a Da Vinci transaction discloses a patient's data — records that disclosure as an accountable, patient-visible event (ExportReceipt or TPODisclosure, Section 4.3). Relative to a bare Da Vinci exchange, Credara's artifacts add mandatory signatures (versus CDex's optional ones), tamper-evidence, portability, point-of-use re-verification, and bounded revocation — the same additive posture as Sections 8.4.3 and 8.5.4, offered to a Da Vinci consumer that can ignore what it does not understand. Credara's contribution is the provenance and authorization spine of the exchange, not the exchange itself.
+
 ## 9. Security and Access Control
 
 ### 9.1 Institutional Identity and Authentication
@@ -1953,7 +2012,7 @@ The evaluation is local to the responding peer — there is no remote consent se
 What if no AuthorizationGrant exists yet for a patient? The spec supports two configurable postures:
 
 - **Deny-by-default**: no Grant = no access. Maximally privacy-preserving. Breaks emergency workflows because most patients will not have proactively created AuthorizationGrants for institutions they have never visited. Research, AI, and federal program scopes always require an explicit Grant regardless of posture.
-- **Treatment-presumed-consent**: treatment relationships are presumed consented under HIPAA's TPO (Treatment, Payment, Operations) exception. Auditing is stricter to compensate — every access without explicit consent generates a high-priority audit record.
+- **Treatment-presumed-consent**: treatment relationships are presumed consented under HIPAA's TPO (Treatment, Payment, Operations) exception. Auditing is stricter to compensate — every access without explicit consent generates a high-priority audit record. When such a presumptive basis results in a *disclosure* (e.g., a prior-authorization submission to a payer), that record is the discloser-authored **TPODisclosure** (Section 4.3.5) — a signed, portable, gossip-replicated DAG event, not merely a local audit line.
 
 Each institution configures its own posture as a network participant. The spec **recommends treatment-presumed-consent as the default** for US healthcare deployments, to align with current practice under HIPAA TPO. Deny-by-default is appropriate for international deployments under stricter privacy regimes (GDPR-equivalent), or for specific high-sensitivity subgraphs (e.g., behavioral health, where many states have stricter consent requirements than HIPAA TPO).
 
@@ -4018,6 +4077,12 @@ What Credara actually writes from scratch:
 Rough total: 8,000-15,000 lines of genuinely new code, plus integration with potentially hundreds of thousands of lines of existing libraries. That's the right ratio for a project that wants to be deployable, maintainable, and trusted in a regulated environment.
 
 ## Version History
+
+**1.1.0 — 2026-07-06 (Released).** Minor version — additive design-authority and disclosure-provenance content; no breaking changes to existing event types or the wire format.
+
+- Added the **§2 design principle *Conform to the domain authorities: Da Vinci and FAST*** — both are named design authorities for Credara's healthcare-domain layer, with a single exception for direct contradiction with a §2 principle (FAST's repository-federation centralization as the worked example: adopt the vocabulary, decline the centralized fabric).
+- Added **§4.3.5 TPODisclosure** — a fourth authorization event type: the grant-less, disclosing-institution-authored record of a disclosure made on a presumptive HIPAA TPO basis (the sibling of `ExportReceipt`, which requires a governing Grant). Added its payload to §5.1.3, updated the §4.3 event-type count and the §4.3.4 disclosure clause, and wired its FHIR projection (§8.2.4) and posture tie-in (§9.3.2). Reflected in `creda-events` (`EventPayload` / `IdentityEventType`, now eleven event types).
+- Added **§8.6 Da Vinci Alignment** (paralleling §8.5): Da Vinci as authority for Credara's data shapes (CDex/PDex/HRex Provenance and Consent) but not its exchange transactions (PAS/CRD/DTR); the author-versus-transmitter Provenance rule; an artifact mapping table; and the verification-not-mediation boundary.
 
 **1.0.0 — 2026-06-13 (Released).** First released version of the specification; status moved from Draft to Released. Changes since `0.1.0-draft`:
 

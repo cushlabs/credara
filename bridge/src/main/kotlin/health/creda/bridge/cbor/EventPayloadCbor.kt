@@ -199,6 +199,7 @@ object EventPayloadCbor {
             )
             "Contest" -> PayloadDetails(contestReason = decodeContestReason(opt(body, "reason")))
             "AuthorizationGrant" -> PayloadDetails(purpose = opt(body, "purpose")?.AsString())
+            "TPODisclosure" -> PayloadDetails(purpose = opt(body, "purpose")?.AsString())
             else -> PayloadDetails()
         }
     }
@@ -329,6 +330,35 @@ object EventPayloadCbor {
             Add("released_scope", encodeScope(releasedScope))
         }).EncodeToBytes(canonical)
 
+    /**
+     * Valid `TPOPurpose` values (§4.3.5): only the three HIPAA TPO bases. A presumptive
+     * Research/AI/federal disclosure is unrepresentable — the Rust enum enforces it at the type
+     * level, and we reject it here at the wire boundary.
+     */
+    val TPO_PURPOSES = setOf("treatment", "payment", "operations")
+
+    /**
+     * Build canonical CBOR for `EventPayload::TPODisclosure` (§4.3.5) — the grant-less sibling of
+     * `ExportReceipt`: a disclosure made on a presumptive HIPAA TPO basis with no governing Grant,
+     * authored by the disclosing institution. `recipient` is a `CertificateFingerprint`, so — like
+     * ExportReceipt's `requesting_institution` — it is emitted as a CBOR array of ints, not a bstr.
+     * `purpose` is one of [TPO_PURPOSES]; `dataReference` is omitted when null (`skip_serializing_if`).
+     */
+    fun encodeTPODisclosure(
+        recipient: ByteArray,
+        purpose: String,
+        disclosedScope: Scope,
+        dataReference: String? = null,
+    ): ByteArray {
+        require(purpose in TPO_PURPOSES) { "invalid TPO purpose: $purpose (must be treatment|payment|operations)" }
+        return wrapVariant("TPODisclosure", CBORObject.NewMap().apply {
+            Add("recipient", fingerprintArray(recipient))
+            Add("purpose", purpose)
+            Add("disclosed_scope", encodeScope(disclosedScope))
+            if (dataReference != null) Add("data_reference", dataReference)
+        }).EncodeToBytes(canonical)
+    }
+
     private fun encodeScope(scope: Scope): CBORObject = CBORObject.NewMap().apply {
         if (scope.subgraphSegments.isNotEmpty()) Add("subgraph_segments", uuidArray(scope.subgraphSegments))
         if (scope.eventTypes.isNotEmpty()) Add("event_types", stringArray(scope.eventTypes))
@@ -376,6 +406,19 @@ object EventPayloadCbor {
         val requestingInstitution: ByteArray,
     )
 
+    /**
+     * Decoded view of a TPODisclosure node (§4.3.5), for the Provenance + AuditEvent projection.
+     * `institutionFingerprint` is the disclosing institution — the `author` of the disclosure.
+     */
+    data class TPODisclosureNodeView(
+        val id: UUID,
+        val institutionFingerprint: ByteArray,
+        val wallClockTimestamp: String,
+        val recipient: ByteArray,
+        val purpose: String,
+        val dataReference: String?,
+    )
+
     /** Decoded view of a Revocation node, for the Consent-inactive projection. */
     data class RevocationNodeView(
         val id: UUID,
@@ -418,6 +461,19 @@ object EventPayloadCbor {
             wallClockTimestamp = obj["wall_clock_timestamp"].AsString(),
             governingGrantId = bytesToUuid(inner["governing_grant_id"].GetByteString()),
             requestingInstitution = bytesFromCborArray(inner["requesting_institution"]),
+        )
+    }
+
+    fun decodeTPODisclosureNode(cbor: ByteArray): TPODisclosureNodeView {
+        val obj = CBORObject.DecodeFromBytes(cbor)
+        val inner = variantBody(obj["payload"], "TPODisclosure")
+        return TPODisclosureNodeView(
+            id = bytesToUuid(obj["id"].GetByteString()),
+            institutionFingerprint = bytesFromCborArray(obj["institution_id"]),
+            wallClockTimestamp = obj["wall_clock_timestamp"].AsString(),
+            recipient = bytesFromCborArray(inner["recipient"]),
+            purpose = inner["purpose"].AsString(),
+            dataReference = if (inner.ContainsKey("data_reference")) inner["data_reference"].AsString() else null,
         )
     }
 
