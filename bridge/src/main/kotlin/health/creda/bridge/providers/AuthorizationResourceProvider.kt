@@ -38,7 +38,8 @@ import java.util.UUID
  *
  *   $creda-authorize -> CreateEvent(AuthorizationGrant)        -> Consent (active)
  *   $creda-revoke    -> CreateEvent(AuthorizationRevocation)   -> Consent (inactive)
- *   $creda-export    -> CreateEvent(ExportReceipt)             -> AuditEvent  (disclosure)
+ *   $creda-export    -> CreateEvent(ExportReceipt)             -> AuditEvent  (disclosure, under a Grant)
+ *   $creda-tpo-disclose -> CreateEvent(TPODisclosure)          -> AuditEvent  (disclosure, grant-less TPO)
  *   $creda-verify    -> EvaluateAuthorization                  -> Parameters (decision)
  *
  * F0 delivers the working FHIR<->CBOR mappers for the three authorization event types. The
@@ -112,6 +113,35 @@ class AuthorizationResourceProvider(
         val payload = EventPayloadCbor.encodeExportReceipt(governingGrantId, requestingInstitution, scope)
         val eventCbor = core.createEvent(payload, listOf(EventPayloadCbor.uuidBytes(governingGrantId)))
         return AuditEventMapper.fromExportReceiptCbor(eventCbor)
+    }
+
+    /**
+     * `$creda-tpo-disclose` (§4.3.5): record a TPODisclosure — the grant-less sibling of
+     * `$creda-export` — when data is disclosed on a presumptive HIPAA TPO basis with no governing
+     * Grant (e.g. a provider submitting a prior authorization to the patient's payer). Authored by
+     * the disclosing institution (Core signs it) and attached to the patient subgraph. Projects as
+     * an AuditEvent (the disclosure ledger, §8.6 / §9.4.3); it also surfaces via `$creda-provenance`
+     * as a CredaProvenance whose agent is the author. `purpose` is restricted to the TPO bases.
+     */
+    @Operation(name = "\$creda-tpo-disclose", typeName = "Patient")
+    fun tpoDisclose(@IdParam patient: IdType, @ResourceParam params: Parameters): AuditEvent {
+        val recipient = hexToBytes(
+            requireNotNull(valueString(params, "recipient")) {
+                "\$creda-tpo-disclose requires a 'recipient' fingerprint (hex)"
+            },
+        )
+        val purpose = requireNotNull(valueString(params, "purpose")) {
+            "\$creda-tpo-disclose requires a 'purpose' (treatment|payment|operations)"
+        }
+        require(purpose in EventPayloadCbor.TPO_PURPOSES) {
+            "\$creda-tpo-disclose purpose must be treatment|payment|operations (grant-less TPO basis), got '$purpose'"
+        }
+        val scope = scopeFromParam(valueString(params, "scope"))
+        val dataReference = valueString(params, "dataReference")
+        val payload = EventPayloadCbor.encodeTPODisclosure(recipient, purpose, scope, dataReference)
+        // No governing Grant: attach the disclosure record to the patient subgraph entry-point.
+        val eventCbor = core.createEvent(payload, listOf(entryPointBytes(patient)))
+        return AuditEventMapper.fromTPODisclosureCbor(eventCbor)
     }
 
     /**
@@ -492,6 +522,44 @@ internal object AuditEventMapper {
                 AuditEvent.AuditEventEntityComponent()
                     .setWhat(Reference("Consent/${v.governingGrantId}")),
             )
+        }
+    }
+
+    /**
+     * Projects a TPODisclosure node (§4.3.5) to a FHIR AuditEvent — the grant-less sibling of the
+     * ExportReceipt disclosure record. No governing Grant: the disclosure rode a presumptive HIPAA
+     * TPO basis, carried as `purposeOfEvent`. The disclosing institution is the author (§8.6.2).
+     */
+    fun fromTPODisclosureCbor(cbor: ByteArray): AuditEvent {
+        val v = EventPayloadCbor.decodeTPODisclosureNode(cbor)
+        return AuditEvent().apply {
+            setId(v.id.toString())
+            type = Coding("http://dicom.nema.org/resources/ontology/DCM", "110106", "Export")
+            action = AuditEvent.AuditEventAction.R
+            recordedElement = InstantType(v.wallClockTimestamp)
+            outcome = AuditEvent.AuditEventOutcome._0 // success
+            // The TPO basis this disclosure was made under — no governing Grant.
+            addPurposeOfEvent(
+                CodeableConcept().addCoding(
+                    Coding("http://credara.network/fhir/CodeSystem/grant-purpose", v.purpose, v.purpose),
+                ),
+            )
+            // The disclosing institution — the author of the disclosure (§8.6.2 author).
+            addAgent(
+                AuditEvent.AuditEventAgentComponent()
+                    .setWho(orgRef(v.institutionFingerprint))
+                    .setRequestor(true),
+            )
+            // The institution the data was disclosed to (e.g. the payer).
+            addAgent(
+                AuditEvent.AuditEventAgentComponent()
+                    .setWho(orgRef(v.recipient))
+                    .setRequestor(false),
+            )
+            // The disclosed artifact reference (opaque, never PHI), when present.
+            if (v.dataReference != null) {
+                addEntity(AuditEvent.AuditEventEntityComponent().setWhat(Reference(v.dataReference)))
+            }
         }
     }
 

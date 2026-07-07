@@ -45,11 +45,13 @@ those operations are not yet functional — see below.
 ### Translator-not-reasoner discipline
 Every provider method does only FHIR↔gRPC mapping.
 
-**Implemented (F0, §8.5.6):** the authorization FHIR↔CBOR mappers and the four authorization
+**Implemented (F0, §8.5.6):** the authorization FHIR↔CBOR mappers and the five authorization
 operations. `EventPayloadCbor` now encodes/decodes the four authorization payloads
 (`AuthorizationGrant`, `AuthorizationRevocation`, `ExportReceipt`, and `TPODisclosure` — the grant-less §4.3.5 disclosure) as canonical CBOR, and
 `AuthorizationResourceProvider` wires `$creda-authorize` → Consent, `$creda-revoke` → Consent
-(inactive), `$creda-export` → AuditEvent, and `$creda-verify` → decision. Wire shapes are pinned
+(inactive), `$creda-export` → AuditEvent, `$creda-tpo-disclose` → AuditEvent (the grant-less §4.3.5
+disclosure), and `$creda-verify` → decision. `AuditEvent?patient=` returns both ExportReceipt and
+TPODisclosure disclosures. Wire shapes are pinned
 by golden-vector tests (`src/test/.../AuthorizationPayloadCborTest.kt`) generated from an
 independent CBOR oracle to match serde+ciborium 0.2.2 exactly — notably `Uuid` as a 16-byte byte
 string but `Vec<u8>` fingerprints as a **CBOR array of ints** (the one easy mistake). This also

@@ -14,8 +14,8 @@ import java.util.UUID
 
 /**
  * The **disclosure** audit ledger (§4.3.3, §8.2.4). `GET AuditEvent?patient={id}` returns the
- * patient's `ExportReceipt` events — the signed, on-chain record of *what data moved, under which
- * Grant, to whom* — projected as FHIR `AuditEvent` ([AuditEventMapper], the FAST `$record-disclosure`
+ * patient's `ExportReceipt` and `TPODisclosure` events — the signed, on-chain record of *what data moved, on
+ * what basis (a Grant, or a grant-less TPO disclosure, §4.3.5), to whom* — projected as FHIR `AuditEvent` ([AuditEventMapper], the FAST `$record-disclosure`
  * shape, §8.5.3). This is the non-repudiable half of audit and lives in the DAG; an empty result is
  * the honest answer until real `$creda-export` events exist (no fabricated ledger).
  *
@@ -34,7 +34,7 @@ class AuditEventResourceProvider(
 
     override fun getResourceType(): Class<AuditEvent> = AuditEvent::class.java
 
-    /** `GET AuditEvent?patient={id}` — the patient's disclosures (ExportReceipts), newest first. */
+    /** `GET AuditEvent?patient={id}` — the patient's disclosures (ExportReceipts + TPODisclosures), newest first. */
     @Search
     fun searchByPatient(@RequiredParam(name = AuditEvent.SP_PATIENT) patient: ReferenceParam): List<AuditEvent> {
         val patientId = patient.idPart.removePrefix("urn:uuid:")
@@ -46,9 +46,16 @@ class AuditEventResourceProvider(
             )
         }
 
-        val disclosures = core.getSubgraphEvents(listOf(entry), listOf("ExportReceipt"))
-            .filter { EventPayloadCbor.eventTypeOf(it) == "ExportReceipt" }
-            .map { AuditEventMapper.fromExportReceiptCbor(it) }
+        // Both disclosure records: governed (ExportReceipt, under a Grant) and grant-less TPO
+        // (TPODisclosure, §4.3.5). Both are signed, on-chain, disclosing-institution-authored.
+        val disclosures = core.getSubgraphEvents(listOf(entry), listOf("ExportReceipt", "TPODisclosure"))
+            .mapNotNull {
+                when (EventPayloadCbor.eventTypeOf(it)) {
+                    "ExportReceipt" -> AuditEventMapper.fromExportReceiptCbor(it)
+                    "TPODisclosure" -> AuditEventMapper.fromTPODisclosureCbor(it)
+                    else -> null
+                }
+            }
 
         return AuditEventProjection.decorate(disclosures, patientId)
     }

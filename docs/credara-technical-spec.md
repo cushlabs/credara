@@ -1348,9 +1348,9 @@ Triggers a Tombstone event after the institution has validated the underlying ri
 
 This is one of the more sensitive operations and requires elevated authorization (typically a privacy officer's credentials, mediated by the institution's existing access control), enforced at the institution's FHIR endpoint before reaching the Bridge.
 
-#### 8.2.9 Operation: $creda-authorize, $creda-revoke, $creda-verify, $creda-export
+#### 8.2.9 Operation: $creda-authorize, $creda-revoke, $creda-verify, $creda-export, $creda-tpo-disclose
 
-These four operations expose the portable authorization layer (Section 4) through FHIR. They operate on the CredaAuthorization profile (based on FHIR Consent) and are the FHIR-side surface for the authorization event types.
+These five operations expose the portable authorization layer (Section 4) through FHIR. They operate on the CredaAuthorization profile (based on FHIR Consent) and are the FHIR-side surface for the authorization event types.
 
 ```
 POST Patient/[id]/$creda-authorize
@@ -1366,7 +1366,7 @@ POST Patient/[id]/$creda-authorize
 }
 ```
 
-`$creda-authorize` creates an AuthorizationGrant. `$creda-revoke` creates an AuthorizationRevocation referencing a prior Grant. `$creda-verify` runs the authorization evaluation algorithm (Section 4.6) for a given requesting institution and returns an authorization decision plus the governing Grant — this is the FHIR-accessible form of the Verifier's check. `$creda-export` records an ExportReceipt when data is released under a Grant and is typically invoked by the Export Gate (Section 10.2) rather than directly by a clinical user.
+`$creda-authorize` creates an AuthorizationGrant. `$creda-revoke` creates an AuthorizationRevocation referencing a prior Grant. `$creda-verify` runs the authorization evaluation algorithm (Section 4.6) for a given requesting institution and returns an authorization decision plus the governing Grant — this is the FHIR-accessible form of the Verifier's check. `$creda-export` records an ExportReceipt when data is released under a Grant and is typically invoked by the Export Gate (Section 10.2) rather than directly by a clinical user. `$creda-tpo-disclose` records the grant-less sibling — a TPODisclosure (Section 4.3.5) for a disclosure made on a presumptive HIPAA TPO basis with no governing Grant — authored by the disclosing institution and projected, like the ExportReceipt, as a disclosure AuditEvent, so it joins the patient's accounting of disclosures at `AuditEvent?patient=` (Sections 8.2.4, 9.4.3).
 
 `$creda-verify` returns a Parameters resource with the decision (`authorized` / `denied` / `denied-revoked` / `denied-expired` / `denied-out-of-scope`), the governing Grant reference, and — when authorized — the scope and use-mode the Grant permits. Because the Verifier operates locally (Section 10.3.3), `$creda-verify` can be served from stale state during a partition, in which case the response includes the age of the responding peer's DAG view.
 
@@ -1534,7 +1534,7 @@ Each Credara peer's HAPI FHIR Bridge advertises its Credara capabilities via the
 
 - **Implements**: the Credara IG (via `CapabilityStatement.implementationGuide`).
 - **Profiles**: CredaPatient, CredaProvenance, CredaAuthorization (FHIR Consent base; Section 9.3 and Section 4).
-- **Operations**: `$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$creda-authorize`, `$creda-revoke`, `$creda-verify`, `$creda-export`.
+- **Operations**: `$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$creda-authorize`, `$creda-revoke`, `$creda-verify`, `$creda-export`, `$creda-tpo-disclose`.
 - **Extensions**: subgraph identifier, root set, per-field confidence, disagreement flag, etc.
 - **Search parameters**: `_creda-token`, plus standard FHIR Patient search parameters.
 
