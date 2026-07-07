@@ -146,6 +146,11 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
   (~2s normal). `make smoke`.
 - `anti-entropy-repair/` — peer-a publishes events before peer-b exists; peer-b joins later;
   events arrive at peer-b only via the periodic anti-entropy round (§6.1.8). `make ae-repair`.
+- `revocation-latency/` — both peers meshed; a Grant is replicated to peer-b, then an
+  `AuthorizationRevocation` is injected at peer-a and its propagation to peer-b measured against
+  §4.7 Bound 1. Because peer-b holds the Grant first, the revocation is validated on arrival
+  (§4.6 step 2) — a revocation that has taken effect, not just an event that landed.
+  `make revocation-latency`.
 - `ui-smoke/` — deploys the persona front-end clients (`clients/`) into the cluster and runs
   Playwright e2e specs as an in-cluster Job. Asserts each persona's primary flow against a
   mock FHIR bridge; rebases onto a real bridge once the M7 `TODO(bridge-verify)` stubs land.
@@ -155,8 +160,6 @@ Planned (not yet implemented):
 
 - `partition-rejoin/` — sustained partition with NetworkPolicy / iptables, both sides keep
   working, reconcile on rejoin.
-- `revocation-latency/` — `AuthorizationGrant` + `AuthorizationRevocation`, measure propagation
-  against §4.7 Bound 1.
 - `rolling-upgrade/` — Helm upgrade with peer rotation, verify no convergence loss (§10.6.7).
 - `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
 - `rogue-link/` — in-cluster realization of the conformance suite's rogue-Link scenarios

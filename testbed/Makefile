@@ -22,7 +22,7 @@ ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean reclaim images smoke ae-repair ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
+.PHONY: up down clean reclaim images smoke ae-repair revocation-latency ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -69,6 +69,13 @@ smoke:
 # is 30s today and the first useful round is at ~t=30s after the joining peer's daemon starts.
 ae-repair:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/anti-entropy-repair/run.sh "$(CLUSTER_NAME)"
+
+# Revocation latency: verifies §4.7 revocation propagation over real gossip. A Grant + Revocation
+# are injected at peer-a; the Grant is confirmed replicated at peer-b first (so the Revocation is
+# validated on arrival, §4.6 step 2), then the Revocation's propagation to peer-b is measured
+# against Bound 1. Adds new peer-driver subcommands — run `make up`/`make images` first.
+revocation-latency:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/revocation-latency/run.sh "$(CLUSTER_NAME)"
 
 # UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
 # Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the

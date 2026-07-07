@@ -92,6 +92,7 @@ cd testbed
 make up          # create kind cluster + build & load Core / Bridge / peer-driver images
 make smoke       # gossip-convergence scenario: inject at peer A, observe at peer B (≤5s budget)
 make ae-repair   # anti-entropy repair scenario (~75s; late-joining peer catches up via AE)
+make revocation-latency  # Grant + Revocation; measures revocation propagation vs §4.7 Bound 1
 make down        # tear down the cluster
 ```
 
@@ -302,7 +303,7 @@ Common first-time hiccups:
   M0–M9 build order.
 - [`testbed/README.md`](../testbed/README.md) — the multi-peer bed and the
   scenario catalog, including the planned scenarios (`partition-rejoin`,
-  `revocation-latency`, `rolling-upgrade`, `storage-class`, `rogue-link`) that
+  `rolling-upgrade`, `storage-class`, `rogue-link`) that
   testers can help bring up.
 - [`clients/README.md`](../clients/README.md) — the five persona front-end clients,
   their FHIR-bridge wiring, and how to swap from mock mode to a real bridge.
@@ -318,8 +319,8 @@ UI smoke. Still in active development — and available soon — are:
 
 - the **real-effect integration smoke** (every client interaction driven against a real
   bridge and asserted to produce a real on-wire event, not just a UI transition);
-- additional multi-peer testbed scenarios: **partition-rejoin**, **revocation-latency**,
-  **rolling-upgrade**, **storage-class**, and **rogue-link**.
+- additional multi-peer testbed scenarios: **partition-rejoin**, **rolling-upgrade**,
+  **storage-class**, and **rogue-link**.
 
 These are sign-posted in [`testbed/README.md`](../testbed/README.md) and `docs/STATUS.md`;
 testers are welcome to help bring them up. Until they land, treat end-to-end coverage as

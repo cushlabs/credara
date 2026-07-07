@@ -1,10 +1,19 @@
 //! Testbed driver — inject + observe events against a Creda peer's gRPC TCP endpoint.
 //!
 //! Subcommands:
-//!   inject  — construct a synthetic test-data Assert payload and call CreateEvent on the target
-//!             peer. Prints the resulting event id (hex UUID) on stdout. The local peer is the
-//!             author; its institutional signing key must be in the network's participant
+//!   inject        — construct a synthetic test-data Assert payload and call CreateEvent on the
+//!             target peer. Prints the resulting event id (hex UUID) on stdout. The local peer is
+//!             the author; its institutional signing key must be in the network's participant
 //!             registry for other peers to admit the event during gossip ingest.
+//!   inject-grant  — create an AuthorizationGrant covering a subject subgraph (§4.3.1), parented to
+//!             the subject's entry-point Assert. Prints the grant event id. Used by the
+//!             revocation-latency scenario.
+//!   inject-revoke — create an AuthorizationRevocation superseding a prior Grant (§4.3.2), parented
+//!             to that Grant so a peer holding the Grant validates it on arrival (§4.6 step 2).
+//!             Prints the revocation event id.
+//!   time-revocation — inject a Revocation at `--peer` AND poll `--observe-peer` for it in one
+//!             process, so t0 is the injecting RPC and t1 is when the second peer first sees it.
+//!             Prints the true inject→observed propagation latency in ms, with no inter-Job gap.
 //!   observe — poll GetEvent on the target peer until the given event id is present or the
 //!             timeout expires. Prints the latency in milliseconds on stdout.
 //!
@@ -44,6 +53,38 @@ enum Command {
         /// Token tag for the synthetic patient (so different scenario runs don't collide).
         #[arg(long, default_value = "smoke")]
         tag: String,
+    },
+    /// Inject an AuthorizationGrant covering a subject subgraph (§4.3.1). Prints the grant id.
+    InjectGrant {
+        /// Subject subgraph entry-point event id (hex UUID), e.g. the output of `inject`.
+        #[arg(long)]
+        subject: String,
+    },
+    /// Inject an AuthorizationRevocation superseding a prior Grant (§4.3.2). Prints the
+    /// revocation id. Parented to the Grant, so a peer holding the Grant validates it on
+    /// arrival (§4.6 step 2) — which is what makes the observed propagation a revocation that
+    /// has *taken effect*, not merely an event that arrived.
+    InjectRevoke {
+        /// The Grant event id to revoke (hex UUID).
+        #[arg(long)]
+        grant: String,
+    },
+    /// Inject a Revocation at `--peer` and time its propagation to `--observe-peer`, all in this
+    /// one process — so the measured window is the true inject→observed cross-peer latency, with
+    /// no inter-Job scheduling gap to swallow it. Prints the latency in milliseconds.
+    TimeRevocation {
+        /// The Grant event id to revoke (hex UUID). Revoked at `--peer`, observed at `--observe-peer`.
+        #[arg(long)]
+        grant: String,
+        /// Second peer's gRPC endpoint to observe propagation on (e.g. cross-namespace DNS).
+        #[arg(long)]
+        observe_peer: String,
+        /// Max wait in milliseconds before giving up.
+        #[arg(long, default_value_t = 5000)]
+        timeout_ms: u64,
+        /// Poll interval in milliseconds (tighter than `observe` for finer latency resolution).
+        #[arg(long, default_value_t = 25)]
+        poll_ms: u64,
     },
     /// Poll GetEvent on the target peer until the given event id is present.
     Observe {
@@ -92,6 +133,11 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Inject { tag } => inject(&mut client, &tag).await,
+        Command::InjectGrant { subject } => inject_grant(&mut client, &subject).await,
+        Command::InjectRevoke { grant } => inject_revoke(&mut client, &grant).await,
+        Command::TimeRevocation { grant, observe_peer, timeout_ms, poll_ms } => {
+            time_revocation(&mut client, &observe_peer, &grant, timeout_ms, poll_ms).await
+        }
         Command::Observe { event_id, timeout_ms, poll_ms } => {
             observe(&mut client, &event_id, timeout_ms, poll_ms).await
         }
@@ -282,6 +328,87 @@ async fn inject(
     // observe.
     println!("{}", node.id);
     Ok(())
+}
+
+/// Inject an `AuthorizationGrant` covering `subject`'s subgraph, parented to that entry-point
+/// (§4.3.1). A minimal treatment-purpose grant — enough for the revocation-latency scenario to
+/// have something a later Revocation can supersede. Prints the grant event id.
+async fn inject_grant(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    subject_str: &str,
+) -> Result<()> {
+    let subject = creda_events::EventId::parse_str(subject_str)
+        .map_err(|e| anyhow!("invalid subject UUID {subject_str:?}: {e}"))?;
+    let payload = EventPayload::AuthorizationGrant {
+        scope: AuthorizationScope::default(),
+        audience: GrantAudience::InstitutionClass("revocation-latency".into()),
+        purpose: GrantPurpose::Treatment,
+        expiration: None,
+        volume_constraints: None,
+        use_mode: UseMode::ReadAndRely,
+    };
+    let id = create(client, &payload, &[subject]).await?;
+    println!("{id}");
+    Ok(())
+}
+
+/// Inject an `AuthorizationRevocation` that supersedes `grant`, parented to it (§4.3.2). Prints
+/// the revocation event id. Because the revocation references the Grant as its parent, a peer that
+/// already holds the Grant validates it on arrival (§4.6 step 2) — so the scenario's measured
+/// propagation is the revocation *taking effect*, not just an opaque event landing.
+async fn inject_revoke(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    grant_str: &str,
+) -> Result<()> {
+    let grant = creda_events::EventId::parse_str(grant_str)
+        .map_err(|e| anyhow!("invalid grant UUID {grant_str:?}: {e}"))?;
+    let payload = EventPayload::AuthorizationRevocation { target_grant_id: grant };
+    let id = create(client, &payload, &[grant]).await?;
+    println!("{id}");
+    Ok(())
+}
+
+/// Inject a Revocation at `inject_client`'s peer and poll `observe_peer` for it in one process,
+/// measuring the true inject→observed propagation latency (§4.7 Bound 1). `start` is taken at the
+/// injecting RPC, so the window is the real cross-peer gossip time with no inter-Job gap.
+async fn time_revocation(
+    inject_client: &mut CredaClient<tonic::transport::Channel>,
+    observe_peer: &str,
+    grant_str: &str,
+    timeout_ms: u64,
+    poll_ms: u64,
+) -> Result<()> {
+    let grant = creda_events::EventId::parse_str(grant_str)
+        .map_err(|e| anyhow!("invalid grant UUID {grant_str:?}: {e}"))?;
+    let mut observe_client = CredaClient::connect(observe_peer.to_string())
+        .await
+        .with_context(|| format!("connecting to observe peer {observe_peer}"))?;
+
+    let payload = EventPayload::AuthorizationRevocation { target_grant_id: grant };
+    let start = Instant::now();
+    let revocation = create(inject_client, &payload, &[grant]).await?;
+
+    let deadline = start + Duration::from_millis(timeout_ms);
+    let poll = Duration::from_millis(poll_ms);
+    let id_bytes = revocation.as_bytes().to_vec();
+    loop {
+        let reply = observe_client
+            .get_event(pb::GetEventRequest { id: id_bytes.clone() })
+            .await
+            .context("GetEvent RPC (observe peer)")?
+            .into_inner();
+        if reply.found {
+            println!("{}", start.elapsed().as_millis());
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            bail!(
+                "timed out after {timeout_ms} ms — revocation {revocation} did not propagate to \
+                 the observe peer {observe_peer}"
+            );
+        }
+        tokio::time::sleep(poll).await;
+    }
 }
 
 async fn observe(
