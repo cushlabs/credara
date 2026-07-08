@@ -82,6 +82,9 @@ If your test report references `creda-events`, `creda-store`, `creda-graph`,
 
 ### Path 2 — Multi-peer testbed (real libp2p, two peers in kind)
 
+> The canonical scenario catalog — what each asserts, its spec section, and green/planned status —
+> is [`docs/E2E.md`](E2E.md). This section is the quickstart.
+
 The in-process suite cannot exercise the real libp2p adapter — gossipsub mesh,
 Kademlia DHT, anti-entropy over the wire — because all of that requires more than
 one process. The testbed brings up a kind cluster with two Credara peers and runs

@@ -142,6 +142,9 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
 
 ## Scenarios
 
+The canonical end-to-end overview — this catalog plus the manual persona harness, with
+per-scenario status — is [`docs/E2E.md`](../docs/E2E.md).
+
 - `gossip-convergence/` — single event injected at peer A, observed at peer B within Bound 1
   (~2s normal). `make smoke`.
 - `anti-entropy-repair/` — peer-a publishes events before peer-b exists; peer-b joins later;

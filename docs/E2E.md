@@ -1,10 +1,52 @@
-# Credara — Manual End-to-End Harness (persona clients)
+# Credara — End-to-End Testing
 
-The five persona clients are the project's **manual end-to-end test harness**: driven against a
-**real** bridge they exercise the full path — client → FHIR → bridge → gRPC → Core → DAG → gossip —
-exactly the way external clients will. Run this pass *before* opening the network to external
-clients. The automated equivalent is the planned integration smoke; this is the hands-on
-version that also validates the UI contract.
+Credara's end-to-end surface has two complementary halves, both driving the **real** path (no
+`MockTransport`). They complement the in-process conformance suite (`anchor creda`) — the
+definitive functional green, but a single process:
+
+- **Automated multi-peer scenarios** (`testbed/`) — real libp2p across two-plus peers in kind:
+  gossip, anti-entropy, the authorization plane, partition tolerance. Fast and scriptable.
+- **Manual persona harness** (`clients/`) — the five persona UIs driven against a real bridge, the
+  way external clients will. Hands-on; also validates the UI contract.
+
+## Automated multi-peer scenarios (testbed)
+
+The multi-process counterpart to `anchor creda`: real gossipsub / Kademlia / anti-entropy across
+peers in a kind cluster, which no single process can exercise. Run from `testbed/` (Docker or
+Podman + kind + kubectl + helm; no host Rust or JDK). `make up` once to build the images and create
+the cluster, then a scenario, then `make down`. Per-scenario detail lives in `testbed/README.md`
+and each `testbed/scenarios/<name>/README.md`.
+
+| Scenario | Asserts | Spec | Run | Status |
+|---|---|---|---|---|
+| gossip-convergence | an event at peer A reaches peer B within Bound 1 | §6.1.4, §4.7 | `make smoke` | ✅ |
+| anti-entropy-repair | a late-joining peer catches up via the periodic AE round | §6.1.8 | `make ae-repair` | ✅ |
+| revocation-latency | a Revocation propagates and *takes effect* at the other peer within Bound 1 (validated on arrival, §4.6 step 2) | §4.3.2, §4.7 | `make revocation-latency` | ✅ |
+| partition-rejoin | a real node-level partition; both sides stay available; the divergent DAGs reconcile via AE on heal | §6.1.7, §6.1.8 | `make partition-rejoin` | ✅ |
+| ui-smoke | each persona's primary flow (Playwright in-cluster, mock bridge) | §8 | `make ui-smoke` | ✅ |
+| rolling-upgrade | Helm peer rotation with no convergence loss | §10.6.7 | — | 🚧 planned |
+| storage-class | each tested storage class survives a peer restart | §10.6.8 | — | 🚧 planned |
+| rogue-link | multi-peer link-chain defense (rogue-Link rejection) | §4.6 step 5.5 | — | 🚧 planned |
+
+Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin`.
+
+Notes:
+
+- Latency scenarios report a real number where possible — `revocation-latency` times inject→observe
+  in one process to avoid the inter-Job scheduling gap that would otherwise read ~0.
+- Reconciliation-paced scenarios (`anti-entropy-repair`, `partition-rejoin`) run slower (~75–120 s):
+  they wait for the anti-entropy interval, not gossip.
+- The in-cluster primitive is the peer-driver (`testbed/tools/peer-driver`): `inject`,
+  `inject-grant`, `inject-revoke`, `time-revocation`, `observe`, `check-absent`, `derive-pubkey`,
+  `seed-demo`.
+
+## Manual persona harness (persona clients)
+
+The five persona clients are the project's **manual** end-to-end harness: driven against a **real**
+bridge they exercise the full path — client → FHIR → bridge → gRPC → Core → DAG → gossip — exactly
+the way external clients will. Run this pass *before* opening the network to external clients. The
+automated equivalent is the planned integration smoke; this is the hands-on version that also
+validates the UI contract.
 
 ## Golden rule
 
