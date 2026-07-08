@@ -151,6 +151,9 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
   §4.7 Bound 1. Because peer-b holds the Grant first, the revocation is validated on arrival
   (§4.6 step 2) — a revocation that has taken effect, not just an event that landed.
   `make revocation-latency`.
+- `partition-rejoin/` — a real node-level iptables partition between the two peers; both keep
+  accepting writes (§6.1.7); isolation is asserted; then heal and the divergent DAGs reconcile via
+  anti-entropy (§6.1.8). `make partition-rejoin`.
 - `ui-smoke/` — deploys the persona front-end clients (`clients/`) into the cluster and runs
   Playwright e2e specs as an in-cluster Job. Asserts each persona's primary flow against a
   mock FHIR bridge; rebases onto a real bridge once the M7 `TODO(bridge-verify)` stubs land.
@@ -158,8 +161,6 @@ testbed runs the same scenarios CI runs against on-prem and cloud k8s.
 
 Planned (not yet implemented):
 
-- `partition-rejoin/` — sustained partition with NetworkPolicy / iptables, both sides keep
-  working, reconcile on rejoin.
 - `rolling-upgrade/` — Helm upgrade with peer rotation, verify no convergence loss (§10.6.7).
 - `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
 - `rogue-link/` — in-cluster realization of the conformance suite's rogue-Link scenarios

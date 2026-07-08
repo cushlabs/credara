@@ -16,6 +16,8 @@
 //!             Prints the true inject→observed propagation latency in ms, with no inter-Job gap.
 //!   observe — poll GetEvent on the target peer until the given event id is present or the
 //!             timeout expires. Prints the latency in milliseconds on stdout.
+//!   check-absent — one-shot GetEvent that succeeds (prints "absent") if the event is NOT present
+//!             and errors if it is. The isolation assertion for the partition-rejoin scenario.
 //!
 //! Wire format mirrors the Bridge / CLI: payload bytes are canonical CBOR (creda-events).
 
@@ -98,6 +100,14 @@ enum Command {
         #[arg(long, default_value_t = 100)]
         poll_ms: u64,
     },
+    /// One-shot GetEvent: succeed (print "absent") if the event is NOT present, error if it is.
+    /// The isolation assertion for partition-rejoin — proves a partitioned peer did not receive
+    /// the other side's event.
+    CheckAbsent {
+        /// Event id that must NOT be present (hex UUID).
+        #[arg(long)]
+        event_id: String,
+    },
     /// Derive the Ed25519 public key from a 32-byte secret file and print it in
     /// participant-registry format (`ed25519 <hex>`). Used by the scenario script to populate
     /// the shared participants ConfigMap.
@@ -141,6 +151,7 @@ async fn main() -> Result<()> {
         Command::Observe { event_id, timeout_ms, poll_ms } => {
             observe(&mut client, &event_id, timeout_ms, poll_ms).await
         }
+        Command::CheckAbsent { event_id } => check_absent(&mut client, &event_id).await,
         Command::SeedDemo => seed_demo(&mut client).await,
         Command::DerivePubkey { .. } => unreachable!("handled above"),
     }
@@ -409,6 +420,25 @@ async fn time_revocation(
         }
         tokio::time::sleep(poll).await;
     }
+}
+
+/// One-shot GetEvent: succeed (print "absent") when the event is NOT present; error if it is. The
+/// isolation assertion for partition-rejoin — a leaked event is a real failure, so it bails.
+async fn check_absent(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    event_id_str: &str,
+) -> Result<()> {
+    let event_id = uuid_to_bytes(event_id_str)?;
+    let reply = client
+        .get_event(pb::GetEventRequest { id: event_id })
+        .await
+        .context("GetEvent RPC")?
+        .into_inner();
+    if reply.found {
+        bail!("event {event_id_str} is present but was expected ABSENT (partition leaked)");
+    }
+    println!("absent");
+    Ok(())
 }
 
 async fn observe(
