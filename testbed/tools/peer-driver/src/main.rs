@@ -32,9 +32,9 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use creda_events::{
-    canonical, AdministrativeGender, AttestPurpose, AuthorizationScope, Demographics,
-    EventPayload, GrantAudience, GrantPurpose, InstitutionalIdentifier, LinkMethod,
-    StructuredAddress, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
+    canonical, AdministrativeGender, AttestPurpose, AuthorizationScope, Demographics, EventPayload,
+    GrantAudience, GrantPurpose, InstitutionalIdentifier, LinkMethod, StructuredAddress,
+    TokenizedDate, TokenizedString, UseMode, VerificationMethod,
 };
 
 mod pb {
@@ -189,22 +189,45 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Inject { tag } => inject(&mut client, &tag).await,
-        Command::InjectGrant { subject, audience_class } => {
-            inject_grant(&mut client, &subject, &audience_class).await
-        }
-        Command::InjectLink { a, b, method, confidence } => {
-            inject_link(&mut client, &a, &b, &method, confidence).await
-        }
-        Command::CheckAuthz { entries, requester_classes, purpose, use_mode, expect } => {
-            check_authz(&mut client, &entries, &requester_classes, &purpose, &use_mode, &expect).await
+        Command::InjectGrant {
+            subject,
+            audience_class,
+        } => inject_grant(&mut client, &subject, &audience_class).await,
+        Command::InjectLink {
+            a,
+            b,
+            method,
+            confidence,
+        } => inject_link(&mut client, &a, &b, &method, confidence).await,
+        Command::CheckAuthz {
+            entries,
+            requester_classes,
+            purpose,
+            use_mode,
+            expect,
+        } => {
+            check_authz(
+                &mut client,
+                &entries,
+                &requester_classes,
+                &purpose,
+                &use_mode,
+                &expect,
+            )
+            .await
         }
         Command::InjectRevoke { grant } => inject_revoke(&mut client, &grant).await,
-        Command::TimeRevocation { grant, observe_peer, timeout_ms, poll_ms } => {
-            time_revocation(&mut client, &observe_peer, &grant, timeout_ms, poll_ms).await
-        }
-        Command::Observe { event_id, timeout_ms, poll_ms } => {
-            observe(&mut client, &event_id, timeout_ms, poll_ms).await
-        }
+        Command::TimeRevocation {
+            grant,
+            observe_peer,
+            timeout_ms,
+            poll_ms,
+        } => time_revocation(&mut client, &observe_peer, &grant, timeout_ms, poll_ms).await,
+        Command::Observe {
+            event_id,
+            timeout_ms,
+            poll_ms,
+        } => observe(&mut client, &event_id, timeout_ms, poll_ms).await,
         Command::CheckAbsent { event_id } => check_absent(&mut client, &event_id).await,
         Command::SeedDemo => seed_demo(&mut client).await,
         Command::DerivePubkey { .. } => unreachable!("handled above"),
@@ -222,7 +245,12 @@ async fn create(
         parent_ids: parents.iter().map(|p| p.as_bytes().to_vec()).collect(),
     };
     let node: creda_events::IdentityEventNode = canonical::from_slice(
-        &client.create_event(req).await.context("CreateEvent RPC")?.into_inner().event_cbor,
+        &client
+            .create_event(req)
+            .await
+            .context("CreateEvent RPC")?
+            .into_inner()
+            .event_cbor,
     )
     .context("decode reply event")?;
     Ok(node.id)
@@ -269,8 +297,14 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     let m_mercy = create(
         client,
         &demo_assert(
-            "gonzalez", "maria", "1984-03-12", VerificationMethod::GovernmentPhotoId,
-            "Mercy General Hospital", "5582019", "Oakland", "CA",
+            "gonzalez",
+            "maria",
+            "1984-03-12",
+            VerificationMethod::GovernmentPhotoId,
+            "Mercy General Hospital",
+            "5582019",
+            "Oakland",
+            "CA",
         ),
         &[],
     )
@@ -278,8 +312,14 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     let m_north = create(
         client,
         &demo_assert(
-            "gonzalez", "maria", "1984-03-12", VerificationMethod::InsuranceCard,
-            "Northside Clinic", "A-7741", "Oakland", "CA",
+            "gonzalez",
+            "maria",
+            "1984-03-12",
+            VerificationMethod::InsuranceCard,
+            "Northside Clinic",
+            "A-7741",
+            "Oakland",
+            "CA",
         ),
         &[],
     )
@@ -296,7 +336,10 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     .await?;
     let m_attest = create(
         client,
-        &EventPayload::Attest { target_event_ids: vec![m_link], purpose: AttestPurpose::Treatment },
+        &EventPayload::Attest {
+            target_event_ids: vec![m_link],
+            purpose: AttestPurpose::Treatment,
+        },
         &[m_link],
     )
     .await?;
@@ -320,8 +363,14 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     let j_mercy = create(
         client,
         &demo_assert(
-            "whitfield", "james", "1971-08-04", VerificationMethod::GovernmentPhotoId,
-            "Mercy General Hospital", "6610042", "Fresno", "CA",
+            "whitfield",
+            "james",
+            "1971-08-04",
+            VerificationMethod::GovernmentPhotoId,
+            "Mercy General Hospital",
+            "6610042",
+            "Fresno",
+            "CA",
         ),
         &[],
     )
@@ -329,8 +378,14 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
     let j_lakeside = create(
         client,
         &demo_assert(
-            "whitfield", "james", "1971-08-14", VerificationMethod::SelfReport,
-            "Lakeside Hospital", "LH-3098", "Fresno", "CA",
+            "whitfield",
+            "james",
+            "1971-08-14",
+            VerificationMethod::SelfReport,
+            "Lakeside Hospital",
+            "LH-3098",
+            "Fresno",
+            "CA",
         ),
         &[],
     )
@@ -358,8 +413,7 @@ async fn seed_demo(client: &mut CredaClient<tonic::transport::Channel>) -> Resul
 }
 
 fn derive_pubkey(secret_file: &str) -> Result<()> {
-    let secret = std::fs::read(secret_file)
-        .with_context(|| format!("reading {secret_file}"))?;
+    let secret = std::fs::read(secret_file).with_context(|| format!("reading {secret_file}"))?;
     let key = creda_events::SigningKey::ed25519_from_secret_bytes(&secret)
         .context("loading Ed25519 secret")?;
     let pubkey = key.verifying_key().public_key_bytes();
@@ -368,10 +422,7 @@ fn derive_pubkey(secret_file: &str) -> Result<()> {
     Ok(())
 }
 
-async fn inject(
-    client: &mut CredaClient<tonic::transport::Channel>,
-    tag: &str,
-) -> Result<()> {
+async fn inject(client: &mut CredaClient<tonic::transport::Channel>, tag: &str) -> Result<()> {
     let payload = synthetic_assert(tag);
     let payload_cbor = canonical::to_vec(&payload).context("serialize EventPayload")?;
     let req = pb::CreateEventRequest {
@@ -482,7 +533,11 @@ async fn check_authz(
         .await
         .context("EvaluateAuthorization RPC")?
         .into_inner();
-    let verdict = if reply.authorized { "authorized" } else { "denied" };
+    let verdict = if reply.authorized {
+        "authorized"
+    } else {
+        "denied"
+    };
     if reply.authorized != expect_authorized {
         bail!(
             "authorization mismatch: expected {expect_str}, got {verdict} (reason: {})",
@@ -540,7 +595,9 @@ async fn inject_revoke(
 ) -> Result<()> {
     let grant = creda_events::EventId::parse_str(grant_str)
         .map_err(|e| anyhow!("invalid grant UUID {grant_str:?}: {e}"))?;
-    let payload = EventPayload::AuthorizationRevocation { target_grant_id: grant };
+    let payload = EventPayload::AuthorizationRevocation {
+        target_grant_id: grant,
+    };
     let id = create(client, &payload, &[grant]).await?;
     println!("{id}");
     Ok(())
@@ -562,7 +619,9 @@ async fn time_revocation(
         .await
         .with_context(|| format!("connecting to observe peer {observe_peer}"))?;
 
-    let payload = EventPayload::AuthorizationRevocation { target_grant_id: grant };
+    let payload = EventPayload::AuthorizationRevocation {
+        target_grant_id: grant,
+    };
     let start = Instant::now();
     let revocation = create(inject_client, &payload, &[grant]).await?;
 
@@ -571,7 +630,9 @@ async fn time_revocation(
     let id_bytes = revocation.as_bytes().to_vec();
     loop {
         let reply = observe_client
-            .get_event(pb::GetEventRequest { id: id_bytes.clone() })
+            .get_event(pb::GetEventRequest {
+                id: id_bytes.clone(),
+            })
             .await
             .context("GetEvent RPC (observe peer)")?
             .into_inner();
@@ -621,7 +682,9 @@ async fn observe(
 
     loop {
         let reply = client
-            .get_event(pb::GetEventRequest { id: event_id.clone() })
+            .get_event(pb::GetEventRequest {
+                id: event_id.clone(),
+            })
             .await
             .context("GetEvent RPC")?
             .into_inner();
@@ -661,7 +724,7 @@ fn synthetic_assert(tag: &str) -> EventPayload {
 }
 
 fn uuid_to_bytes(s: &str) -> Result<Vec<u8>> {
-    let parsed = creda_events::EventId::parse_str(s)
-        .map_err(|e| anyhow!("invalid UUID {s:?}: {e}"))?;
+    let parsed =
+        creda_events::EventId::parse_str(s).map_err(|e| anyhow!("invalid UUID {s:?}: {e}"))?;
     Ok(parsed.as_bytes().to_vec())
 }

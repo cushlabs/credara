@@ -13,8 +13,8 @@ use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use creda_events::{
-    CertificateFingerprint, EventId, EventPayload, IdentityEventNode, IdentityEventType, TestDataTag,
-    VerifyingKey,
+    CertificateFingerprint, EventId, EventPayload, IdentityEventNode, IdentityEventType,
+    TestDataTag, VerifyingKey,
 };
 use creda_graph::{
     evaluate_with_link_chain, project, AuthorizationDecision, AuthorizationQuery, ConfidenceConfig,
