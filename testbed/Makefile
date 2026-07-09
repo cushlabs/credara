@@ -22,7 +22,7 @@ ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
+.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -83,6 +83,14 @@ revocation-latency:
 # run `make up`/`make images` first. Slower (~2-3 min; reconciliation is AE-paced).
 partition-rejoin:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/partition-rejoin/run.sh "$(CLUSTER_NAME)"
+
+# Rogue-link: verifies the §4.6 step 5.5 cross-institutional link-chain defense over real gossip. A
+# rogue peer fuses a self-issued Grant onto the responder's patient via a manual Link (denied) and
+# via an insurance-crosswalk Link (admitted); the deny-by-default responder's EvaluateAuthorization
+# must reject the former and honor the latter. Adds the inject-link/check-authz peer-driver
+# subcommands and the Core link-chain wiring — run `make up`/`make images` first.
+rogue-link:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/rogue-link/run.sh "$(CLUSTER_NAME)"
 
 # UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
 # Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the

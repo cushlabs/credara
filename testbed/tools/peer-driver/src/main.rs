@@ -11,6 +11,12 @@
 //!   inject-revoke — create an AuthorizationRevocation superseding a prior Grant (§4.3.2), parented
 //!             to that Grant so a peer holding the Grant validates it on arrival (§4.6 step 2).
 //!             Prints the revocation event id.
+//!   inject-link   — create a Link fusing two subgraph heads with a given method + confidence
+//!             (§5.1.1). Used by the rogue-link scenario to gossip both a weak (rogue) Link and a
+//!             strong (trusted) control Link. Prints the link event id.
+//!   check-authz   — call EvaluateAuthorization on the target peer for a requester/purpose/use-mode
+//!             against a subgraph, and assert the decision matches an expected authorized|denied.
+//!             The rogue-link scenario's verdict assertion (§4.6 step 5.5).
 //!   time-revocation — inject a Revocation at `--peer` AND poll `--observe-peer` for it in one
 //!             process, so t0 is the injecting RPC and t1 is when the second peer first sees it.
 //!             Prints the true inject→observed propagation latency in ms, with no inter-Job gap.
@@ -58,9 +64,49 @@ enum Command {
     },
     /// Inject an AuthorizationGrant covering a subject subgraph (§4.3.1). Prints the grant id.
     InjectGrant {
-        /// Subject subgraph entry-point event id (hex UUID), e.g. the output of `inject`.
+        /// Subject subgraph entry-point event id (hex UUID), e.g. the output of `inject`. The grant
+        /// is parented to this id, so it lands in that fragment's subgraph.
         #[arg(long)]
         subject: String,
+        /// Audience institution class the grant covers (§4.3.1 / §4.6 step 3). A requester whose
+        /// `check-authz --requester-class` matches satisfies the audience.
+        #[arg(long = "audience-class", default_value = "revocation-latency")]
+        audience_class: String,
+    },
+    /// Inject a Link fusing two subgraph heads with a method + confidence (§5.1.1). Prints the id.
+    InjectLink {
+        /// First subgraph head (hex UUID) — e.g. the injecting peer's own Assert.
+        #[arg(long)]
+        a: String,
+        /// Second subgraph head (hex UUID) — e.g. the responder's real patient Assert.
+        #[arg(long)]
+        b: String,
+        /// Link method: manual | algorithmic | referral | insurance-crosswalk | other. The method
+        /// sets the confidence ceiling the responder's link-chain check caps to (§4.6 step 5.5).
+        #[arg(long, default_value = "manual")]
+        method: String,
+        /// Match confidence in basis points (0–10000). Capped to the method ceiling on evaluation.
+        #[arg(long)]
+        confidence: u16,
+    },
+    /// Evaluate authorization on the target peer and assert the decision matches `--expect`.
+    CheckAuthz {
+        /// Subgraph entry-point event id(s) to evaluate against (hex UUID). Repeatable.
+        #[arg(long = "entry", required = true)]
+        entries: Vec<String>,
+        /// Audience class the requester satisfies (§4.6 step 3). Repeatable; empty is allowed.
+        #[arg(long = "requester-class")]
+        requester_classes: Vec<String>,
+        /// Grant purpose: treatment | payment | operations | public-health | research |
+        /// ai-training | ai-inference | federal-program.
+        #[arg(long, default_value = "treatment")]
+        purpose: String,
+        /// Use mode: read-only | read-and-rely | read-and-export.
+        #[arg(long = "use-mode", default_value = "read-only")]
+        use_mode: String,
+        /// Expected outcome: authorized | denied. The command errors if the peer disagrees.
+        #[arg(long)]
+        expect: String,
     },
     /// Inject an AuthorizationRevocation superseding a prior Grant (§4.3.2). Prints the
     /// revocation id. Parented to the Grant, so a peer holding the Grant validates it on
@@ -143,7 +189,15 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Inject { tag } => inject(&mut client, &tag).await,
-        Command::InjectGrant { subject } => inject_grant(&mut client, &subject).await,
+        Command::InjectGrant { subject, audience_class } => {
+            inject_grant(&mut client, &subject, &audience_class).await
+        }
+        Command::InjectLink { a, b, method, confidence } => {
+            inject_link(&mut client, &a, &b, &method, confidence).await
+        }
+        Command::CheckAuthz { entries, requester_classes, purpose, use_mode, expect } => {
+            check_authz(&mut client, &entries, &requester_classes, &purpose, &use_mode, &expect).await
+        }
         Command::InjectRevoke { grant } => inject_revoke(&mut client, &grant).await,
         Command::TimeRevocation { grant, observe_peer, timeout_ms, poll_ms } => {
             time_revocation(&mut client, &observe_peer, &grant, timeout_ms, poll_ms).await
@@ -347,12 +401,13 @@ async fn inject(
 async fn inject_grant(
     client: &mut CredaClient<tonic::transport::Channel>,
     subject_str: &str,
+    audience_class: &str,
 ) -> Result<()> {
     let subject = creda_events::EventId::parse_str(subject_str)
         .map_err(|e| anyhow!("invalid subject UUID {subject_str:?}: {e}"))?;
     let payload = EventPayload::AuthorizationGrant {
         scope: AuthorizationScope::default(),
-        audience: GrantAudience::InstitutionClass("revocation-latency".into()),
+        audience: GrantAudience::InstitutionClass(audience_class.to_string()),
         purpose: GrantPurpose::Treatment,
         expiration: None,
         volume_constraints: None,
@@ -361,6 +416,118 @@ async fn inject_grant(
     let id = create(client, &payload, &[subject]).await?;
     println!("{id}");
     Ok(())
+}
+
+/// Inject a `Link` fusing two subgraph heads (§5.1.1), parented to both so it materializes into
+/// each fragment's subgraph. `method` sets the confidence ceiling the responder's link-chain check
+/// caps to (§4.6 step 5.5): a `manual` link at 10000 is capped below the trust floor and cannot
+/// carry authorization across institutions, while an `insurance-crosswalk` link can. Prints the id.
+async fn inject_link(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    a_str: &str,
+    b_str: &str,
+    method_str: &str,
+    confidence: u16,
+) -> Result<()> {
+    let a = creda_events::EventId::parse_str(a_str)
+        .map_err(|e| anyhow!("invalid head UUID {a_str:?}: {e}"))?;
+    let b = creda_events::EventId::parse_str(b_str)
+        .map_err(|e| anyhow!("invalid head UUID {b_str:?}: {e}"))?;
+    let payload = EventPayload::Link {
+        target_subgraph_heads: (a, b),
+        confidence_score: confidence,
+        method: parse_link_method(method_str)?,
+    };
+    let id = create(client, &payload, &[a, b]).await?;
+    println!("{id}");
+    Ok(())
+}
+
+/// Call `EvaluateAuthorization` on the target peer and assert the decision matches `expect`
+/// (§4.6). Prints `<authorized|denied> (reason: ...)` on success; bails on mismatch so a scenario
+/// script fails loudly. The rogue-link scenario runs this against the responder peer after gossip
+/// converges: a rogue Link-reached Grant must yield `denied`, a trusted Link-reached one `authorized`.
+async fn check_authz(
+    client: &mut CredaClient<tonic::transport::Channel>,
+    entries: &[String],
+    requester_classes: &[String],
+    purpose_str: &str,
+    use_mode_str: &str,
+    expect_str: &str,
+) -> Result<()> {
+    let entry_points = entries
+        .iter()
+        .map(|s| uuid_to_bytes(s))
+        .collect::<Result<Vec<_>>>()?;
+    let expect_authorized = match expect_str.to_ascii_lowercase().as_str() {
+        "authorized" | "allow" | "allowed" => true,
+        "denied" | "deny" => false,
+        other => bail!("invalid --expect {other:?} (expected authorized|denied)"),
+    };
+    let req = pb::AuthRequest {
+        entry_points,
+        requester: Some(pb::RequesterContext {
+            fingerprint: Vec::new(),
+            classes: requester_classes.to_vec(),
+            wildcards: Vec::new(),
+        }),
+        purpose: parse_purpose(purpose_str)? as i32,
+        use_mode: parse_use_mode(use_mode_str)? as i32,
+        requested_event_types: Vec::new(),
+        requested_segments: Vec::new(),
+        requested_data_categories: Vec::new(),
+    };
+    let reply = client
+        .evaluate_authorization(req)
+        .await
+        .context("EvaluateAuthorization RPC")?
+        .into_inner();
+    let verdict = if reply.authorized { "authorized" } else { "denied" };
+    if reply.authorized != expect_authorized {
+        bail!(
+            "authorization mismatch: expected {expect_str}, got {verdict} (reason: {})",
+            reply.reason
+        );
+    }
+    println!("{verdict} (reason: {})", reply.reason);
+    Ok(())
+}
+
+fn parse_link_method(s: &str) -> Result<LinkMethod> {
+    Ok(match s.to_ascii_lowercase().replace('_', "-").as_str() {
+        "manual" => LinkMethod::Manual,
+        "algorithmic" => LinkMethod::Algorithmic,
+        "referral" => LinkMethod::Referral,
+        "insurance-crosswalk" => LinkMethod::InsuranceCrosswalk,
+        "other" => LinkMethod::Other,
+        other => bail!(
+            "unknown link method {other:?} (expected manual|algorithmic|referral|\
+             insurance-crosswalk|other)"
+        ),
+    })
+}
+
+fn parse_purpose(s: &str) -> Result<pb::GrantPurpose> {
+    Ok(match s.to_ascii_lowercase().replace('_', "-").as_str() {
+        "treatment" => pb::GrantPurpose::Treatment,
+        "payment" => pb::GrantPurpose::Payment,
+        "operations" => pb::GrantPurpose::Operations,
+        "public-health" => pb::GrantPurpose::PublicHealth,
+        "research" => pb::GrantPurpose::Research,
+        "ai-training" => pb::GrantPurpose::AiTraining,
+        "ai-inference" => pb::GrantPurpose::AiInference,
+        "federal-program" => pb::GrantPurpose::FederalProgram,
+        other => bail!("unknown purpose {other:?}"),
+    })
+}
+
+fn parse_use_mode(s: &str) -> Result<pb::UseMode> {
+    Ok(match s.to_ascii_lowercase().replace('_', "-").as_str() {
+        "read-only" => pb::UseMode::ReadOnly,
+        "read-and-rely" => pb::UseMode::ReadAndRely,
+        "read-and-export" => pb::UseMode::ReadAndExport,
+        other => bail!("unknown use mode {other:?}"),
+    })
 }
 
 /// Inject an `AuthorizationRevocation` that supersedes `grant`, parented to it (§4.3.2). Prints

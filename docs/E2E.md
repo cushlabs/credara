@@ -24,11 +24,11 @@ and each `testbed/scenarios/<name>/README.md`.
 | revocation-latency | a Revocation propagates and *takes effect* at the other peer within Bound 1 (validated on arrival, §4.6 step 2) | §4.3.2, §4.7 | `make revocation-latency` | ✅ |
 | partition-rejoin | a real node-level partition; both sides stay available; the divergent DAGs reconcile via AE on heal | §6.1.7, §6.1.8 | `make partition-rejoin` | ✅ |
 | ui-smoke | each persona's primary flow (Playwright in-cluster, mock bridge) | §8 | `make ui-smoke` | ✅ |
+| rogue-link | a rogue peer's self-issued Grant, fused onto the responder's patient by a Link it controls, is denied through a ceiling-capped `manual` Link and admitted through a trusted `insurance-crosswalk` Link | §4.6 step 5.5, §5.3.5 | `make rogue-link` | ✅ |
 | rolling-upgrade | Helm peer rotation with no convergence loss | §10.6.7 | — | 🚧 planned |
 | storage-class | each tested storage class survives a peer restart | §10.6.8 | — | 🚧 planned |
-| rogue-link | multi-peer link-chain defense (rogue-Link rejection) | §4.6 step 5.5 | — | 🚧 planned |
 
-Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin`.
+Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link`.
 
 Notes:
 

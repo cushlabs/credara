@@ -13,11 +13,12 @@ use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use creda_events::{
-    CertificateFingerprint, EventId, EventPayload, IdentityEventNode, TestDataTag, VerifyingKey,
+    CertificateFingerprint, EventId, EventPayload, IdentityEventNode, IdentityEventType, TestDataTag,
+    VerifyingKey,
 };
 use creda_graph::{
-    evaluate, project, AuthorizationDecision, AuthorizationQuery, ConfidenceConfig,
-    EffectiveIdentity, Subgraph,
+    evaluate_with_link_chain, project, AuthorizationDecision, AuthorizationQuery, ConfidenceConfig,
+    EffectiveIdentity, LinkChainConfig, Subgraph,
 };
 use creda_net::Snapshot;
 use creda_store::Store;
@@ -318,12 +319,29 @@ impl CredaCore {
         // Volume utilization tracking is a Core responsibility not yet wired (§4.6 step 5);
         // pass an empty map for now.
         let utilization = std::collections::HashMap::new();
-        Ok(evaluate(
+        // §4.6 step 5.5: apply the Link-chain cross-institutional check. The responder's anchors
+        // are its OWN Asserts/Attests for this patient — the events it already trusts. A Grant that
+        // reaches this peer's view of the patient only through a weak/rogue Link to those anchors is
+        // denied; a Grant in the peer's own fragment, or reached through a high-confidence Link, is
+        // admitted (creda_graph::link_chain). Defaults per LinkChainConfig; a per-deployment config
+        // surface (ceilings/floor/require-standing) is a tracked follow-up.
+        let me = self.institution_id();
+        let mut responder_anchors: BTreeSet<EventId> = BTreeSet::new();
+        for ty in [IdentityEventType::Assert, IdentityEventType::Attest] {
+            for node in subgraph.nodes_of_type(ty) {
+                if node.institution_id == me {
+                    responder_anchors.insert(node.id);
+                }
+            }
+        }
+        Ok(evaluate_with_link_chain(
             &subgraph,
             query,
             self.config.default_posture.to_graph(),
             now_unix_secs(),
             &utilization,
+            &responder_anchors,
+            &LinkChainConfig::default(),
         ))
     }
 

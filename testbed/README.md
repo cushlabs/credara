@@ -161,13 +161,15 @@ per-scenario status — is [`docs/E2E.md`](../docs/E2E.md).
   Playwright e2e specs as an in-cluster Job. Asserts each persona's primary flow against a
   mock FHIR bridge; rebases onto a real bridge once the M7 `TODO(bridge-verify)` stubs land.
   `make ui-smoke`.
+- `rogue-link/` — a rogue peer gossips a self-issued Grant fused onto the responder's patient by a
+  Link it controls; the deny-by-default responder's `EvaluateAuthorization` denies the Grant reached
+  through a ceiling-capped `manual` Link and admits the one reached through a trusted
+  `insurance-crosswalk` Link (§4.6 step 5.5, §5.3.5). `make rogue-link`.
 
 Planned (not yet implemented):
 
 - `rolling-upgrade/` — Helm upgrade with peer rotation, verify no convergence loss (§10.6.7).
 - `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
-- `rogue-link/` — in-cluster realization of the conformance suite's rogue-Link scenarios
-  (§4.6 step 5.5).
 
 ## Relationship to the M9 conformance suite
 

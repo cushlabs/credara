@@ -5,7 +5,7 @@
 use creda_core::{CredaConfig, CredaCore, InMemorySigner, Ingest, KeyRegistry, PostureSetting};
 use creda_events::{
     AuthorizationScope, CertificateFingerprint, Demographics, EventPayload, GrantAudience,
-    GrantPurpose, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
+    GrantPurpose, LinkMethod, TokenizedDate, TokenizedString, UseMode, VerificationMethod,
 };
 use creda_graph::{AuthorizationQuery, RequesterContext};
 use creda_store::MemoryStore;
@@ -190,4 +190,99 @@ fn synthetic_only_refuses_untagged_ingest_but_accepts_tagged() {
         local.ingest_event(tagged, &reg2).unwrap(),
         Ingest::Accepted
     ));
+}
+
+// ---- Link-chain cross-institutional defense (§4.6 step 5.5) --------------------------------
+//
+// A rogue institution must not be able to manufacture authorization over a patient it does not
+// legitimately know by gossiping a self-issued Grant together with a Link that fuses its own
+// fragment onto the responder's trusted identity. The responder's `evaluate_authorization` runs
+// the link-chain check with its OWN Asserts as anchors: a Grant reachable only through a Link
+// whose method-capped confidence falls below the trust floor is denied; the same shape reached
+// through a trusted, high-confidence Link is admitted. These lock the Core wiring itself,
+// independent of the multi-peer testbed rogue-link scenario.
+
+/// Build a responder peer holding its own patient Assert, then replicate a foreign ("rogue")
+/// peer's parallel Assert, a Link fusing the two fragments, and a self-audience Grant. Returns
+/// the responder's authorization decision for the rogue institution requesting Treatment. The
+/// responder runs deny-by-default, so the rogue Grant is the ONLY path to authorization — which
+/// makes the link-chain verdict the sole determinant of the outcome.
+fn rogue_link_decision(method: LinkMethod, confidence: u16) -> creda_graph::AuthorizationDecision {
+    let me = core_with(PostureSetting::DenyByDefault);
+    let me_assert = me.create_event(assert_payload(), vec![]).unwrap();
+
+    // A rogue peer with its own key, unknown to `me` except via the registry we hand ingest.
+    let rogue_signer = InMemorySigner::generate().unwrap();
+    let rogue_vk = rogue_signer.verifying_key();
+    let rogue = CredaCore::new(
+        Box::new(MemoryStore::new()),
+        Box::new(rogue_signer),
+        CredaConfig::default(),
+    );
+    let rogue_fp = rogue.institution_id();
+
+    let rogue_assert = rogue.create_event(assert_payload(), vec![]).unwrap();
+    let link = rogue
+        .create_event(
+            EventPayload::Link {
+                target_subgraph_heads: (rogue_assert.id, me_assert.id),
+                confidence_score: confidence,
+                method,
+            },
+            vec![rogue_assert.id, me_assert.id],
+        )
+        .unwrap();
+    let grant = rogue
+        .create_event(
+            EventPayload::AuthorizationGrant {
+                scope: AuthorizationScope::default(),
+                audience: GrantAudience::InstitutionId(rogue_fp.clone()),
+                purpose: GrantPurpose::Treatment,
+                expiration: None,
+                volume_constraints: None,
+                use_mode: UseMode::ReadAndRely,
+            },
+            vec![rogue_assert.id],
+        )
+        .unwrap();
+
+    // Replicate the rogue fragment into the responder via signature-verified ingest.
+    let reg = KeyRegistry::from_keys([rogue_vk]);
+    for ev in [rogue_assert, link, grant] {
+        assert_eq!(me.ingest_event(ev, &reg).unwrap(), Ingest::Accepted);
+    }
+
+    let query = AuthorizationQuery {
+        requester: RequesterContext::new(rogue_fp),
+        purpose: GrantPurpose::Treatment,
+        use_mode: UseMode::ReadOnly,
+        requested_event_types: vec![],
+        requested_segments: vec![],
+        requested_data_categories: vec![],
+    };
+    me.evaluate_authorization(&[me_assert.id], &query).unwrap()
+}
+
+#[test]
+fn link_chain_denies_grant_reached_only_through_rogue_link() {
+    // A manual link, even at maximum confidence, is capped below the trust floor by its method
+    // ceiling — so the self-issued Grant never gains standing over the responder's patient.
+    let decision = rogue_link_decision(LinkMethod::Manual, 10_000);
+    assert!(
+        !decision.authorized,
+        "a Grant reachable only through a ceiling-capped rogue Link must be denied"
+    );
+}
+
+#[test]
+fn link_chain_admits_grant_reached_through_trusted_link() {
+    // The identical shape, reached through a high-confidence insurance-crosswalk link that clears
+    // the floor, is admitted — confirming the wiring denies the rogue path specifically, not all
+    // cross-institutional links.
+    let decision = rogue_link_decision(LinkMethod::InsuranceCrosswalk, 9_500);
+    assert!(
+        decision.authorized,
+        "a Grant reached through a trusted, high-confidence Link must be admitted"
+    );
+    assert_eq!(decision.covering_grants.len(), 1);
 }
