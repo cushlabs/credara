@@ -25,10 +25,10 @@ and each `testbed/scenarios/<name>/README.md`.
 | partition-rejoin | a real node-level partition; both sides stay available; the divergent DAGs reconcile via AE on heal | §6.1.7, §6.1.8 | `make partition-rejoin` | ✅ |
 | ui-smoke | each persona's primary flow (Playwright in-cluster, mock bridge) | §8 | `make ui-smoke` | ✅ |
 | rogue-link | a rogue peer's self-issued Grant, fused onto the responder's patient by a Link it controls, is denied through a ceiling-capped `manual` Link and admitted through a trusted `insurance-crosswalk` Link | §4.6 step 5.5, §5.3.5 | `make rogue-link` | ✅ |
-| rolling-upgrade | Helm peer rotation with no convergence loss | §10.6.7 | — | 🚧 planned |
+| rolling-upgrade | a `helm upgrade` rolls a peer's pod (StatefulSet RollingUpdate); the roll advances to a new revision, pre-roll data survives the rotation, the rest of the network keeps serving, and the rolled peer rejoins and catches up with no lost events | §10.6.7 | `make rolling-upgrade` | ✅ |
 | storage-class | each tested storage class survives a peer restart | §10.6.8 | — | 🚧 planned |
 
-Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link`.
+Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade`.
 
 Notes:
 

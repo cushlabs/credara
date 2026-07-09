@@ -22,7 +22,7 @@ ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
+.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link rolling-upgrade ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -91,6 +91,15 @@ partition-rejoin:
 # subcommands and the Core link-chain wiring — run `make up`/`make images` first.
 rogue-link:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/rogue-link/run.sh "$(CLUSTER_NAME)"
+
+# Rolling-upgrade: verifies the §10.6.7 within-institution maintenance path. A `helm upgrade` rolls
+# peer-b's pod (config-checksum change → StatefulSet RollingUpdate, /readyz-gated); asserts the roll
+# advanced to a new revision + replaced the pod, pre-roll data survived the rotation (PVC re-attach),
+# peer-a kept serving during the window, and the rolled peer rejoined and caught up with no lost
+# events. Uses only inject/observe — run `make up`/`make images` first. Slower (~2-3 min; catch-up is
+# AE-paced).
+rolling-upgrade:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/rolling-upgrade/run.sh "$(CLUSTER_NAME)"
 
 # UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
 # Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the

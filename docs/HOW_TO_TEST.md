@@ -98,6 +98,7 @@ make ae-repair   # anti-entropy repair scenario (~75s; late-joining peer catches
 make revocation-latency  # Grant + Revocation; measures revocation propagation vs §4.7 Bound 1
 make partition-rejoin    # real node-level partition; both sides write; reconcile via AE on heal
 make rogue-link  # rogue peer's Link-fused Grant denied (manual) / admitted (crosswalk), §4.6 step 5.5
+make rolling-upgrade     # helm upgrade rolls a peer; data persists; rejoin + catch-up, §10.6.7
 make down        # tear down the cluster
 ```
 
@@ -307,8 +308,7 @@ Common first-time hiccups:
 - [`REPO_STRUCTURE.md`](../REPO_STRUCTURE.md) — where everything lives, plus the
   M0–M9 build order.
 - [`testbed/README.md`](../testbed/README.md) — the multi-peer bed and the
-  scenario catalog, including the planned scenarios (`rolling-upgrade`,
-  `storage-class`) that
+  scenario catalog, including the planned scenario (`storage-class`) that
   testers can help bring up.
 - [`clients/README.md`](../clients/README.md) — the five persona front-end clients,
   their FHIR-bridge wiring, and how to swap from mock mode to a real bridge.
@@ -320,12 +320,12 @@ Common first-time hiccups:
 
 The end-to-end surface is still being built out. Today you get the in-process conformance
 suite; the two-peer gossip-convergence, anti-entropy, revocation-latency, partition-rejoin,
-and rogue-link testbed scenarios; and the persona UI smoke. Still in active development — and
-available soon — are:
+rogue-link, and rolling-upgrade testbed scenarios; and the persona UI smoke. Still in active
+development — and available soon — are:
 
 - the **real-effect integration smoke** (every client interaction driven against a real
   bridge and asserted to produce a real on-wire event, not just a UI transition);
-- additional multi-peer testbed scenarios: **rolling-upgrade** and **storage-class**.
+- the remaining multi-peer testbed scenario: **storage-class**.
 
 These are sign-posted in [`testbed/README.md`](../testbed/README.md) and `docs/STATUS.md`;
 testers are welcome to help bring them up. Until they land, treat end-to-end coverage as

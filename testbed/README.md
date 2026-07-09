@@ -165,10 +165,13 @@ per-scenario status — is [`docs/E2E.md`](../docs/E2E.md).
   Link it controls; the deny-by-default responder's `EvaluateAuthorization` denies the Grant reached
   through a ceiling-capped `manual` Link and admits the one reached through a trusted
   `insurance-crosswalk` Link (§4.6 step 5.5, §5.3.5). `make rogue-link`.
+- `rolling-upgrade/` — a `helm upgrade` rolls peer-b's pod (StatefulSet RollingUpdate, /readyz-gated);
+  asserts the roll advanced to a new revision and replaced the pod, pre-roll data survived the
+  rotation (PVC re-attach), peer-a kept serving throughout, and the rolled peer rejoined and caught up
+  with no lost events (§10.6.7). `make rolling-upgrade`.
 
 Planned (not yet implemented):
 
-- `rolling-upgrade/` — Helm upgrade with peer rotation, verify no convergence loss (§10.6.7).
 - `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
 
 ## Relationship to the M9 conformance suite
