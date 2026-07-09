@@ -22,7 +22,7 @@ ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link rolling-upgrade ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
+.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link rolling-upgrade storage-class ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -100,6 +100,14 @@ rogue-link:
 # AE-paced).
 rolling-upgrade:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/rolling-upgrade/run.sh "$(CLUSTER_NAME)"
+
+# Storage-class: verifies the §10.6.8 "store survives a peer restart" claim. A single seed peer on
+# the class under test writes markers, the pod is deleted + recreated (same PVC re-attaches), and the
+# markers must still be present — PV persistence + RocksDB reopen. Default tests the cluster-default
+# class (kind: local-path); STORAGE_CLASS=<class> targets a real matrix class on a richer cluster.
+# Uses only inject/observe — run `make up`/`make images` first.
+storage-class:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/storage-class/run.sh "$(CLUSTER_NAME)"
 
 # UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
 # Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the

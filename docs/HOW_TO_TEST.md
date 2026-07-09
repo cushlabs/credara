@@ -99,6 +99,7 @@ make revocation-latency  # Grant + Revocation; measures revocation propagation v
 make partition-rejoin    # real node-level partition; both sides write; reconcile via AE on heal
 make rogue-link  # rogue peer's Link-fused Grant denied (manual) / admitted (crosswalk), §4.6 step 5.5
 make rolling-upgrade     # helm upgrade rolls a peer; data persists; rejoin + catch-up, §10.6.7
+make storage-class       # peer store survives a pod restart on the class under test (PVC + RocksDB), §10.6.8
 make down        # tear down the cluster
 ```
 
@@ -308,8 +309,7 @@ Common first-time hiccups:
 - [`REPO_STRUCTURE.md`](../REPO_STRUCTURE.md) — where everything lives, plus the
   M0–M9 build order.
 - [`testbed/README.md`](../testbed/README.md) — the multi-peer bed and the
-  scenario catalog, including the planned scenario (`storage-class`) that
-  testers can help bring up.
+  scenario catalog (all scenarios now implemented).
 - [`clients/README.md`](../clients/README.md) — the five persona front-end clients,
   their FHIR-bridge wiring, and how to swap from mock mode to a real bridge.
 - [`clients/mockups/personas.md`](../clients/mockups/personas.md) — what each persona is allowed to see
@@ -318,14 +318,13 @@ Common first-time hiccups:
 
 ## Coming soon: more end-to-end scenarios
 
-The end-to-end surface is still being built out. Today you get the in-process conformance
-suite; the two-peer gossip-convergence, anti-entropy, revocation-latency, partition-rejoin,
-rogue-link, and rolling-upgrade testbed scenarios; and the persona UI smoke. Still in active
-development — and available soon — are:
+The end-to-end surface now covers the in-process conformance suite; the full multi-peer
+testbed catalog — gossip-convergence, anti-entropy, revocation-latency, partition-rejoin,
+rogue-link, rolling-upgrade, and storage-class; and the persona UI smoke. Still in active
+development — and available soon — is:
 
 - the **real-effect integration smoke** (every client interaction driven against a real
-  bridge and asserted to produce a real on-wire event, not just a UI transition);
-- the remaining multi-peer testbed scenario: **storage-class**.
+  bridge and asserted to produce a real on-wire event, not just a UI transition).
 
 These are sign-posted in [`testbed/README.md`](../testbed/README.md) and `docs/STATUS.md`;
 testers are welcome to help bring them up. Until they land, treat end-to-end coverage as

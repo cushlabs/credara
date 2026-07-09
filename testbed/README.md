@@ -169,10 +169,10 @@ per-scenario status — is [`docs/E2E.md`](../docs/E2E.md).
   asserts the roll advanced to a new revision and replaced the pod, pre-roll data survived the
   rotation (PVC re-attach), peer-a kept serving throughout, and the rolled peer rejoined and caught up
   with no lost events (§10.6.7). `make rolling-upgrade`.
-
-Planned (not yet implemented):
-
-- `storage-class/` — verify each tested storage class survives a peer restart (§10.6.8).
+- `storage-class/` — a single peer on the storage class under test writes events, its pod is deleted
+  and recreated (same PVC re-attaches), and the events must still be present — PV persistence +
+  RocksDB reopen (§10.6.8). Default tests kind's `local-path`; `STORAGE_CLASS=<class>` targets a real
+  matrix class (gp3, Longhorn, OpenEBS) on a richer cluster. `make storage-class`.
 
 ## Relationship to the M9 conformance suite
 

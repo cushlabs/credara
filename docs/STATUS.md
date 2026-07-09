@@ -142,7 +142,7 @@ view: metrics + fleet-wide events + disclosures + stewardship + compliance). Moc
 
 1. `make grpc && anchor creda && make bridge` compile + test clean.
 2. `(cd clients && pnpm install && pnpm typecheck)` clean (pnpm — not npm/npx).
-3. Multi-peer testbed scenarios pass (`make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade`).
+3. Multi-peer testbed scenarios pass (`make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade && storage-class`).
 4. No **silent fakes**: every not-yet-real surface is 🚧 (loud) or 🧪 (chip-marked demo).
 5. (Planned) integration smoke drives each client interaction against a real bridge
    and asserts a real effect; CI grep gate rejects untracked `TODO`/`FIXME`/fixture leakage.

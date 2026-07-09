@@ -26,9 +26,9 @@ and each `testbed/scenarios/<name>/README.md`.
 | ui-smoke | each persona's primary flow (Playwright in-cluster, mock bridge) | §8 | `make ui-smoke` | ✅ |
 | rogue-link | a rogue peer's self-issued Grant, fused onto the responder's patient by a Link it controls, is denied through a ceiling-capped `manual` Link and admitted through a trusted `insurance-crosswalk` Link | §4.6 step 5.5, §5.3.5 | `make rogue-link` | ✅ |
 | rolling-upgrade | a `helm upgrade` rolls a peer's pod (StatefulSet RollingUpdate); the roll advances to a new revision, pre-roll data survives the rotation, the rest of the network keeps serving, and the rolled peer rejoins and catches up with no lost events | §10.6.7 | `make rolling-upgrade` | ✅ |
-| storage-class | each tested storage class survives a peer restart | §10.6.8 | — | 🚧 planned |
+| storage-class | a peer's store survives a pod restart on the storage class under test — the PVC re-attaches and RocksDB reopens with committed events intact (default `local-path`; `STORAGE_CLASS=<class>` for a real matrix class) | §10.6.8 | `make storage-class` | ✅ |
 
-Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade`.
+Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade && storage-class`.
 
 Notes:
 
