@@ -27,6 +27,14 @@ guide before opening a pull request.
 - **Incremental and verifiable.** One logical change per commit; one milestone (or a
   coherent slice of one) per pull request. No giant unreviewable commits. Every PR must
   pass CI before merge.
+- **Green before you promote.** Run `make anchor` and let it finish green **before you
+  stage, commit, or push** — no exceptions. It runs the exact `ci-rust` gate sequence
+  (`fmt --check` → workspace clippy → gRPC-feature clippy → libp2p-adapter clippy →
+  workspace tests → gRPC tests → doctests) inside the dev container, so a clean
+  `anchor creda` means a green `ci-rust`. **`make test` is not a substitute**: `cargo test`
+  never invokes rustfmt or clippy, so a formatting- or lint-only problem compiles, tests
+  clean, and still fails CI. A red CI on `main` is the failure we are preventing; the only
+  way to prevent it is to run the full gate locally first.
 - **Honor the open questions.** Section 13 of the spec lists unresolved design decisions.
   Where something is marked deferred, scaffold the interface, implement the simplest
   defensible default, mark it `TODO(open-question-13.x)`, and **open a tracking issue**.
@@ -126,9 +134,12 @@ and is not parallelized.
 - [ ] My change references the governing spec section in the commit message(s).
 - [ ] I read that spec section before writing the code.
 - [ ] I reused existing libraries per Appendix C rather than reimplementing them.
-- [ ] Tests cover the new behavior and pass locally — run `make test` (no toolchain install
-      needed; Docker only — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
-- [ ] `make fmt-check` and `make clippy` are clean. `make ci` runs all three gates at once.
+- [ ] Tests cover the new behavior and pass locally (no toolchain install needed; Docker
+      only — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)).
+- [ ] **`make anchor` passed green before I staged/committed/pushed** — the full `ci-rust`
+      gate (fmt + clippy + workspace/gRPC tests + doctests) in the dev container. `make ci`
+      is the equivalent discrete-target run; `make fmt-check` / `make clippy` / `make test`
+      re-run individual gates when iterating.
 - [ ] Any deferred decision is marked `TODO(open-question-13.x)` with a linked issue.
 - [ ] No secrets, credentials, or real PHI are included — synthetic data only.
 - [ ] My commits are signed off (DCO — see below).
