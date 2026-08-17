@@ -1,0 +1,76 @@
+name: codeql
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so advisories that land after a merge still surface.
+    - cron: '21 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # build-mode: manual, NOT autobuild and NOT none.
+          #
+          # autobuild fails here for two structural reasons: it runs `./gradlew` from the
+          # repo root, and (a) this repo deliberately ships no Gradle wrapper — see the note
+          # in ci-java.yml — and (b) there is no Gradle project at the root at all; the
+          # bridge lives in bridge/.
+          #
+          # `none` is the tempting shortcut and is wrong: CodeQL's buildless mode does not
+          # support Kotlin, so bridge/src Kotlin sources would be silently excluded and the
+          # job would go green having analyzed only part of the code.
+          - language: java-kotlin
+            build-mode: manual
+          # Workflow files need no build.
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Set up JDK
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        if: matrix.build-mode == 'manual'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Pinned for the same reason as ci-java.yml: the Spring Boot 3.3.2 plugin still
+          # calls CopyProcessingSpec.getDirMode(), removed in Gradle 9. Without a committed
+          # wrapper, setup-gradle would otherwise fetch 9.x. Keep this in step with
+          # ci-java.yml when the Spring Boot plugin is bumped.
+          gradle-version: "8.10.2"
+
+      - name: Compile bridge for CodeQL
+        if: matrix.build-mode == 'manual'
+        working-directory: bridge
+        # testClasses, not build: CodeQL needs compiled classes, not the test run or the
+        # bootJar packaging step whose memory profile gradle.properties is tuned around.
+        run: gradle testClasses --no-daemon
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
