@@ -22,10 +22,11 @@ authority or vendor lock-in.
 
 ## Status
 
-> **Spec finalized at v1.0 · software pre-launch — all milestones implemented; multi-peer
+> **Spec released at v1.1.0 · software pre-launch — all milestones implemented; multi-peer
 > testbed green; hardening in progress. Open for testers.** The
 > [technical specification](docs/credara-technical-spec.md) (Sections 1–13 + appendices, ~90
-> pages) is **finalized at v1.0.0** — complete and authoritative — while the implementation
+> pages) is **released at v1.1.0** — complete and authoritative, with a published
+> [version history](docs/credara-technical-spec.md#version-history) — while the implementation
 > hardens toward a matching software release. All ten build milestones
 > (M0–M9) are implemented and verified, the default workspace builds and tests green, the
 > opt-in libp2p adapter compiles and lints clean against the pinned version, and the
@@ -90,10 +91,11 @@ Three distinct kinds of exchange flow between Credara peers. They are worth sepa
 they carry different things — and because none of them ever carries cleartext PHI.
 
 **1. Event gossip (the main flow).** When an institution creates an event — a new identity
-assertion, a link, an authorization grant, a revocation, a tombstone — its peer pushes that
-event to a handful of neighboring peers, who push it onward, spreading it across the network in
-roughly log(N) rounds (about 1–2 seconds network-wide). What is on the wire is a *batch* of
-event nodes serialized in canonical CBOR, inside an encrypted Noise channel. Each batch carries:
+assertion, a link, an authorization grant, a revocation, a tombstone, a disclosure record —
+its peer pushes that event to a handful of neighboring peers, who push it onward, spreading it
+across the network in roughly log(N) rounds (about 1–2 seconds network-wide). What is on the
+wire is a *batch* of event nodes serialized in canonical CBOR, inside an encrypted Noise
+channel. Each batch carries:
 
 - the sender's peer ID,
 - a batch sequence number (for deduplication), and
@@ -107,6 +109,14 @@ timestamps, and a logical clock. Critically, the payload carries **tokenized dem
 cleartext PHI** — cleartext patient data never traverses the gossip network by design. Receiving
 peers verify the signature, store the event, and re-gossip it; they ignore any event UUID they
 have already seen.
+
+Two of those event types authorize nothing. An **ExportReceipt** records a disclosure made *under*
+a Grant; a **TPODisclosure** records one made on HIPAA's presumptive Treatment, Payment, or
+Operations basis, where there is no Grant to cite. Both are signed by the **disclosing
+institution** — never by a gateway, bridge, or any intermediary that merely moved the bytes — and
+neither is ever an input to an authorization decision. They replicate for one reason: so that a
+patient's accounting of disclosures is a complete, portable ledger of what moved and on what
+basis, every entry signed by whoever moved it.
 
 **2. Anti-entropy (the backstop).** Gossip is best-effort, so peers periodically reconcile. Two
 peers holding the same patient's subgraph exchange a Merkle root computed over their *sorted set
@@ -141,7 +151,7 @@ sequenceDiagram
     participant DHT as Kademlia DHT
 
     Note over EHR,DHT: 1 · Event gossip — the main flow (spreads in ~log N rounds, ~1–2 s)
-    EHR->>A: create event — Assert / Link / Grant / Revoke / Tombstone
+    EHR->>A: create event — Assert / Link / Grant / Revoke / Tombstone / Disclosure
     Note right of A: peer batches events,<br/>flushing at 64 events or 100 ms
     A->>B: GossipBatch over Noise — sender ID, seq no., CBOR event nodes
     A->>C: GossipBatch (same)
