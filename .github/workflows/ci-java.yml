@@ -34,7 +34,7 @@ jobs:
           # CopyProcessingSpec.getDirMode(), which Gradle 9 removed. Without a committed wrapper,
           # setup-gradle would otherwise fetch the latest (9.x) and fail packaging. Revisit when
           # the Spring Boot plugin is bumped to a Gradle-9-compatible release.
-          gradle-version: "8.10.2"
+          gradle-version: "8.14.5"
       - name: Build and test bridge
         if: steps.bridge.outputs.present == 'true'
         working-directory: bridge

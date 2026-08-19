@@ -9,7 +9,7 @@
 #   docker build -f deploy/docker/bridge.Dockerfile -t creda-bridge:dev .
 #
 # TODO(DQ-4): pin the exact Hummingbird OpenJDK image references (registry path + digest).
-ARG GRADLE_BUILDER=docker.io/library/gradle:8.10-jdk21
+ARG GRADLE_BUILDER=docker.io/library/gradle:8.14.5-jdk21
 ARG RUNTIME=registry.fedoraproject.org/hummingbird/openjdk21-nonroot:fips
 
 FROM ${GRADLE_BUILDER} AS builder

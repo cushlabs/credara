@@ -429,7 +429,7 @@ internal object ConsentMapper {
         val v = EventPayloadCbor.decodeGrantNode(cbor)
         return baseConsent(v.id, patientId, Consent.ConsentState.ACTIVE, v.wallClockTimestamp, v.institutionFingerprint)
             .apply {
-                provision = Consent.provisionComponent().apply {
+                provision = Consent.ProvisionComponent().apply {
                     type = Consent.ConsentProvisionType.PERMIT
                     if (v.expiration != null) period = Period().setEndElement(DateTimeType(v.expiration))
                     addPurpose(Coding(PURPOSE_SYSTEM, v.purpose, v.purpose))

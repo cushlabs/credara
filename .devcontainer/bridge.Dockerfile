@@ -9,7 +9,7 @@
 ARG BASE=registry.fedoraproject.org/fedora:41
 FROM ${BASE}
 
-ARG GRADLE_VERSION=8.10
+ARG GRADLE_VERSION=8.14.5
 
 # OpenJDK 21 + the small tools needed to fetch and unpack the Gradle distribution.
 RUN dnf -y install java-21-openjdk-devel curl ca-certificates unzip findutils which \

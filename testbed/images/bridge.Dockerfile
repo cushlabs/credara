@@ -8,7 +8,7 @@
 # Build context = repo root:
 #   docker build -f testbed/images/bridge.Dockerfile -t creda-bridge:testbed .
 
-ARG GRADLE_BUILDER=docker.io/library/gradle:8.10-jdk21
+ARG GRADLE_BUILDER=docker.io/library/gradle:8.14.5-jdk21
 ARG RUNTIME=docker.io/library/eclipse-temurin:21-jre-jammy
 
 FROM ${GRADLE_BUILDER} AS builder

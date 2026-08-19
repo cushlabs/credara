@@ -52,7 +52,7 @@ DEV_BASE ?= registry.fedoraproject.org/fedora:41
 BRIDGE_DEV_IMAGE   ?= creda-bridge-dev:local
 BRIDGE_DOCKERFILE  := .devcontainer/bridge.Dockerfile
 BRIDGE_BASE        ?= registry.fedoraproject.org/fedora:41
-BRIDGE_STOCK_IMAGE ?= docker.io/library/gradle:8.10-jdk21
+BRIDGE_STOCK_IMAGE ?= docker.io/library/gradle:8.14.5-jdk21
 
 # Optional cap on build parallelism. Empty = use all cores (fastest). Set JOBS=1 (or 2) to
 # bound peak memory when compiling RocksDB on a memory-limited Docker VM. A single `-j` also

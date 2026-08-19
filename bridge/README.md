@@ -23,10 +23,27 @@ framework, validator, Subscription and Bulk Data support.
 
 This is the one **Java/Kotlin** component (Spring Boot + HAPI FHIR R4 + grpc-java, built with
 Gradle). It builds **separately** from the Rust workspace — `anchor creda` does not touch it; use
-`make bridge`. `gradle build` is **green** (the project compiles and the gRPC stubs generate from
-the shared proto). The FHIR↔CBOR encoders/mappers and the remaining operations are runtime
+`make bridge`. `gradle build` is **green** (compile, tests, and `bootJar`; the gRPC stubs generate
+from the shared proto). The FHIR↔CBOR encoders/mappers and the remaining operations are runtime
 `TODO(bridge-verify)` stubs (they throw `TODO()` until implemented), so the build compiles but
 those operations are not yet functional — see below.
+
+> **Dependency upgrade, 2026-08-19.** Spring Boot 3.3.2 → **4.1.0**, HAPI FHIR 7.2.0 → **8.10.1**,
+> Kotlin 1.9.24 → **2.4.10**, grpc-java 1.66.0 → **1.83.1**, Netty 4.1 → **4.2**, Gradle 8.10 →
+> **8.14.5**. Motive: Spring Boot 3.3.x left OSS support in June 2025 and every 3.x branch is now
+> unsupported, so the module was running on an unpatched web framework.
+>
+> Exactly **one** source change was needed across the whole module: `Consent.provisionComponent` →
+> `Consent.ProvisionComponent` in `AuthorizationResourceProvider.kt`. That is a FHIR R4 model
+> rename in `org.hl7.fhir.core` (6.1.2.2 → 6.9.12, pulled in by HAPI 8), which corrected the casing
+> on that one generated class — `provisionActorComponent` and `provisionDataComponent` are still
+> lowercase, so do not "fix" those. Every other HAPI and Spring symbol the Bridge imports is
+> unchanged across both hops.
+>
+> Residual risk is documented at the top of `build.gradle.kts`: HAPI 8.10.1 is CI-tested against
+> Spring Framework 6.2.18, not the Spring Framework 7 that Boot 4.1 brings. Compile and tests pass;
+> that is not the same as proven at runtime. Fallback if a runtime failure lands inside HAPI on a
+> Spring type: Spring Boot 3.5.9, keeping HAPI 8.10.1 and Kotlin 2.4.10.
 
 ### Layout
 - `build.gradle.kts` / `gradle.properties` — deps (HAPI, Spring Boot, grpc-java, netty UDS) and
@@ -67,7 +84,30 @@ Core's `EvaluateAuthorization` gRPC (the engine path exists; the gRPC wiring is 
 see `crates/creda-core/src/grpc.rs`).
 
 ### Build
-Needs a JDK 21 + Gradle (not in the Rust dev image). CI builds it via `ci-java.yml`
-(`actions/setup-java` + `gradle/actions/setup-gradle` → `gradle build`); the protobuf gradle
-plugin fetches `protoc` and the grpc-java plugin from Maven, so no system protoc is required. The
-**shipped** image is the Fedora Hummingbird OpenJDK base (DQ-4).
+Needs a JDK 21 + **Gradle 8.14 or later** (not in the Rust dev image). The Gradle floor is hard:
+the Spring Boot 4.1 plugin throws below 8.14. Gradle 9.x also works now — the Boot 3.3.2
+`getDirMode()` incompatibility that forced the old 8.10.2 pin is gone — but `ci-java.yml` stays on
+8.14.3 so the framework bump moves one variable at a time.
+
+CI builds it via `ci-java.yml` (`actions/setup-java` + `gradle/actions/setup-gradle` →
+`gradle build`); the protobuf gradle plugin fetches `protoc` and the grpc-java plugin from Maven,
+so no system protoc is required. The **shipped** image is the Fedora Hummingbird OpenJDK base
+(DQ-4).
+
+Two dependency-pairing constraints are load-bearing and explained in `gradle.properties`:
+
+- **grpc-java is pinned to 1.83.1, above Boot's managed 1.80.0.** Boot 4.1.0's BOM ships Netty
+  4.2.15.Final but pins grpc-bom to 1.80.0, which is a Netty-4.1 build. grpc-java 1.83.x is the
+  first line built against Netty 4.2, so moving grpc up lands on Boot's Netty exactly instead of
+  dragging Netty back down. The `extra["grpc-java.version"]` override in `build.gradle.kts` moves
+  the whole transitive BOM, not just the artifacts declared by name.
+- **Jackson 2 and Jackson 3 both sit on the classpath.** Boot 4 defaults to Jackson 3
+  (`tools.jackson`); HAPI FHIR 8.10.1 is Jackson 2 only (`com.fasterxml.jackson`). Different Maven
+  coordinates *and* different Java packages, so they coexist by design. Only the Jackson 2
+  classes are pulled in — not `spring-boot-jackson2`, which exists for the deprecated Jackson 2
+  auto-configuration the Bridge does not use.
+
+`io.netty.channel.epoll.EpollEventLoopGroup` (used by `grpc/CredaCoreClient.kt`) is deprecated in
+Netty 4.2 in favour of `MultiThreadIoEventLoopGroup` + `EpollIoHandler.newFactory()`. It still
+exists and still extends `MultiThreadIoEventLoopGroup`, so behaviour is unchanged; expect a
+deprecation warning and treat the migration as a separate follow-up.
