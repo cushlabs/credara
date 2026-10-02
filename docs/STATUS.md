@@ -34,9 +34,11 @@ priority class of bug here.
 
 ## FHIR Bridge (`bridge/`, Kotlin/HAPI) — partial
 
+Endpoint-level reference (paths, parameters, responses, errors): [`docs/BRIDGE_API.md`](BRIDGE_API.md).
+
 | Surface | State | Notes |
 |---|---|---|
-| `$creda-authorize` / `-revoke` / `-export` / `-verify` | ✅ | Patient-typed plain-provider ops; F0 CBOR mappers + golden tests. `-verify` calls Core's `EvaluateAuthorization`. |
+| `$creda-authorize` / `-revoke` / `-export` / `-tpo-disclose` / `-verify` | ✅ | Patient-typed plain-provider ops; F0 CBOR mappers + golden tests. `-verify` calls Core's `EvaluateAuthorization`. |
 | `Consent?patient=` search | ✅ | Authorization read-back. |
 | `Organization` search | ✅ | Network-wide institution discovery — distinct grant audiences store-wide (Core `ListInstitutions`). Backs the patient share datalist. Name-only (institutions are fingerprints here, not directory entries). |
 | `Task` create/search/`$creda-resolve-request` | ✅ (pilot) | Off-chain access-request inbox (hybrid workflow, §4.3.4). Ephemeral in-Bridge state — not a DAG event, not persisted, single-Bridge delivery. Cross-peer delivery is a real-PHI design item. |

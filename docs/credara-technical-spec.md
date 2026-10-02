@@ -1535,6 +1535,7 @@ Each Credara peer's HAPI FHIR Bridge advertises its Credara capabilities via the
 - **Implements**: the Credara IG (via `CapabilityStatement.implementationGuide`).
 - **Profiles**: CredaPatient, CredaProvenance, CredaAuthorization (FHIR Consent base; Section 9.3 and Section 4).
 - **Operations**: `$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$creda-authorize`, `$creda-revoke`, `$creda-verify`, `$creda-export`, `$creda-tpo-disclose`.
+  *Implementation note (2026-10):* HAPI generates the statement from the registered providers, so it advertises exactly what is built. Today that is the above **minus** `$creda-link`, `$creda-disambiguate`, `$creda-self-verify`, **plus** `$creda-amend`, `$creda-effective-identity`, `$creda-cleartext`, `$match`, and `Task/$creda-resolve-request`. The served surface is documented in `docs/BRIDGE_API.md`.
 - **Extensions**: subgraph identifier, root set, per-field confidence, disagreement flag, etc.
 - **Search parameters**: `_creda-token`, plus standard FHIR Patient search parameters.
 
@@ -2263,12 +2264,17 @@ The Bridge is a Spring Boot application embedding HAPI FHIR's `RestfulServer` in
 
 #### 10.4.2 Resource Providers
 
-Custom `IResourceProvider` implementations for each FHIR resource Credara exposes:
+Custom HAPI providers for each FHIR resource Credara exposes. The list below reflects the Bridge **as built**; the endpoint-level reference (paths, parameters, responses, error codes) is `docs/BRIDGE_API.md`, and per-feature build status is `docs/STATUS.md`.
 
-- **`PatientResourceProvider`**: read, search, history, and the custom Credara operations (`$creda-provenance`, `$creda-attest`, `$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-disambiguate`, `$creda-self-verify`, `$match`, `$export`).
-- **`ProvenanceResourceProvider`**: read, search, history, `$creda-contest`.
-- **`AuthorizationResourceProvider`**: create (as AuthorizationGrant), read, search, delete (as AuthorizationRevocation); plus the `$creda-authorize`, `$creda-revoke`, and `$creda-verify` operations.
-- **`AuditEventResourceProvider`**: read, search (read-side audit only; events from Core are projected as Provenance, not AuditEvent).
+- **`PatientResourceProvider`** (`IResourceProvider`): `read` (the CredaPatient projection, Section 8.2.2), `search` by `_creda-token` (Section 8.2.11), `$match`, `$creda-attest`, `$creda-tombstone`. `create` and `delete` are registered only to reject with `405` (Section 8.3.3).
+- **`AuthorizationResourceProvider`** (HAPI *plain* provider, not an `IResourceProvider`): the Patient-typed operations `$creda-authorize`, `$creda-revoke`, `$creda-verify`, `$creda-export`, `$creda-tpo-disclose`, `$creda-cleartext` (Section 9.2.4), `$creda-amend` (Section 3.4.5), `$creda-provenance`, and `$creda-effective-identity`. It is a plain provider because HAPI permits one resource provider per type and these operations must live under `/Patient/{id}/`; there is **no** `/Authorization` resource — grants are written through these operations and read back via `Consent?patient=`.
+- **`ProvenanceResourceProvider`**: `read`, `$creda-contest`. No search or history.
+- **`ConsentResourceProvider`**: `search` by `patient` — the authorization read-back surface (grants, with revoked ones `inactive`).
+- **`AuditEventResourceProvider`**: `search` by `patient` — the on-chain **disclosure** ledger (`ExportReceipt`, `TPODisclosure`) projected as `AuditEvent` (Section 8.2.4). Read-side access logging is the separate `BridgeAccessAuditInterceptor` → `AccessAuditSink` stream, not a FHIR resource.
+- **`OrganizationResourceProvider`**: `search` (no parameters) — institution discovery from the store's distinct grant audiences.
+- **`TaskResourceProvider`**: `create`, `search` by `patient`, `$creda-resolve-request` — the off-chain access-request inbox (Section 4.3.4). Deliberately in-memory and unpersisted.
+
+Not yet implemented: `$creda-link`, `$creda-disambiguate`, `$creda-self-verify`, `$export` / Bulk Data (Section 8.2.14), Subscription (Section 8.2.13), `_history` on any resource, and SMART scope enforcement (Section 10.4.4).
 
 Each provider delegates to Credara Core via gRPC. Providers contain no identity logic — they translate FHIR requests into gRPC calls and translate gRPC responses into FHIR resources.
 

@@ -4,13 +4,21 @@ The FHIR R4 integration surface. Java/Kotlin, built with Gradle.
 
 **Governing spec sections:** §8 (FHIR Integration), §10.4 (HAPI FHIR Bridge).
 
-Will contain: HAPI FHIR in **Plain Server** mode (never JPA — the event store is the source of
-truth, no parallel relational store); custom resource providers (Patient, Provenance,
-Authorization, AuditEvent); custom operations (`$creda-provenance`, `$creda-attest`,
-`$creda-link`, `$creda-contest`, `$creda-tombstone`, `$creda-authorize`, `$creda-revoke`,
-`$creda-verify`, `$creda-export`, `$creda-disambiguate` scaffold, `$creda-self-verify`); FHIR
-profiles on US Core; the `_creda-token` SearchParameter; CapabilityStatement; Subscription;
-Bulk Data export — all delegating to Creda Core over the in-pod gRPC socket.
+HAPI FHIR in **Plain Server** mode (never JPA — the event store is the source of truth, no
+parallel relational store) at `/fhir`, delegating every request to Creda Core over the in-pod gRPC
+socket. **The endpoint reference — every path, parameter, response, and error code the server
+actually serves — is [`docs/BRIDGE_API.md`](../docs/BRIDGE_API.md).** Per-feature build status is
+in [`docs/STATUS.md`](../docs/STATUS.md); design intent is spec §8.2.
+
+Served today: resource providers for Patient, Provenance, Consent, Organization, Task, and
+AuditEvent; the Patient operations `$match`, `$creda-attest`, `$creda-tombstone`, `$creda-amend`,
+`$creda-provenance`, `$creda-effective-identity`, `$creda-authorize`, `$creda-revoke`,
+`$creda-verify`, `$creda-export`, `$creda-tpo-disclose`, `$creda-cleartext`;
+`Provenance/$creda-contest`; `Task/$creda-resolve-request`; the `_creda-token` SearchParameter;
+and a CapabilityStatement annotated with the Credara IG and profiles.
+
+Specified but **not yet built**: `$creda-link`, `$creda-disambiguate`, `$creda-self-verify`,
+Bulk Data `$export`, Subscription, `_history`, SMART scope enforcement.
 
 **Assemble:** HAPI FHIR (do NOT write a FHIR server), the US Core IG, HAPI's `@Operation`
 framework, validator, Subscription and Bulk Data support.
@@ -19,14 +27,14 @@ framework, validator, Subscription and Bulk Data support.
 > **Critical constraint:** the Bridge is a TRANSLATOR, NOT A REASONER (§10.4.2). All identity
 > logic, confidence computation, traversal, and authorization evaluation live in Creda Core.
 
-## Status: M7 scaffold — builds green ✓ (logic stubs are follow-ups)
+## Status: builds green ✓ — core FHIR surface implemented
 
 This is the one **Java/Kotlin** component (Spring Boot + HAPI FHIR R4 + grpc-java, built with
 Gradle). It builds **separately** from the Rust workspace — `anchor creda` does not touch it; use
 `make bridge`. `gradle build` is **green** (compile, tests, and `bootJar`; the gRPC stubs generate
-from the shared proto). The FHIR↔CBOR encoders/mappers and the remaining operations are runtime
-`TODO(bridge-verify)` stubs (they throw `TODO()` until implemented), so the build compiles but
-those operations are not yet functional — see below.
+from the shared proto). The FHIR↔CBOR encoders/mappers and the operations listed above are
+implemented and exercised by the persona clients (`docs/E2E.md`) and the `bridge-smoke` testbed
+scenario; the remaining gaps are listed at the top of this file and in `docs/BRIDGE_API.md` §9.
 
 > **Dependency upgrade, 2026-08-19.** Spring Boot 3.3.2 → **4.1.0**, HAPI FHIR 7.2.0 → **8.10.1**,
 > Kotlin 1.9.24 → **2.4.10**, grpc-java 1.66.0 → **1.83.1**, Netty 4.1 → **4.2**, Gradle 8.10 →
@@ -54,10 +62,17 @@ those operations are not yet functional — see below.
   - `FhirServerConfig.kt` — HAPI `RestfulServer` in **Plain Server** mode (§8.3.3) at `/fhir/*`.
   - `grpc/CredaCoreClient.kt` — thin gRPC client to Core over the in-pod **Unix domain socket**
     (§8.3.1); events cross as canonical-CBOR bytes.
-  - `providers/` — `PatientResourceProvider` (read=project §8.1.1, search by `_creda-token`
-    §8.2.11, create/delete rejected §8.3.3, `$creda-attest` §8.2.6), `AuthorizationResourceProvider`
-    (`$creda-authorize`/`$creda-verify` §8.2.9), `ProvenanceResourceProvider` (events→Provenance
-    §8.2.3, `$creda-contest`), `AuditEventResourceProvider` (read-side audit only §8.2.4).
+  - `providers/` — `PatientResourceProvider` (read = CredaPatient projection §8.2.2, search by
+    `_creda-token` §8.2.11, `$match`, `$creda-attest` §8.2.6, `$creda-tombstone` §3.4.6,
+    create/delete rejected §8.3.3); `AuthorizationResourceProvider` (HAPI *plain* provider carrying
+    the Patient-typed ops: `$creda-authorize`/`-revoke`/`-verify`/`-export`/`-tpo-disclose` §8.2.9,
+    `$creda-cleartext` §9.2, `$creda-amend` §3.4.5, `$creda-provenance`, `$creda-effective-identity`);
+    `ProvenanceResourceProvider` (read, `$creda-contest` §8.2.7); `ConsentResourceProvider`
+    (`Consent?patient=` grant read-back); `AuditEventResourceProvider` (`AuditEvent?patient=`
+    disclosure ledger §8.2.4); `OrganizationResourceProvider` (institution discovery);
+    `TaskResourceProvider` (off-chain access-request inbox §4.3.4, in-memory);
+    `BridgeAccessAuditInterceptor` (read-side access log) and `CredaCapabilityStatementInterceptor`
+    (§8.2.12).
 
 ### Translator-not-reasoner discipline
 Every provider method does only FHIR↔gRPC mapping.
@@ -74,14 +89,14 @@ independent CBOR oracle to match serde+ciborium 0.2.2 exactly — notably `Uuid`
 string but `Vec<u8>` fingerprints as a **CBOR array of ints** (the one easy mistake). This also
 fixed a latent bug in `decodeEventNode`, which read those `Vec<u8>` fields as byte strings.
 
-**Still stubs:** the remaining encoders/mappers (`ProvenanceMapper`) and operations
-(`$creda-provenance`/`link`/`tombstone`/`disambiguate`/`self-verify`/`$match`, Subscription→gossip
-§8.2.13, Bulk Data §8.2.14, CapabilityStatement customization §8.2.12, the CredaPatient US-Core
-profile §8.2.2) follow the same thin pattern and are documented stubs in this scaffold. The FHIR
-projection here is the minimal-but-faithful CredaAuthorization shape; the FASTConsent-conformant
-projection (grantee/controller/manager, FASTReference) is F1 (§8.5.6). `$creda-verify` depends on
-Core's `EvaluateAuthorization` gRPC (the engine path exists; the gRPC wiring is a Core follow-up —
-see `crates/creda-core/src/grpc.rs`).
+**Since F0:** `ProvenanceMapper`, `$creda-provenance`, `$creda-tombstone` (a real Core-side
+scrub), `$match` (scored via `PatientMatcher`, uncalibrated §5.3.2), `$creda-effective-identity`,
+`$creda-amend`, `$creda-cleartext` (consent gate + `CleartextProvider` SPI), the CredaPatient
+projection §8.2.2, and the CapabilityStatement interceptor §8.2.12 are all implemented;
+`$creda-verify` is wired to Core's `EvaluateAuthorization`. The Consent projection is still the
+minimal-but-faithful CredaAuthorization shape; the FASTConsent-conformant projection
+(grantee/controller/manager, FASTReference) remains F1 (§8.5.6). Not built: `$creda-link`,
+`$creda-disambiguate`, `$creda-self-verify`, Subscription→gossip §8.2.13, Bulk Data §8.2.14.
 
 ### Build
 Needs a JDK 21 + **Gradle 8.14 or later** (not in the Rust dev image). The Gradle floor is hard:
