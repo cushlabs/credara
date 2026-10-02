@@ -9,9 +9,15 @@ fullnameOverride: peer
 
 replicaCount: 1
 
-# Bridge ON. The chart's existing wiring shares a `/var/run/creda` emptyDir between the
-# core and bridge containers; bridge env var CREDA_CORE_SOCKET points at the UDS that Core
-# binds (default /var/run/creda/core.sock). No TCP between them — keeps the surface tight.
+# Bridge ON — the whole point of real-mode UAT.
+#
+# NOTE ON TRANSPORT: this file overrides `config.grpcSocket` to tcp:// below, so Core and the
+# Bridge talk over TCP on loopback here, NOT over the shared `/var/run/creda` UDS the chart
+# defaults to. (An earlier version of this comment claimed the opposite; it predated the override.)
+# The reason is in the config block. The cost is that real-mode UAT does not exercise the Bridge's
+# epoll domain-socket path — `make bridge-smoke` is the scenario that does, and it holds the
+# production UDS shape precisely because it asserts over HTTP and needs no peer-driver access to
+# Core.
 bridge:
   enabled: true
 

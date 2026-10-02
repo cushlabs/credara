@@ -23,6 +23,14 @@ ENV HOME=/tmp CARGO_HOME=/tmp/cargo-cache
 RUN cargo build --release --manifest-path testbed/tools/peer-driver/Cargo.toml
 
 FROM ${RUNTIME}
+# curl, for scenarios that assert over HTTP rather than gRPC — bridge-smoke overrides the
+# ENTRYPOINT below and runs `curl` from this image against the Bridge's FHIR surface. Carrying it
+# here avoids introducing a fourth testbed image (and a fourth entry in build-and-load.sh) for a
+# handful of status-code assertions. `--allowerasing` because fedora-minimal ships `curl-minimal`,
+# which `curl` would otherwise conflict with rather than replace.
+RUN microdnf install -y --allowerasing curl \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
 COPY --from=builder /src/testbed/tools/peer-driver/target/release/peer-driver /usr/local/bin/peer-driver
 # Non-root UID at the image level so the image satisfies PodSecurity-restricted on its own.
 # The peer-driver only opens an outbound TCP connection and writes to stdout — it needs no

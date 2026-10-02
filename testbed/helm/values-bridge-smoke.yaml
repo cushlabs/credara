@@ -1,0 +1,70 @@
+# Testbed values for the bridge-smoke scenario — the ONLY gate scenario that runs the Bridge.
+#
+# Two deliberate differences from values-peer-a.yaml, and both are the point of the scenario:
+#
+# 1. `bridge.enabled: true`. Every other gate scenario (values-peer-a/b) disables the Bridge
+#    because gossip/AE/partition only exercise the protocol layer, and the Bridge costs ~3 GB of
+#    Java heap per peer. That is a sound trade for those scenarios, but it left the gate unable to
+#    detect a Bridge that does not start or does not serve. This scenario pays the heap cost once.
+#
+# 2. `grpcSocket` stays at the chart's PRODUCTION default — a Unix domain socket on the shared
+#    `uds` emptyDir (§10.5.1) — rather than the `tcp://` override every other testbed values file
+#    uses. That override exists for a good reason elsewhere (the seed/reset Jobs run as separate
+#    pods and cannot reach a UDS inside peer-0), but it means the Bridge's epoll domain-socket
+#    transport — `EpollEventLoopGroup` + `EpollDomainSocketChannel` in CredaCoreClient, i.e. the
+#    transport production actually uses — was exercised by nothing in the repo. This scenario
+#    asserts over HTTP against the Bridge, never gRPC against Core, so it has no reason to want
+#    TCP and can hold the production shape.
+#
+# Consequence of (2): there is no `grpc` Service port and no peer-driver access to Core here. Do
+# not add seeding to this scenario — it asserts on the empty-store responses precisely so it needs
+# none. If you ever need seeded data, seed THROUGH the Bridge.
+
+fullnameOverride: peer
+
+replicaCount: 1
+
+bridge:
+  enabled: true
+
+image:
+  core:
+    repository: creda-core
+    tag: testbed
+    # Never — images are loaded into the kind nodes by `make images`; there is no remote registry
+    # for the :testbed tags.
+    pullPolicy: Never
+  bridge:
+    repository: creda-bridge
+    tag: testbed
+    pullPolicy: Never
+
+config:
+  dataDir: /var/lib/creda
+  # PRODUCTION DEFAULT — do not change to tcp:// without reading note (2) above. The Core
+  # container binds this path on the shared `uds` emptyDir; the Bridge's CREDA_CORE_SOCKET is
+  # derived from the same value (statefulset.yaml), so this single key selects the transport for
+  # both ends.
+  grpcSocket: /var/run/creda/core.sock
+  libp2pListen: /ip4/0.0.0.0/tcp/4001
+  defaultPosture: treatment-presumed
+  snapshotIntervalSecs: 21600
+  subscribedBuckets: [0]
+  subscribeAllBuckets: true
+  # Single isolated peer — nothing to gossip with, and nothing here depends on the mesh.
+  bootstrapPeers: []
+
+snapshotCronJob:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Bridge heap trimmed from the chart default (3Gi req / 6Gi limit). This scenario serves four
+# requests against an empty store; the production baseline would just make the scenario harder to
+# schedule on a kind worker. Raise it if the Bridge starts OOMing as real operations land.
+resources:
+  bridge:
+    requests: { cpu: "500m", memory: 1Gi }
+    limits: { cpu: "2", memory: 2Gi }

@@ -22,7 +22,7 @@ ENGINE       ?= docker
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link rolling-upgrade storage-class ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
+.PHONY: up down clean reclaim images smoke ae-repair revocation-latency partition-rejoin rogue-link rolling-upgrade storage-class bridge-smoke ui-smoke ui-up ui-forward ui-down ui-up-real ui-down-real reset seed
 
 ## --- top-level lifecycle ---
 ## Docker is the only host prerequisite. The peer-driver, like Core and Bridge, is built inside
@@ -108,6 +108,15 @@ rolling-upgrade:
 # Uses only inject/observe — run `make up`/`make images` first.
 storage-class:
 	$(BASH) $(REPO_ROOT)/testbed/scenarios/storage-class/run.sh "$(CLUSTER_NAME)"
+
+# Bridge-smoke: the one gate scenario that runs the HAPI FHIR Bridge (§8, §10.4), and the only
+# place the production Core<->Bridge Unix-domain-socket transport (§10.5.1) is exercised — every
+# other values file overrides grpcSocket to tcp://. A single peer with bridge.enabled=true plus an
+# in-cluster Job that asserts over HTTP: /fhir/metadata 200, malformed id 400, unknown id
+# 404-not-500 (the UDS round-trip), AuditEvent?patient= empty Bundle, and a Bridge log free of
+# Spring linkage errors. Needs `make up`/`make images` first (loads creda-bridge:testbed).
+bridge-smoke:
+	$(BASH) $(REPO_ROOT)/testbed/scenarios/bridge-smoke/run.sh "$(CLUSTER_NAME)"
 
 # UI smoke: deploys the persona front-end clients (clients/) into the cluster and runs the
 # Playwright e2e specs as an in-cluster Job. Mock-mode (no bridge wiring) for now; once the

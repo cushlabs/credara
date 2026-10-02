@@ -27,8 +27,9 @@ and each `testbed/scenarios/<name>/README.md`.
 | rogue-link | a rogue peer's self-issued Grant, fused onto the responder's patient by a Link it controls, is denied through a ceiling-capped `manual` Link and admitted through a trusted `insurance-crosswalk` Link | §4.6 step 5.5, §5.3.5 | `make rogue-link` | ✅ |
 | rolling-upgrade | a `helm upgrade` rolls a peer's pod (StatefulSet RollingUpdate); the roll advances to a new revision, pre-roll data survives the rotation, the rest of the network keeps serving, and the rolled peer rejoins and catches up with no lost events | §10.6.7 | `make rolling-upgrade` | ✅ |
 | storage-class | a peer's store survives a pod restart on the storage class under test — the PVC re-attaches and RocksDB reopens with committed events intact (default `local-path`; `STORAGE_CLASS=<class>` for a real matrix class) | §10.6.8 | `make storage-class` | ✅ |
+| bridge-smoke | the HAPI FHIR Bridge starts and serves, and reaches Core over the **production UDS transport** (§10.5.1) rather than the tcp:// override every other testbed values file uses: `/metadata`, 400 on a malformed id, **404-not-500** on an unknown id (the UDS round-trip check), an empty `AuditEvent` Bundle, and a Bridge log free of Spring linkage errors | §8, §10.4, §10.5.1 | `make bridge-smoke` | NEW - not yet run |
 
-Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade && storage-class`.
+Release gate: `make -C testbed up && smoke && ae-repair && revocation-latency && partition-rejoin && rogue-link && rolling-upgrade && storage-class && bridge-smoke`.
 
 Notes:
 
@@ -36,6 +37,12 @@ Notes:
   in one process to avoid the inter-Job scheduling gap that would otherwise read ~0.
 - Reconciliation-paced scenarios (`anti-entropy-repair`, `partition-rejoin`) run slower (~75–120 s):
   they wait for the anti-entropy interval, not gossip.
+- `bridge-smoke` is the only scenario that runs the Bridge. `values-peer-a.yaml` and
+  `values-peer-b.yaml` set `bridge.enabled: false` (gossip/AE/partition exercise the protocol
+  layer only, and the Bridge costs ~3 GB of Java heap per peer) and `ui-smoke` runs the clients
+  in mock mode — so without it a fully green gate carries zero signal about the FHIR surface.
+  It is also the only place the Bridge's **epoll domain-socket** path runs: real-mode UAT
+  overrides `grpcSocket` to `tcp://` so the seed/reset Jobs can reach Core from another pod.
 - The in-cluster primitive is the peer-driver (`testbed/tools/peer-driver`): `inject`,
   `inject-grant`, `inject-revoke`, `time-revocation`, `observe`, `check-absent`, `derive-pubkey`,
   `seed-demo`.
