@@ -37,6 +37,11 @@ use crate::error::{Error, Result};
 use crate::signer::InMemorySigner;
 
 /// Generated protobuf types and service traits.
+///
+/// `double_must_use` is allowed because tonic's generated server trait is `#[async_trait]`, which
+/// stamps `#[must_use]` onto methods that already return a `Pin<Box<dyn Future>>` — clippy (since
+/// Rust 1.99) flags that as redundant. The code is generated into `OUT_DIR` and not ours to edit.
+#[allow(clippy::double_must_use)]
 pub mod pb {
     tonic::include_proto!("creda");
 }
